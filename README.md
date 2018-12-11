@@ -16,6 +16,14 @@ Lemonldap::NG manages both authentication and authorization. Furthermore
 it provides headers for accounting. So you can have a full AAA protection
 for your web space as described below.
 
+## EXPORTS
+
+Volumes:
+ * `/etc/lemonldap-ng`: lemonldap-ng.ini and virtual hosts
+ * `/var/lib/lemonldap-ng`: sessions and configuration files
+Port:
+ * 80
+
 ## BUG REPORT
 
 Use [OW2 GitLab](https://gitlab.ow2.org/lemonldap-ng/lemonldap-ng/issues)

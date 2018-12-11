@@ -1,6 +1,6 @@
 FROM debian:buster
 MAINTAINER Xavier (Yadd) Guimard
-LABEL name="lemonldap-ng-nginx" \
+LABEL name="yadd/llng-nginx" \
       version="v2.0.0~a1"
 
 ENV SSODOMAIN=example.com \
@@ -10,6 +10,10 @@ ENV SSODOMAIN=example.com \
     DEBIAN_FRONTEND=noninteractive
 
 EXPOSE 80 443
+
+VOLUME /etc/lemonldap-ng
+VOLUME /var/lib/lemonldap-ng
+
 RUN apt-get -y update \
     && apt-get -y dist-upgrade
 
@@ -24,7 +28,11 @@ RUN echo "# Install Dumb-init" \
     && apt-get install -f -y \
     && apt-get -y update \
     && echo "# Install LemonLDAP::NG package" \
-    && apt-get -y install nginx lemonldap-ng cron anacron \
+    && apt-get -y install nginx lemonldap-ng cron anacron libsoap-lite-perl libcache-memcached-perl libdigest-hmac-perl \
+       libconvert-base32-perl libnet-ldap-perl libsoap-lite-perl libxml-libxml-perl libxml-simple-perl libclone-perl \
+       libcrypt-u2f-server-perl libdbi-perl libgssapi-perl libimage-magick-perl liblasso-perl libnet-facebook-oauth2-perl \
+       libnet-openid-consumer-perl libnet-openid-server-perl libnet-oauth-perl libsoap-lite-perl libweb-id-perl \
+    && find /var/cache/apt/archives/ /var/lib/dpkg/ /var/lib/apt/lists/ -type f -delete \
     && echo "LLNG installed"
 
 RUN echo "#!/bin/sh" > /usr/bin/start.sh && \
