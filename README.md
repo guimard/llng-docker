@@ -26,7 +26,7 @@ ask features on this docker image.
 
 ## COPYRIGHT AND LICENSE
 
-See COPYING file for details.
+Copyright Copyright 2018, Xavier (yadd) Guimard <yadd@debian.org>
 
 This library is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
