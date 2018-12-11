@@ -32,6 +32,7 @@ RUN echo "# Install Dumb-init" \
        libconvert-base32-perl libnet-ldap-perl libsoap-lite-perl libxml-libxml-perl libxml-simple-perl libclone-perl \
        libcrypt-u2f-server-perl libdbi-perl libgssapi-perl libimage-magick-perl liblasso-perl libnet-facebook-oauth2-perl \
        libnet-openid-consumer-perl libnet-openid-server-perl libnet-oauth-perl libsoap-lite-perl libweb-id-perl \
+       libdbd-pg-perl \
     && find /var/cache/apt/archives/ /var/lib/dpkg/ /var/lib/apt/lists/ -type f -delete \
     && echo "LLNG installed"
 
