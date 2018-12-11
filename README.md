@@ -2,8 +2,16 @@
 
 ## SYNOPSIS
 
+    export SSODOMAIN=sso.example.com
     export PORT=8080
-    docker run -p 8080:80 --env=PORT yadd/llng-nginx
+    docker run -p 8080:80 --env=PORT --env=SSODOMAIN yadd/llng-nginx
+
+Don't forget to fix your DNS entries _(maybe in `/etc/resolv.conf`)_.
+Used hosts:
+ * auth.$SSODOMAIN
+ * manager.$SSODOMAIN
+ * test1.$SSODOMAIN
+ * test2.$SSODOMAIN
 
 ## DESCRIPTION
 
