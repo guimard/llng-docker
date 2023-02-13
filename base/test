@@ -1,0 +1,5 @@
+#!/bin/sh
+
+set -e
+
+docker-compose run base cat /etc/lemonldap-ng/lemonldap-ng.ini | grep 'dbiChain=DBI:Pg:database=lemonldapng;host=db'
