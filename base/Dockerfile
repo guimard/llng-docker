@@ -6,7 +6,7 @@ LABEL maintainer="Yadd yadd@debian.org>" \
 ARG S6_OVERLAY_VERSION=3.1.3.0
 
 ENV SSODOMAIN=example.com \
-    PORTAL=http://auth.example.com \
+    PORTAL=http://auth.example.com/ \
     LOGLEVEL=info \
     REDIS_SERVER="" \
     REDIS_INDEXES="" \

@@ -11,10 +11,13 @@ if test "$REDIS_SERVER" != ""; then
     echo "lemonldap-ng.ini updated to use redis"
 fi
 
+# Fix logLevel
+perl -i -pe 's/^logLevel\s*=.*$/logLevel=$ENV{LOGLEVEL}/' /etc/lemonldap-ng/lemonldap-ng.ini
+
 # OPTIONAL DATABASE FOR CONFIGURATION
 #
 # 1 - Check for PostgreSQL server
-if test "PG_SERVER" != ""; then
+if [ "$PG_SERVER" != "" ]; then
    PG_DATABASE=${PG_DATABASE:-lemonldap-ng}
    DEFAULT_DBI_CHAIN="DBI:Pg:database=$PG_DATABASE;host=$PG_SERVER"
    DBI_CHAIN=${DBI_CHAIN:-$DEFAULT_DBI_CHAIN}
@@ -43,3 +46,6 @@ if test "$DBI_CHAIN" != ""; then
      /usr/share/lemonldap-ng/bin/convertConfig --new=/etc/lemonldap-ng/lemonldap-ng.ini --current=/etc/lemonldap-ng/lemonldap-ng-file.ini
    fi
 fi
+
+/usr/share/docker-llng/updateConf "setDomain" $SSODOMAIN
+/usr/share/docker-llng/updateConf "set" portal $PORTAL
