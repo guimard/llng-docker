@@ -1,16 +1,5 @@
 #!/command/with-contenv sh
 
-# If Redis server is given, let's use it for sessions
-if test "$REDIS_SERVER" != ""; then
-    mv -f /etc/lemonldap-ng/lemonldap-ng.redis /etc/lemonldap-ng/lemonldap-ng.ini
-    REDIS_INDEXES=${REDIS_INDEXES:-uid mail}
-    export REDIS_INDEXES
-    perl -i -pe 's/__REDIS_SERVER__/$ENV{REDIS_SERVER}/g;
-	s/__REDIS_INDEXES__/$ENV{REDIS_INDEXES}/g;
-    ' /etc/lemonldap-ng/lemonldap-ng.ini
-    echo "lemonldap-ng.ini updated to use redis"
-fi
-
 # Fix logLevel
 perl -i -pe 's/^logLevel\s*=.*$/logLevel=$ENV{LOGLEVEL}/' /etc/lemonldap-ng/lemonldap-ng.ini
 
@@ -49,3 +38,10 @@ fi
 
 /usr/share/docker-llng/updateConf "setDomain" $SSODOMAIN
 /usr/share/docker-llng/updateConf "set" portal $PORTAL
+
+# If Redis server is given, let's use it for sessions
+if test "$REDIS_SERVER" != ""; then
+    REDIS_INDEXES=${REDIS_INDEXES:-uid mail}
+    /usr/share/docker-llng/updateConf set globalStorage 'Apache::Session::Browseable::Redis'
+    /usr/share/docker-llng/updateConf set globalStorageOptions "{server=>'$REDIS_SERVER',Index=>'$REDIS_INDEXES'}"
+fi

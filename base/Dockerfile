@@ -58,6 +58,8 @@ VOLUME ["/etc/lemonldap-ng","/var/lib/lemonldap-ng/conf", "/var/lib/lemonldap-ng
 COPY install /
 
 # DEBUG
+#CMD ["cat","/var/lib/lemonldap-ng/conf/lmConf-1.json"]
+
 CMD ["echo", "This is a base image, not usable directly"]
 
 ENTRYPOINT ["/init"]

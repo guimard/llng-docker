@@ -1,40 +1,42 @@
 #!/usr/bin/perl -w
 
+use strict;
 use Lemonldap::NG::Common::Conf;
 
-eval {
-    my $confAcc = Lemonldap::NG::Common::Conf->new( {} );
-    my $cfgNum  = $confAcc->lastCfg();
-    my $conf    = $confAcc->getConf( { cfgNum => $cfgNum, noCache => 1 } );
-    if ( $ARGV[0] eq 'get' ) {
-        print $conf->{ $ARGV[1] } . "\n";
-    }
-    elsif ( $ARGV[0] eq 'set' ) {
-        if ( $conf->{ $ARGV[1] } ne $ARGV[2] ) {
-            print STDERR "Key $ARGV[1] updated from "
-              . $conf->{ $ARGV[1] }
-              . " to $ARGV[2]\n";
-            $conf->{ $ARGV[1] } = $ARGV[2];
-            my $res = $confAcc->saveConf( $conf, force => 1, cfgNumFixed => 1 );
+my $confAcc = Lemonldap::NG::Common::Conf->new( {} );
+my $cfgNum  = $confAcc->lastCfg();
+my $conf    = $confAcc->getConf( { cfgNum => $cfgNum, noCache => 1 } );
+if ( $ARGV[0] eq 'get' ) {
+    print $conf->{ $ARGV[1] } . "\n";
+}
+elsif ( $ARGV[0] eq 'set' ) {
+    if ( $conf->{ $ARGV[1] } ne $ARGV[2] ) {
+        print STDERR "Key $ARGV[1] updated from "
+          . $conf->{ $ARGV[1] }
+          . " to $ARGV[2]\n";
+        if ( $ARGV[2] =~ /^[\{\[].*[\]\}]$/ ) {
+            $ARGV[2] = eval $ARGV[2];
         }
+        $conf->{ $ARGV[1] } = $ARGV[2];
+        my $res = $confAcc->saveConf( $conf, force => 1, cfgNumFixed => 1 );
     }
-    elsif ( $ARGV[0] eq 'setDomain' ) {
-        my $currentDomain = $conf->{domain};
-        print STDERR "Current domain: $currentDomain\n";
-        my $newDomain = $ARGV[1];
-        if ( $newDomain ne $currentDomain ) {
-            print STDERR "New domain: $newDomain\n";
-            foreach ( keys %$conf ) {
-                next if ref $conf->{$_};
-                if ( $conf->{$_} =~ s/\.\Q$currentDomain\E/\.$newDomain/g ) {
-                    print STDERR "Key $_ updated\n";
-                }
+}
+elsif ( $ARGV[0] eq 'setDomain' ) {
+    my $currentDomain = $conf->{domain};
+    print STDERR "Current domain: $currentDomain\n";
+    my $newDomain = $ARGV[1];
+    if ( $newDomain ne $currentDomain ) {
+        print STDERR "New domain: $newDomain\n";
+        foreach ( keys %$conf ) {
+            next if ref $conf->{$_};
+            if ( $conf->{$_} =~ s/\.\Q$currentDomain\E/\.$newDomain/g ) {
+                print STDERR "Key $_ updated\n";
             }
-            $conf->{domain} = $newDomain;
-            my $res = $confAcc->saveConf( $conf, force => 1, cfgNumFixed => 1 );
         }
+        $conf->{domain} = $newDomain;
+        my $res = $confAcc->saveConf( $conf, force => 1, cfgNumFixed => 1 );
     }
-    else {
-        die "Unknown command: '$ARGV[1]'";
-    }
-};
+}
+else {
+    die "Unknown command: '$ARGV[1]'";
+}

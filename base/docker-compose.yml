@@ -17,6 +17,7 @@ services:
       target: development
     environment:
       - PG_SERVER=db
+      - REDIS_SERVER=qwerty
     depends_on:
       db:
         condition: service_healthy
