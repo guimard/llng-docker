@@ -1,7 +1,8 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
 
 use strict;
 use Lemonldap::NG::Common::Conf;
+use JSON;
 
 my $confAcc = Lemonldap::NG::Common::Conf->new( {} );
 my $cfgNum  = $confAcc->lastCfg();
@@ -27,12 +28,10 @@ elsif ( $ARGV[0] eq 'setDomain' ) {
     my $newDomain = $ARGV[1];
     if ( $newDomain ne $currentDomain ) {
         print STDERR "New domain: $newDomain\n";
-        foreach ( keys %$conf ) {
-            next if ref $conf->{$_};
-            if ( $conf->{$_} =~ s/\.\Q$currentDomain\E/\.$newDomain/g ) {
-                print STDERR "Key $_ updated\n";
-            }
-        }
+        delete $conf->{cipher};
+        my $content = JSON::to_json($conf);
+        $content =~ s/\.\Q$currentDomain\E/\.$newDomain/g;
+        $conf = JSON::from_json($content);
         $conf->{domain} = $newDomain;
         my $res = $confAcc->saveConf( $conf, force => 1, cfgNumFixed => 1 );
     }
