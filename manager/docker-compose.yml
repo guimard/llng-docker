@@ -1,0 +1,43 @@
+version: "3.4"
+
+services:
+  db:
+    image: yadd/lemonldap-ng-pg-database
+    environment:
+      - POSTGRES_PASSWORD=zz
+    healthcheck:
+      test: "exit 0"
+  redis:
+    image: redis
+  portal:
+    image: yadd/lemonldap-ng-portal
+    environment:
+      - PG_SERVER=db
+      - REDIS_SERVER=redis:6379
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+  manager:
+    image: yadd/lemonldap-ng-manager
+    environment:
+      - PG_SERVER=db
+      - REDIS_SERVER=redis:6379
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  haproxy:
+    image: haproxy:2.6-bullseye
+    ports:
+      - 80:80
+    volumes:
+      - ./haproxy:/usr/local/etc/haproxy:ro
+    sysctls:
+      - net.ipv4.ip_unprivileged_port_start=0
+    depends_on:
+      - portal
+      - manager

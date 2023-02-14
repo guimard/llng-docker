@@ -1,0 +1,8 @@
+#!/command/with-contenv sh
+
+perl -i -pe 's#__FASTCGISOCKDIR__#/run/llng-fastcgi-server#g;
+s#__PORT__#80#g;
+s#__DNSDOMAIN__#$ENV{SSODOMAIN}#g;
+s#__MANAGERSITEDIR__#/usr/share/lemonldap-ng/manager/htdocs/#g;
+s#__MANAGERSTATICDIR__#/usr/share/lemonldap-ng/manager/htdocs/static/#g;
+' /etc/lemonldap-ng/manager-nginx.conf

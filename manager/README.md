@@ -2,9 +2,9 @@
 
 Lemonldap::NG portal based on [yadd/lemonldap-ng-base](https://github.com/guimard/llng-docker/blob/master/base/README.md#readme)
 
-This image is then scalable _(see docker-compose example)_:
-* use a configured PostgreSQL database _(you can use [yadd/lemonldap-ng-pg-database](https://github.com/guimard/llng-docker/blob/master/pg/README.md#readme))_
-* share your sessions with a Redis server
+Note that you should share sessions and configuration to use. See
+docker-compose example to see how to do this using redis and
+[PostgreSQL](https://github.com/guimard/llng-docker/blob/master/pg/README.md#readme).
 
 ## Features _(inherited from [yadd/lemonldap-ng-base](https://github.com/guimard/llng-docker/blob/master/base/README.md#readme))_
 
