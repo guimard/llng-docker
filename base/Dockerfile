@@ -22,6 +22,7 @@ ENV SSODOMAIN=example.com \
 
 RUN echo "# Install backports source" && \
     apt-get -y update && \
+    apt-get -y dist-upgrade && \
     echo 'deb http://deb.debian.org/debian bullseye-backports main' > /etc/apt/sources.list.d/backports.list && \
     apt-get -y update && \
     apt-get -y install procps xz-utils

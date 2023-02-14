@@ -1,9 +1,12 @@
-# yadd/lemonldap-ng-base
+# yadd/lemonldap-ng-portal
 
-Base image for `yadd/lemonldap-ng-*` dockers. Does nothing except configuring
-LemonLDAP::NG.
+Lemonldap::NG portal based on [yadd/lemonldap-ng-base](https://github.com/guimard/llng-docker/blob/master/base/README.md#readme)
 
-## Features
+This image is then scalable _(see docker-compose example)_:
+* use a configured PostgreSQL database _(you can use [yadd/lemonldap-ng-pg-database](https://github.com/guimard/llng-docker/blob/master/pg/README.md#readme))_
+* share your sessions with a Redis server
+
+## Features _(inherited from [yadd/lemonldap-ng-base](https://github.com/guimard/llng-docker/blob/master/base/README.md#readme))_
 
 * Update current configuration using given variables :
   * set domain (`SSODOMAIN`)
@@ -16,19 +19,7 @@ LemonLDAP::NG.
 
 ## Variables and default values
 
-* `SSODOMAIN` = example.com
-* `PORTAL` = http://auth.example.com/
-* `LOGLEVEL` = info
-* `REDIS_SERVER` =
-* `REDIS_INDEXES` = uid mail
-* `PG_SERVER` =
-* `PG_DATABASE` = lemonldapng
-* `PG_USER` = lemonldap
-* `PG_PASSWORD` = lemonldap
-* `PG_TABLE` = lmConfig
-* `DBI_CHAIN` = **if** `$PG_SERVER` **then** `DBI:Pg:database=$PG_DATABASE;host=$PG_SERVER` **else** `""`
-* `DBI_USER` = `$PG_USER`
-* `DBI_PASSWORD` = `$PG_PASSWORD`
+See [yadd/lemonldap-ng-base](https://github.com/guimard/llng-docker/blob/master/base/README.md#readme)
 
 ## Docker-compose example
 
@@ -44,10 +35,10 @@ services:
       test: "exit 0"
   redis:
     image: redis
-  base:
-    image: yadd/lemonldap-ng-base
+  portal:
+    image: yadd/lemonldap-ng-portal
     environment:
-      - PG_SERVER=pgdb
+      - PG_SERVER=db
       - REDIS_SERVER=redis:6379
     depends_on:
       db:
@@ -55,7 +46,3 @@ services:
       redis:
         condition: service_started
 ```
-
-## Copyright and license
-
-Copyright Xavier Guimard <yadd@debian.org>, see LICENSE file.
