@@ -34,6 +34,8 @@ if test "$DBI_CHAIN" != ""; then
    if test "$CONF" = "0"; then
      /usr/share/lemonldap-ng/bin/convertConfig --new=/etc/lemonldap-ng/lemonldap-ng.ini --current=/etc/lemonldap-ng/lemonldap-ng-file.ini
    fi
+   /usr/share/docker-llng/updateConf set persistentStorage "Apache::Session::Browseable::Postgres"
+   /usr/share/docker-llng/updateConf set persistentStorageOptions "{DataSource=>'$DBI_CHAIN',UserName=>'$DBI_USER',Password=>'$DBI_PASSWORD',Commit=>1}"
 fi
 
 /usr/share/docker-llng/updateConf "setDomain" $SSODOMAIN

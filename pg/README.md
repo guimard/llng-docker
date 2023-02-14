@@ -10,7 +10,7 @@ sessions.
 * PG\_USER: lemonldap
 * PG\_PASSWORD: lemonldap
 * TABLE: lmConfig
-* PTABLE: psessions
+* PTABLE: sessions
 
 and all variables from postgres:bullseye. Note that you should set
 `POSTGRES_PASSWORD` variable _(root password)_
