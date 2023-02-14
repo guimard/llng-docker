@@ -1,6 +1,7 @@
 # yadd/lemonldap-ng-base
 
-Base image for `yadd/lemonldap-ng-*` dockers. Does nothing except configuring LemonLDAP::NG.
+Base image for `yadd/lemonldap-ng-*` dockers. Does nothing except configuring
+LemonLDAP::NG.
 
 ## Features
 
@@ -28,3 +29,7 @@ Base image for `yadd/lemonldap-ng-*` dockers. Does nothing except configuring Le
 * `DBI_CHAIN` = **if** `$PG_SERVER` **then** `DBI:Pg:database=$PG_DATABASE;host=$PG_SERVER` **else** `""`
 * `DBI_USER` = `$PG_USER`
 * `DBI_PASSWORD` = `$PG_PASSWORD`
+
+## Copyright and license
+
+Copyright Xavier Guimard <yadd@debian.org>, see LICENSE file.

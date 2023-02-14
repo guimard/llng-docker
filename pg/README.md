@@ -12,3 +12,7 @@ This is a PostgreSQL database, configured to store
 
 and all variables from postgres:bullseye. Note that you should set
 `POSTGRES_PASSWORD` variable _(root password)_
+
+## Copyright and license
+
+Copyright Xavier Guimard <yadd@debian.org>, see LICENSE file.

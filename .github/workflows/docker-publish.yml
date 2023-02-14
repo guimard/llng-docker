@@ -20,12 +20,12 @@ jobs:
         uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
         with:
           images: yadd/lemonldap-ng-pg-database
-      - name: Build and push Docker image for app1
+      - name: Build and push Docker image for pg
         uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
         with:
           context: ./pg
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: yadd/lemonldap-ng-pg-database:latest
           label: ${{ steps.meta.outputs.labels }}
 
   build-and-push-base:
@@ -38,9 +38,25 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Build and push Docker image for app2
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+        with:
+          images: yadd/lemonldap-ng-pg-database
+      - name: Build and push Docker image for base
         uses: docker/build-push-action@v2
         with:
           context: ./base
           push: true
           tags: yadd/lemonldap-ng-base:latest
+          label: ${{ steps.meta.outputs.labels }}
+      - name: push README to Dockerhub
+        uses: christian-korneck/update-container-description-action@v1
+        env:
+          DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASS: ${{ secrets.DOCKER_PASSWORD }}
+        with:
+          destination_container_repo: yadd/lemonldap-ng-base
+          provider: dockerhub
+          short_description: 'Base image for lemonldap-ng dockers'
+          readme_file: 'base/README.md'
