@@ -46,4 +46,7 @@ if test "$REDIS_SERVER" != ""; then
     REDIS_INDEXES=${REDIS_INDEXES:-uid mail}
     /usr/share/docker-llng/updateConf set globalStorage 'Apache::Session::Browseable::Redis'
     /usr/share/docker-llng/updateConf set globalStorageOptions "{server=>'$REDIS_SERVER',Index=>'$REDIS_INDEXES'}"
+    /usr/share/docker-llng/updateConf set forceGlobalStorageIssuerOTT 1
+    /usr/share/docker-llng/updateConf set tokenUseGlobalStorage 1
+    /usr/share/docker-llng/updateConf set forceGlobalStorageUpgradeOTT 1
 fi
