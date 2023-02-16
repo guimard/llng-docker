@@ -1,0 +1,23 @@
+version: "3.4"
+
+services:
+  db:
+    image: yadd/lemonldap-ng-pg-database
+    environment:
+      - POSTGRES_PASSWORD=zz
+    healthcheck:
+      test: "exit 0"
+  redis:
+    image: redis
+  portal:
+    image: yadd/lemonldap-ng-full
+    ports:
+      - 80:80
+    environment:
+      - PG_SERVER=db
+      - REDIS_SERVER=redis:6379
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
