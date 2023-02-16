@@ -17,6 +17,12 @@ RUN echo "# Install nginx, portal and manager libs" && \
         libio-socket-timeout-perl libunicode-string-perl \
         libio-string-perl
 
+RUN echo "Install doc" && \
+    mv /etc/dpkg/dpkg.cfg.d /tmp/ && \
+    apt -y install \
+    	lemonldap-ng-doc/bullseye-backports && \
+    mv /tmp/dpkg.cfg.d /etc/dpkg/
+
 RUN echo "# Install nginx configuration files" && \
     cd /etc/nginx/sites-enabled/ && \
     ln -s ../../lemonldap-ng/manager-nginx.conf
