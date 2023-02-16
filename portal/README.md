@@ -68,3 +68,15 @@ services:
       - portal
       - manager
 ```
+
+## Repository and bug reports
+
+* Repository: [github.com/guimard/llng-docker](https://github.com/guimard/llng-docker/tree/master/portal)
+* [Dockerfile](https://github.com/guimard/llng-docker/blob/master/portal/Dockerfile)
+* [Issues database](https://github.com/guimard/llng-docker/issues)
+
+## Copyright and license
+
+Copyright: Xavier Guimard <yadd@debian.org>.
+
+License: [GNU General Public License v2.0](../LICENSE)

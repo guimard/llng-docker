@@ -56,6 +56,14 @@ services:
         condition: service_started
 ```
 
+## Repository and bug reports
+
+* Repository: [github.com/guimard/llng-docker](https://github.com/guimard/llng-docker/tree/master/base)
+* [Dockerfile](https://github.com/guimard/llng-docker/blob/master/base/Dockerfile)
+* [Issues database](https://github.com/guimard/llng-docker/issues)
+
 ## Copyright and license
 
-Copyright Xavier Guimard <yadd@debian.org>, see LICENSE file.
+Copyright: Xavier Guimard <yadd@debian.org>.
+
+License: [GNU General Public License v2.0](../LICENSE)

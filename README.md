@@ -66,3 +66,9 @@ services:
       - portal
       - manager
 ```
+
+## Copyright and license
+
+Copyright: Xavier Guimard <yadd@debian.org>.
+
+License: [GNU General Public License v2.0](./LICENSE)
