@@ -1,6 +1,6 @@
 FROM yadd/lemonldap-ng-base
 LABEL maintainer="Yadd yadd@debian.org>" \
-	name="lemonldap-ng-manager" \
+	name="yadd/lemonldap-ng-manager" \
 	version="v1.0"
 
 

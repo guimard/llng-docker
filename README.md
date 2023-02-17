@@ -20,6 +20,9 @@ PostgreSQL database, based on [postgres:bullseye](https://hub.docker.com/_/postg
 [Debian backports packages](https://backports.debian.org/), so using the
 last published version.
 
+You can also use [dev](./dev) to build an image using the upstream repository.
+Set `BRANCH` to choose the upstream branch to clone.
+
 ## Docker-compose example:
 
 ```yaml

@@ -1,6 +1,6 @@
 FROM debian:bullseye-slim
 LABEL maintainer="Yadd yadd@debian.org>" \
-	name="lemonldap-ng-base" \
+	name="yadd/lemonldap-ng-base" \
 	version="v1.0"
 
 ARG S6_OVERLAY_VERSION=3.1.3.0

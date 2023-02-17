@@ -1,6 +1,6 @@
 FROM yadd/lemonldap-ng-base
 LABEL maintainer="Yadd yadd@debian.org>" \
-	name="lemonldap-ng-portal" \
+	name="yadd/lemonldap-ng-portal" \
 	version="v1.0"
 
 RUN echo "# Install nginx, portal and manager libs" && \
