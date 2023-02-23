@@ -72,6 +72,7 @@ jobs:
           readme_file: 'base/README.md'
 
   build-and-push-portal:
+    needs: build-and-push-base
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -105,6 +106,7 @@ jobs:
           readme_file: 'portal/README.md'
 
   build-and-push-manager:
+    needs: build-and-push-base
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -138,6 +140,7 @@ jobs:
           readme_file: 'manager/README.md'
 
   build-and-push-full:
+    needs: build-and-push-portal
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
