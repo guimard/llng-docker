@@ -196,10 +196,10 @@ jobs:
         uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
         with:
           images: yadd/lemonldap-ng-dev
-      - name: Build and push Docker image for full
+      - name: Build and push Docker image for dev
         uses: docker/build-push-action@v2
         with:
           context: ./dev
           push: true
-          tags: yadd/lemonldap-ng-full:2.0.16-${{ steps.date.outputs.date }}
+          tags: yadd/lemonldap-ng-dev:2.0.16-${{ steps.date.outputs.date }}
           label: ${{ steps.meta.outputs.labels }}
