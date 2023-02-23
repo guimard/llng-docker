@@ -183,7 +183,7 @@ jobs:
       - name: Test with environment variables
         run: echo $TAG_NAME
         env:
-        - TAG_NAME: 2.0.16-${{ steps.date.outputs.date }}
+          TAG_NAME: 2.0.16-${{ steps.date.outputs.date }}
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Login to Docker Hub
