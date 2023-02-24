@@ -32,6 +32,8 @@ COPY --from=0 /mnt/*.deb /tmp/
 
 RUN dpkg --force-overwrite --force-confold -i /tmp/*.deb
 
+RUN rm -rf /mnt/*.deb
+
 RUN mkdir -p /var/lib/lemonldap-ng/cache && chown www-data:www-data /var/lib/lemonldap-ng/cache
 
 CMD ["/usr/sbin/nginx"]
