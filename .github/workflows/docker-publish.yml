@@ -203,3 +203,37 @@ jobs:
           push: true
           tags: yadd/lemonldap-ng-dev:2.0.16-${{ steps.date.outputs.date }}
           label: ${{ steps.meta.outputs.labels }}
+
+  build-and-push-ssoaas-fastcgi-server:
+    needs: build-and-push-base
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Login to Docker Hub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+        with:
+          images: yadd/lemonldap-ng-ssoaas-fastcgi-server
+      - name: Build and push Docker image for SSOaaS FastCGI Server
+        uses: docker/build-push-action@v2
+        with:
+          context: ./ssoaas-fastcgi-server
+          push: true
+          tags: yadd/lemonldap-ng-ssoaas-fastcgi-server:latest
+          label: ${{ steps.meta.outputs.labels }}
+      - name: push README to Dockerhub
+        uses: christian-korneck/update-container-description-action@v1
+        env:
+          DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASS: ${{ secrets.DOCKER_PASSWORD }}
+        with:
+          destination_container_repo: yadd/lemonldap-ng-ssoaas-fastcgi-server
+          provider: dockerhub
+          short_description: 'LemonLDAP::NG SSOaaS FastCGI Server'
+          readme_file: 'ssoaas-fastcgi-server/README.md'
