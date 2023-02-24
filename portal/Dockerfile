@@ -28,4 +28,6 @@ RUN (echo ""; echo "daemon off;") >> /etc/nginx/nginx.conf
 
 COPY install /
 
+EXPOSE 80
+
 CMD ["/usr/sbin/nginx"]

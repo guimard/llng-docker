@@ -50,3 +50,6 @@ if test "$REDIS_SERVER" != ""; then
     /usr/share/docker-llng/updateConf set tokenUseGlobalStorage 1
     /usr/share/docker-llng/updateConf set forceGlobalStorageUpgradeOTT 1
 fi
+
+# Drop any cache
+rm -rf /var/lib/lemonldap-ng/cache/*/*
