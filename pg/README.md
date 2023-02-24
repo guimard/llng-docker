@@ -15,6 +15,15 @@ sessions.
 and all variables from postgres:bullseye. Note that you should set
 `POSTGRES_PASSWORD` variable _(root password)_
 
+## Initialize configuration
+
+If `/llng-conf/conf.json` exists, the database will be initialized with this
+configuration. You can use docker "volumes" for this:
+
+```shell
+$ docker run -v /path/to/conf.json:/llng-conf/conf.json yadd/lemonldap-ng-pg-database
+```
+
 ## Repository and bug reports
 
 * Repository: [github.com/guimard/llng-docker](https://github.com/guimard/llng-docker/tree/master/pg)

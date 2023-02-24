@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 set -e
 
 DATABASE=${PG_DATABASE:-lemonldapng}
@@ -23,3 +23,21 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$DATABASE" <<-EOSQ
 	);
 	GRANT ALL PRIVILEGES ON TABLE $PTABLE TO $USER;
 EOSQL
+
+if test -e /llng-conf/conf.json; then
+	SERIALIZED=`perl -MJSON -e '$/=undef;
+		open F, "/llng-conf/conf.json" or die $!;
+		$a=JSON::from_json(<F>);
+		$a->{cfgNum}=1;
+		$a=JSON::to_json($a);
+		$a=~s/'\''/'\'\''/g;
+		$a =~ s/\\\\/\\\\\\\\/g;
+		print $a;'`
+	echo "set val '$SERIALIZED'" >&2
+	psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$DATABASE" <<-EOSQL
+	\\set val '$SERIALIZED'
+	INSERT INTO $TABLE (cfgNum, data) VALUES (1, :'val');
+	SELECT * FROM $TABLE;
+	\\unset val
+EOSQL
+fi

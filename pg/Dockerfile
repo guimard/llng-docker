@@ -10,4 +10,8 @@ ENV PG_DATABASE=lemonldapng \
     TABLE=lmConfig \
     PTABLE=sessions
 
+RUN mkdir -p /llng-conf
+
+VOLUME ["/llng-conf/"]
+
 COPY install /
