@@ -1,13 +1,13 @@
 FROM yadd/lemonldap-ng-base
 LABEL maintainer="Yadd yadd@debian.org>" \
-	name="yadd/lemonldap-ng-ssoaas-fastcgi-server" \
-	version="v1.0"
+      name="yadd/lemonldap-ng-ssoaas-fastcgi-server" \
+      version="v1.0"
 
 RUN echo "# Install libs" && \
     apt -y update && \
     apt -y dist-upgrade && \
     apt install -y --no-install-recommends \
-        lemonldap-ng-fastcgi-server/bullseye-backports \
+        lemonldap-ng-fastcgi-server/${DEBIAN_VERSION}-backports \
         libfcgi-engine-perl && \
     apt autoremove && apt clean && rm -rf /var/lib/apt/lists/*
 

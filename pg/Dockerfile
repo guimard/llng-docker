@@ -1,8 +1,8 @@
 FROM postgres:13-bullseye
 
 LABEL maintainer="Yadd yadd@debian.org>" \
-        name="yadd/lemonldap-ng-pg-database" \
-        version="v1.0"
+      name="yadd/lemonldap-ng-pg-database" \
+      version="v1.0"
 
 ENV PG_DATABASE=lemonldapng \
     PG_USER=lemonldap \

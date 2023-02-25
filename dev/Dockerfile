@@ -1,5 +1,6 @@
 # Build packages
-FROM debian:bullseye-slim
+ARG DEBIAN_VERSION=bullseye
+FROM debian:${DEBIAN_VERSION}-slim
 
 ARG BRANCH=v2.0
 
@@ -26,8 +27,8 @@ RUN cd lemon*/ && export DEB_BUILD_OPTIONS=nocheck && dpkg-buildpackage -d -us -
 # Overwrite packages in image
 FROM yadd/lemonldap-ng-full
 LABEL maintainer="Yadd yadd@debian.org>" \
-	name="yadd/lemonldap-ng-dev" \
-	version="v0.1"
+      name="yadd/lemonldap-ng-dev" \
+      version="v0.1"
 
 COPY --from=0 /mnt/*.deb /tmp/
 

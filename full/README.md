@@ -62,6 +62,6 @@ services:
 
 ## Copyright and license
 
-Copyright: Xavier Guimard <yadd@debian.org>.
+Copyright: Xavier (Yadd) Guimard <yadd@debian.org>.
 
-License: [GNU General Public License v2.0](../LICENSE)
+License: [GNU General Public License v2.0](https://github.com/guimard/llng-docker/blob/master/LICENSE)

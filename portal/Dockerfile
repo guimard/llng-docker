@@ -1,17 +1,17 @@
 FROM yadd/lemonldap-ng-base
 LABEL maintainer="Yadd yadd@debian.org>" \
-	name="yadd/lemonldap-ng-portal" \
-	version="v1.0"
+      name="yadd/lemonldap-ng-portal" \
+      version="v1.0"
 
 RUN echo "# Install nginx and portal libs" && \
     apt -y update && \
     apt -y dist-upgrade && \
     apt -y --no-install-recommends install nginx \
-	lemonldap-ng-fastcgi-server/bullseye-backports \
-    	liblemonldap-ng-portal-perl/bullseye-backports \
-	gsfonts \
-	libcrypt-u2f-server-perl libgeoip2-perl \
-    	libglib-perl libgssapi-perl libhttp-browserdetect-perl \
+        lemonldap-ng-fastcgi-server/${DEBIAN_VERSION}-backports \
+        liblemonldap-ng-portal-perl/${DEBIAN_VERSION}-backports \
+        gsfonts \
+        libcrypt-u2f-server-perl libgeoip2-perl \
+        libglib-perl libgssapi-perl libhttp-browserdetect-perl \
         libimage-magick-perl liblasso-perl libnet-facebook-oauth2-perl \
         libnet-openid-consumer-perl libnet-openid-server-perl \
         libnet-oauth-perl libsoap-lite-perl fonts-urw-base35 \

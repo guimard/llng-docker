@@ -1,7 +1,12 @@
-FROM debian:bullseye-slim
+ARG DEBIANVERSION=bullseye
+
+FROM debian:${DEBIANVERSION}-slim
+
+ENV DEBIAN_VERSION=bullseye
+
 LABEL maintainer="Yadd yadd@debian.org>" \
-	name="yadd/lemonldap-ng-base" \
-	version="v1.0"
+      name="yadd/lemonldap-ng-base" \
+      version="v1.0"
 
 ARG S6_OVERLAY_VERSION=3.1.3.0
 
@@ -20,14 +25,14 @@ ENV SSODOMAIN=example.com \
     DBI_PASSWORD="" \
     DEBIAN_FRONTEND=noninteractive
 
-RUN echo "# Install packages" && \
+RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
     apt-get -y update && \
     apt-get -y dist-upgrade && \
-    echo 'deb http://deb.debian.org/debian bullseye-backports main' > /etc/apt/sources.list.d/backports.list && \
+    echo "deb http://deb.debian.org/debian" ${DEBIAN_VERSION}"-backports main" > /etc/apt/sources.list.d/backports.list && \
     apt-get -y update && \
     apt-get -y --no-install-recommends install procps xz-utils \
-    liblemonldap-ng-common-perl/bullseye-backports \
-    liblemonldap-ng-handler-perl/bullseye-backports \
+    liblemonldap-ng-common-perl/${DEBIAN_VERSION}-backports \
+    liblemonldap-ng-handler-perl/${DEBIAN_VERSION}-backports \
     libapache-session-browseable-perl \
     libdbi-perl libdbd-pg-perl \
     libhttp-parser-xs-perl liblwp-protocol-https-perl libstring-random-perl \
