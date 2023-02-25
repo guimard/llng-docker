@@ -9,7 +9,7 @@ RUN echo "# Install nginx and portal libs" && \
     apt -y --no-install-recommends install nginx \
 	lemonldap-ng-fastcgi-server/bullseye-backports \
     	liblemonldap-ng-portal-perl/bullseye-backports \
-	gsfonts 
+	gsfonts \
 	libcrypt-u2f-server-perl libgeoip2-perl \
     	libglib-perl libgssapi-perl libhttp-browserdetect-perl \
         libimage-magick-perl liblasso-perl libnet-facebook-oauth2-perl \
