@@ -1,0 +1,14 @@
+#!/bin/sh
+
+set -e
+
+for i in pg base portal manager full ssoaas-fastcgi-server; do
+	(
+	cd $i
+	NAME=`grep 'name="yadd/' Dockerfile|sed -e 's/.*name="//' -e 's/".*$//'`
+	docker build --rm -t $NAME .
+	)
+done
+
+cd dev
+./build-dev

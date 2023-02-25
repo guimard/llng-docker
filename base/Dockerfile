@@ -20,28 +20,20 @@ ENV SSODOMAIN=example.com \
     DBI_PASSWORD="" \
     DEBIAN_FRONTEND=noninteractive
 
-RUN echo "# Install backports source" && \
+RUN echo "# Install packages" && \
     apt-get -y update && \
     apt-get -y dist-upgrade && \
     echo 'deb http://deb.debian.org/debian bullseye-backports main' > /etc/apt/sources.list.d/backports.list && \
     apt-get -y update && \
-    apt-get -y install procps xz-utils
-
-RUN echo "# Install LemonLDAP::NG base libraries" && \
-    apt-get -y install \
+    apt-get -y --no-install-recommends install procps xz-utils \
     liblemonldap-ng-common-perl/bullseye-backports \
-    liblemonldap-ng-handler-perl/bullseye-backports
-
-RUN echo "# Install some LemonLDAP::NG dependencies" && \
-    apt-get -y install \
+    liblemonldap-ng-handler-perl/bullseye-backports \
     libapache-session-browseable-perl \
     libdbi-perl libdbd-pg-perl \
     libhttp-parser-xs-perl liblwp-protocol-https-perl libstring-random-perl \
     libconvert-base32-perl libnet-ldap-perl libxml-libxml-perl libxml-simple-perl \
-    libredis-fast-perl libredis-perl
-
-RUN apt autoremove
-RUN apt clean
+    libredis-fast-perl libredis-perl && \
+    apt autoremove && apt clean && rm -rf /var/lib/apt/lists/*
 
 RUN echo "# Drop comments" && \
     perl -i -ne 'print unless /^\s*;/ or /^\s*$/' /etc/lemonldap-ng/lemonldap-ng.ini

@@ -3,12 +3,13 @@ LABEL maintainer="Yadd yadd@debian.org>" \
 	name="yadd/lemonldap-ng-ssoaas-fastcgi-server" \
 	version="v1.0"
 
-RUN echo "# Install nginx, portal and manager libs" && \
+RUN echo "# Install libs" && \
     apt -y update && \
     apt -y dist-upgrade && \
     apt install -y --no-install-recommends \
         lemonldap-ng-fastcgi-server/bullseye-backports \
-        libfcgi-engine-perl
+        libfcgi-engine-perl && \
+    apt autoremove && apt clean && rm -rf /var/lib/apt/lists/*
 
 CMD ["/usr/sbin/llng-fastcgi-server", "--foreground", "-u", "www-data", "-g", "www-data", "-s", "/tmp/llng-fastcgi.sock", "--listen", ":9001", "-e", "FCGI::Engine"]
 

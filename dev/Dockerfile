@@ -5,11 +5,12 @@ ARG BRANCH=v2.0
 
 RUN apt -y update && \
     apt -y dist-upgrade && \
-    apt install -y git debhelper dpkg-dev libio-string-perl libjson-perl \
+    apt --no-install-recommends install -y git debhelper dpkg-dev libio-string-perl libjson-perl \
         liblwp-protocol-psgi-perl libmouse-perl libregexp-assemble-perl \
         libregexp-common-perl python3-sphinx \
         python3-sphinx-bootstrap-theme \
-        uglifyjs yui-compressor
+        uglifyjs yui-compressor && \
+    apt autoremove && apt clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /mnt
 
@@ -31,6 +32,11 @@ LABEL maintainer="Yadd yadd@debian.org>" \
 COPY --from=0 /mnt/*.deb /tmp/
 
 RUN dpkg --force-overwrite --force-confold -i /tmp/*.deb
+RUN echo "Install doc" && \
+    mv /etc/dpkg/dpkg.cfg.d /tmp/ && \
+    ls -l /tmp/ && \
+    dpkg --force-overwrite --force-confold -i /tmp/lemonldap-ng-doc*.deb && \
+    mv /tmp/dpkg.cfg.d /etc/dpkg/
 
 RUN rm -rf /mnt/*.deb
 

@@ -4,10 +4,10 @@ LABEL maintainer="Yadd yadd@debian.org>" \
 	version="v1.0"
 
 
-RUN echo "# Install nginx, portal and manager libs" && \
+RUN echo "# Install nginx and manager libs" && \
     apt -y update && \
     apt -y dist-upgrade && \
-    apt -y install nginx \
+    apt -y --no-install-recommends install nginx \
 	lemonldap-ng-fastcgi-server/bullseye-backports \
     	liblemonldap-ng-manager-perl/bullseye-backports \
     	libglib-perl libgssapi-perl libsoap-lite-perl fonts-urw-base35 \
@@ -15,13 +15,12 @@ RUN echo "# Install nginx, portal and manager libs" && \
         libconvert-base32-perl libio-string-perl libipc-run-perl \
         libgd-securityimage-perl libmime-tools-perl libnet-ldap-perl \
         libio-socket-timeout-perl libunicode-string-perl \
-        libio-string-perl
-
-RUN echo "Install doc" && \
+        libio-string-perl && \
     mv /etc/dpkg/dpkg.cfg.d /tmp/ && \
-    apt -y install \
+    apt -y --no-install-recommends install \
     	lemonldap-ng-doc/bullseye-backports && \
-    mv /tmp/dpkg.cfg.d /etc/dpkg/
+    mv /tmp/dpkg.cfg.d /etc/dpkg/ && \
+    apt autoremove && apt clean && rm -rf /var/lib/apt/lists/*
 
 RUN echo "# Install nginx configuration files" && \
     cd /etc/nginx/sites-enabled/ && \
