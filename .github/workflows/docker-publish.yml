@@ -3,6 +3,7 @@ name: Build and Publish Docker Images
 env:
   VERSION: 2.0.16
   PGVERSION: 13
+  DEBIANVERSION: bullseye
 
 on:
   push:
@@ -69,6 +70,7 @@ jobs:
             yadd/lemonldap-ng-base:latest
             yadd/lemonldap-ng-base:stable
             yadd/lemonldap-ng-base:${{ env.VERSION }}
+            yadd/lemonldap-ng-base:${{ env.VERSION }}-${{ env.DEBIANVERSION }}
           label: ${{ steps.meta.outputs.labels }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
@@ -106,6 +108,7 @@ jobs:
             yadd/lemonldap-ng-portal:latest
             yadd/lemonldap-ng-portal:stable
             yadd/lemonldap-ng-portal:${{ env.VERSION }}
+            yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DEBIANVERSION }}
           label: ${{ steps.meta.outputs.labels }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
@@ -143,6 +146,7 @@ jobs:
             yadd/lemonldap-ng-manager:latest
             yadd/lemonldap-ng-manager:stable
             yadd/lemonldap-ng-manager:${{ env.VERSION }}
+            yadd/lemonldap-ng-manager:${{ env.VERSION }}-${{ env.DEBIANVERSION }}
           label: ${{ steps.meta.outputs.labels }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
@@ -180,6 +184,7 @@ jobs:
             yadd/lemonldap-ng-full:latest
             yadd/lemonldap-ng-full:stable
             yadd/lemonldap-ng-full:${{ env.VERSION }}
+            yadd/lemonldap-ng-full:${{ env.VERSION }}-${{ env.DEBIANVERSION }}
           label: ${{ steps.meta.outputs.labels }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
@@ -217,6 +222,7 @@ jobs:
             yadd/lemonldap-ng-ssoaas-fastcgi-server:latest
             yadd/lemonldap-ng-ssoaas-fastcgi-server:stable
             yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ env.VERSION }}
+            yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ env.VERSION }}-${{ env.DEBIANVERSION }}
           label: ${{ steps.meta.outputs.labels }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
@@ -239,7 +245,9 @@ jobs:
       - name: Test with environment variables
         run: echo $TAG_NAME
         env:
-          TAG_NAME: ${{ env.VERSION }}-${{ steps.date.outputs.date }}
+          TAG_NAME: |
+            ${{ env.VERSION }}-${{ steps.date.outputs.date }}
+            ${{ env.VERSION }}-${{ steps.date.outputs.date }}-${{ env.DEBIANVERSION }}
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Login to Docker Hub
