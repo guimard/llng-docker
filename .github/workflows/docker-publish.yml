@@ -2,6 +2,7 @@ name: Build and Publish Docker Images
 
 env:
   VERSION: 2.0.16
+  PGVERSION: 13
 
 on:
   push:
@@ -28,7 +29,10 @@ jobs:
         with:
           context: ./pg
           push: true
-          tags: yadd/lemonldap-ng-pg-database:latest
+          tags: |
+            yadd/lemonldap-ng-pg-database:latest
+            yadd/lemonldap-ng-pg-database:${{ env.PGVERSION }}
+            yadd/lemonldap-ng-pg-database:${{ env.PGVERSION }}-bullseye
           label: ${{ steps.meta.outputs.labels }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1

@@ -12,6 +12,10 @@ Example to build from `oidc-front-channel-logout` branch:
 $ docker build -t my/test --build-arg=BRANCH=oidc-front-channel-logout .
 ```
 
+## Tags
+
+* `2.x.x-date`: base version and date of last patches included
+
 ## Copyright and license
 
 Copyright: Xavier Guimard <yadd@debian.org>.

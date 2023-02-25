@@ -6,3 +6,8 @@ See [Our concept of SSOaaS](https://lemonldap-ng.org/documentation/latest/ssoaas
 to understand what is LemonLDAP::NG's SSOaaS.
 
 To try this image, see [this example](https://github.com/guimard/llng-docker/tree/master/nginx-protected-by-lemonldap-ng-fastcgi-server)
+
+## Tags
+
+* `stable`: latest lemonldap-ng\* packages from Debian backports
+* `2.x.x`: versioned lemonldap-ng\* packages from Debian backports

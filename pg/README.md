@@ -4,6 +4,11 @@ This is a PostgreSQL database, configured to store
 [LemonLDAP::NG](https://lemonldap-ng.org) configuration and persistent
 sessions.
 
+## Tags
+
+* `<number>`: PostgreSQL major version
+* `<number>-bullseye`: [postgres tag](https://hub.docker.com/_/postgres) used as source of this image
+
 ## Variables with default values:
 
 * PG\_DATABASE: lemonldapng

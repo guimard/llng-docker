@@ -6,6 +6,11 @@ This image is then scalable _(see docker-compose example)_:
 * use a configured PostgreSQL database _(you can use [yadd/lemonldap-ng-pg-database](https://github.com/guimard/llng-docker/blob/master/pg/README.md#readme))_
 * share your sessions with a Redis server
 
+## Tags
+
+* `stable`: latest lemonldap-ng\* packages from Debian backports
+* `2.x.x`: versioned lemonldap-ng\* packages from Debian backports
+
 ## Features _(inherited from [yadd/lemonldap-ng-base](https://github.com/guimard/llng-docker/blob/master/base/README.md#readme))_
 
 * Update current configuration using given variables :

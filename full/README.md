@@ -6,6 +6,11 @@ Note that you should share sessions and configuration to use. See
 docker-compose example to see how to do this using redis and
 [PostgreSQL](https://github.com/guimard/llng-docker/blob/master/pg/README.md#readme).
 
+## Tags
+
+* `stable`: latest lemonldap-ng\* packages from Debian backports
+* `2.x.x`: versioned lemonldap-ng\* packages from Debian backports
+
 ## Features _(inherited from [yadd/lemonldap-ng-base](https://github.com/guimard/llng-docker/blob/master/base/README.md#readme))_
 
 * Update current configuration using given variables :
