@@ -1,5 +1,8 @@
 name: Build and Publish Docker Images
 
+env:
+  VERSION: 2.0.16
+
 on:
   push:
     branches: [master]
@@ -58,7 +61,10 @@ jobs:
         with:
           context: ./base
           push: true
-          tags: yadd/lemonldap-ng-base:latest
+          tags: |
+            yadd/lemonldap-ng-base:latest
+            yadd/lemonldap-ng-base:stable
+            yadd/lemonldap-ng-base:${{ env.VERSION }}
           label: ${{ steps.meta.outputs.labels }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
@@ -92,7 +98,10 @@ jobs:
         with:
           context: ./portal
           push: true
-          tags: yadd/lemonldap-ng-portal:latest
+          tags: |
+            yadd/lemonldap-ng-portal:latest
+            yadd/lemonldap-ng-portal:stable
+            yadd/lemonldap-ng-portal:${{ env.VERSION }}
           label: ${{ steps.meta.outputs.labels }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
@@ -126,7 +135,10 @@ jobs:
         with:
           context: ./manager
           push: true
-          tags: yadd/lemonldap-ng-manager:latest
+          tags: |
+            yadd/lemonldap-ng-manager:latest
+            yadd/lemonldap-ng-manager:stable
+            yadd/lemonldap-ng-manager:${{ env.VERSION }}
           label: ${{ steps.meta.outputs.labels }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
@@ -160,7 +172,10 @@ jobs:
         with:
           context: ./full
           push: true
-          tags: yadd/lemonldap-ng-full:latest
+          tags: |
+            yadd/lemonldap-ng-full:latest
+            yadd/lemonldap-ng-full:stable
+            yadd/lemonldap-ng-full:${{ env.VERSION }}
           label: ${{ steps.meta.outputs.labels }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
@@ -194,7 +209,10 @@ jobs:
         with:
           context: ./ssoaas-fastcgi-server
           push: true
-          tags: yadd/lemonldap-ng-ssoaas-fastcgi-server:latest
+          tags: |
+            yadd/lemonldap-ng-ssoaas-fastcgi-server:latest
+            yadd/lemonldap-ng-ssoaas-fastcgi-server:stable
+            yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ env.VERSION }}
           label: ${{ steps.meta.outputs.labels }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
@@ -217,7 +235,7 @@ jobs:
       - name: Test with environment variables
         run: echo $TAG_NAME
         env:
-          TAG_NAME: 2.0.16-${{ steps.date.outputs.date }}
+          TAG_NAME: ${{ env.VERSION }}-${{ steps.date.outputs.date }}
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Login to Docker Hub
@@ -235,5 +253,5 @@ jobs:
         with:
           context: ./dev
           push: true
-          tags: yadd/lemonldap-ng-dev:2.0.16-${{ steps.date.outputs.date }}
+          tags: yadd/lemonldap-ng-dev:${{ env.VERSION }}-${{ steps.date.outputs.date }}
           label: ${{ steps.meta.outputs.labels }}
