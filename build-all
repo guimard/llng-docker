@@ -2,13 +2,16 @@
 
 set -e
 
-for i in pg base portal manager full ssoaas-fastcgi-server; do
+LIST=${LIST:-pg base portal manager full ssoaas-fastcgi-server dev}
+
+for i in $LIST; do
 	(
 	cd $i
-	NAME=`grep 'name="yadd/' Dockerfile|sed -e 's/.*name="//' -e 's/".*$//'`
-	docker build --rm -t $NAME .
+	if test "$i" = "dev"; then
+		./build-dev
+	else
+		NAME=`grep 'name="yadd/' Dockerfile|sed -e 's/.*name="//' -e 's/".*$//'`
+		docker build --rm -t $NAME .
+	fi
 	)
 done
-
-cd dev
-./build-dev

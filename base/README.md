@@ -21,19 +21,23 @@ LemonLDAP::NG.
 
 ## Variables and default values
 
-* `SSODOMAIN` = example.com
-* `PORTAL` = http://auth.example.com/
-* `LOGLEVEL` = info
+* `SSODOMAIN` = `example.com`
+* `PORTAL` = `http://auth.example.com/` _(full URL needed here)_
+* `LOGLEVEL` = `info` _(possible values: debug, info, notice, warn, error)_
 * `REDIS_SERVER` =
-* `REDIS_INDEXES` = uid mail
+* `REDIS_INDEXES` = `uid mail` _(see Apache::Session::Browseable::Redis)_
 * `PG_SERVER` =
-* `PG_DATABASE` = lemonldapng
-* `PG_USER` = lemonldap
-* `PG_PASSWORD` = lemonldap
-* `PG_TABLE` = lmConfig
+* `PG_DATABASE` = `lemonldapng`
+* `PG_USER` = `lemonldap`
+* `PG_PASSWORD` = `lemonldap`
+* `PG_TABLE` = `lmConfig`
 * `DBI_CHAIN` = **if** `$PG_SERVER` **then** `DBI:Pg:database=$PG_DATABASE;host=$PG_SERVER` **else** `""`
 * `DBI_USER` = `$PG_USER`
 * `DBI_PASSWORD` = `$PG_PASSWORD`
+* `LOGGER` = `syslog` _(possible values: stderr, syslog)_
+* `USERLOGGER` = `syslog` _(possible values: stderr, syslog)_
+
+**LemonLDAP::NG logs**: when using default values _(syslog)_, logs are stored in `/var/log/syslogd/` _(default S6 behavior)_
 
 ## Docker-compose example
 
@@ -54,6 +58,8 @@ services:
     environment:
       - PG_SERVER=pgdb
       - REDIS_SERVER=redis:6379
+      - LOGGER=stderr
+      - USERLOGGER=stderr
     depends_on:
       db:
         condition: service_healthy

@@ -45,6 +45,8 @@ services:
     environment:
       - PG_SERVER=db
       - REDIS_SERVER=redis:6379
+      - LOGGER=stderr
+      - USERLOGGER=stderr
     depends_on:
       db:
         condition: service_healthy
@@ -55,6 +57,8 @@ services:
     environment:
       - PG_SERVER=db
       - REDIS_SERVER=redis:6379
+      - LOGGER=stderr
+      - USERLOGGER=stderr
     depends_on:
       db:
         condition: service_healthy

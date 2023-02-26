@@ -3,6 +3,17 @@
 # Fix logLevel
 perl -i -pe 's/^logLevel\s*=.*$/logLevel=$ENV{LOGLEVEL}/' /etc/lemonldap-ng/lemonldap-ng.ini
 
+# Fix logger
+if test "$LOGGER" = "stderr"; then
+	echo "Set logger to Lemonldap::NG::Common::Logger::Std"
+	perl -i -ne 'print unless /^logger\s*=/;print "logger = Lemonldap::NG::Common::Logger::Std\n" if/^\[\s*all\s*\]/;' /etc/lemonldap-ng/lemonldap-ng.ini;
+fi
+
+if test "$USERLOGGER" = "stderr"; then
+	echo "Set userLogger to Lemonldap::NG::Common::Logger::Std"
+	perl -i -ne 'print unless /^userLogger\s*=/;print "userLogger = Lemonldap::NG::Common::Logger::Std\n" if/^\[\s*all\s*\]/;' /etc/lemonldap-ng/lemonldap-ng.ini;
+fi
+
 # OPTIONAL DATABASE FOR CONFIGURATION
 #
 # 1 - Check for PostgreSQL server
