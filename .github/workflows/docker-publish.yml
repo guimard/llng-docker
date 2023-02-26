@@ -112,6 +112,8 @@ jobs:
             yadd/lemonldap-ng-portal:${{ env.VERSION }}
             yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DEBIANVERSION }}
           label: ${{ steps.meta.outputs.labels }}
+      - name: test
+        run: cd portal/test && docker-compose run test && docker-compose down
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
         env:
