@@ -27,7 +27,12 @@ describe('LLNG portal', () => {
       .field('password','dwho')
       .field('token',   token)
       .expect('set-cookie', /lemonldap=/)
-      .expect(302,done)
+      .expect(302)
+      .then( res => {
+        cookies = request.jar.getCookies({domain:'example.com',path:'/',secure:false,script:false}).toValueString()
+        assert.ok( cookies.match(/lemonldap=[0-9a-f]+/) )
+        done()
+      })
   })
   it('should return 200 to authenticated JSON request', done => {
     request.get('/')
