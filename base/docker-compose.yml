@@ -12,7 +12,6 @@ services:
     build:
       context: .
       dockerfile: ./Dockerfile
-      target: development
     environment:
       - PG_SERVER=db
       - REDIS_SERVER=qwerty

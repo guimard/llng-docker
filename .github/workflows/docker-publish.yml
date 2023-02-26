@@ -72,6 +72,8 @@ jobs:
             yadd/lemonldap-ng-base:${{ env.VERSION }}
             yadd/lemonldap-ng-base:${{ env.VERSION }}-${{ env.DEBIANVERSION }}
           label: ${{ steps.meta.outputs.labels }}
+      - name: test
+        run: cd base && ./test
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
         env:
