@@ -7,8 +7,12 @@ LABEL maintainer="Yadd yadd@debian.org>" \
 ENV PG_DATABASE=lemonldapng \
     PG_USER=lemonldap \
     PG_PASSWORD=lemonldap \
-    TABLE=lmConfig \
-    PTABLE=sessions
+    PG_TABLE=lmConfig \
+    PG_PERSISTENT_SESSIONS_TABLE=psessions \
+    PG_SESSIONS_TABLE=sessions \
+    PG_SAML_TABLE=samlsessions \
+    PG_OIDC_TABLE=oidcsessions \
+    PG_CAS_TABLE=cassessions
 
 RUN mkdir -p /llng-conf
 

@@ -1,6 +1,7 @@
 #!/command/with-contenv sh
 
 # Fix logLevel
+echo "Set logLevel to $LOGLEVEL"
 perl -i -pe 's/^logLevel\s*=.*$/logLevel=$ENV{LOGLEVEL}/' /etc/lemonldap-ng/lemonldap-ng.ini
 
 # Fix logger
@@ -25,6 +26,7 @@ if [ "$PG_SERVER" != "" ]; then
 fi
 
 if test "$DBI_CHAIN" != ""; then
+   echo "Configuring lemonldap-ng.ini to use database for configuration"
    # 2 - Save current INI file
    cp /etc/lemonldap-ng/lemonldap-ng.ini /etc/lemonldap-ng/lemonldap-ng-file.ini
    # 3 - Build DBI variables if not given
@@ -44,9 +46,21 @@ if test "$DBI_CHAIN" != ""; then
    # 6 - If no configuration in current server, let's convert current "File" configuration into database
    if test "$CONF" = "0"; then
      /usr/share/lemonldap-ng/bin/convertConfig --new=/etc/lemonldap-ng/lemonldap-ng.ini --current=/etc/lemonldap-ng/lemonldap-ng-file.ini
+     /usr/share/docker-llng/updateConf set persistentStorage "Apache::Session::Browseable::PgJSON"
+     /usr/share/docker-llng/updateConf set persistentStorageOptions "{TableName=>'$PG_PERSISTENT_SESSIONS_TABLE',DataSource=>'$DBI_CHAIN',UserName=>'$DBI_USER',Password=>'$DBI_PASSWORD',Commit=>1}"
+     if test "$REDIS_SERVER" = ""; then
+       /usr/share/docker-llng/updateConf set globalStorage "Apache::Session::Browseable::PgJSON"
+       /usr/share/docker-llng/updateConf set globalStorageOptions "{TableName=>'$PG_SESSIONS_TABLE',DataSource=>'$DBI_CHAIN',UserName=>'$DBI_USER',Password=>'$DBI_PASSWORD',Commit=>1}"
+       /usr/share/docker-llng/updateConf set samlStorage "Apache::Session::Browseable::PgJSON"
+       /usr/share/docker-llng/updateConf set samlStorageOptions "{TableName=>'$PG_SAML_TABLE',DataSource=>'$DBI_CHAIN',UserName=>'$DBI_USER',Password=>'$DBI_PASSWORD',Commit=>1}"
+       /usr/share/docker-llng/updateConf set oidcStorage "Apache::Session::Browseable::PgJSON"
+       /usr/share/docker-llng/updateConf set oidcStorageOptions "{TableName=>'$PG_OIDC_TABLE',DataSource=>'$DBI_CHAIN',UserName=>'$DBI_USER',Password=>'$DBI_PASSWORD',Commit=>1}"
+       /usr/share/docker-llng/updateConf set casStorage "Apache::Session::Browseable::PgJSON"
+       /usr/share/docker-llng/updateConf set casStorageOptions "{TableName=>'$PG_CAS_TABLE',DataSource=>'$DBI_CHAIN',UserName=>'$DBI_USER',Password=>'$DBI_PASSWORD',Commit=>1}"
+     fi
+   else
+     echo "Previous configuration found, skipping session storage changes"
    fi
-   /usr/share/docker-llng/updateConf set persistentStorage "Apache::Session::Browseable::Postgres"
-   /usr/share/docker-llng/updateConf set persistentStorageOptions "{DataSource=>'$DBI_CHAIN',UserName=>'$DBI_USER',Password=>'$DBI_PASSWORD',Commit=>1}"
 fi
 
 /usr/share/docker-llng/updateConf "setDomain" $SSODOMAIN
@@ -54,6 +68,7 @@ fi
 
 # If Redis server is given, let's use it for sessions
 if test "$REDIS_SERVER" != ""; then
+    echo "Change configuration to use Redis for sessions"
     REDIS_INDEXES=${REDIS_INDEXES:-uid mail}
     /usr/share/docker-llng/updateConf set globalStorage 'Apache::Session::Browseable::Redis'
     /usr/share/docker-llng/updateConf set globalStorageOptions "{server=>'$REDIS_SERVER',Index=>'$REDIS_INDEXES'}"

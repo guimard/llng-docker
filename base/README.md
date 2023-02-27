@@ -24,18 +24,27 @@ LemonLDAP::NG.
 * `SSODOMAIN` = `example.com`
 * `PORTAL` = `http://auth.example.com/` _(full URL needed here)_
 * `LOGLEVEL` = `info` _(possible values: debug, info, notice, warn, error)_
-* `REDIS_SERVER` =
-* `REDIS_INDEXES` = `uid mail` _(see Apache::Session::Browseable::Redis)_
-* `PG_SERVER` =
-* `PG_DATABASE` = `lemonldapng`
-* `PG_USER` = `lemonldap`
-* `PG_PASSWORD` = `lemonldap`
-* `PG_TABLE` = `lmConfig`
-* `DBI_CHAIN` = **if** `$PG_SERVER` **then** `DBI:Pg:database=$PG_DATABASE;host=$PG_SERVER` **else** `""`
-* `DBI_USER` = `$PG_USER`
-* `DBI_PASSWORD` = `$PG_PASSWORD`
 * `LOGGER` = `syslog` _(possible values: stderr, syslog)_
 * `USERLOGGER` = `syslog` _(possible values: stderr, syslog)_
+* Configuration and persistent session storage
+  * `PG_SERVER` =
+  * `PG_DATABASE` = `lemonldapng`
+  * `PG_USER` = `lemonldap`
+  * `PG_PASSWORD` = `lemonldap`
+  * `PG_TABLE` = `lmConfig`
+  * Advanced _(see DBI(3pm) for more)_
+    * `DBI_CHAIN` = **if** `$PG_SERVER` **then** `DBI:Pg:database=$PG_DATABASE;host=$PG_SERVER` **else** `""`
+    * `DBI_USER` = `$PG_USER`
+    * `DBI_PASSWORD` = `$PG_PASSWORD`
+* Session storage:
+  * `REDIS_SERVER` =
+  * `REDIS_INDEXES` = `_whatToTrace _session_kind _utime ipAddr _httpSessionType _user` _(see Apache::Session::Browseable::Redis)_
+  * Used only if `REDIS_SERVER` is empty and configuration database is empty:
+    * `PG_PERSISTENT_SESSIONS_TABLE` = `psessions`
+    * `PG_SESSIONS_TABLE` = `sessions`
+    * `PG_SAML_TABLE` = `samlsessions`
+    * `PG_OIDC_TABLE` = `oidcsessions`
+    * `PG_CAS_TABLE` = `cassessions`
 
 **LemonLDAP::NG logs**: when using default values _(syslog)_, logs are stored in `/var/log/syslogd/` _(default S6 behavior)_
 

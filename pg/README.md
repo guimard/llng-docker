@@ -14,8 +14,12 @@ sessions.
 * PG\_DATABASE: lemonldapng
 * PG\_USER: lemonldap
 * PG\_PASSWORD: lemonldap
-* TABLE: lmConfig
-* PTABLE: sessions
+* PG\_TABLE: lmConfig
+* PG\_PERSISTENT\_SESSIONS\_TABLE: psessions
+* PG\_SESSIONS\_TABLE: sessions
+* PG\_SAML\_TABLE: samlsessions
+* PG\_OIDC\_TABLE: oidcsessions
+* PG\_CAS\_TABLE: cassessions
 
 and all variables from postgres:bullseye. Note that you should set
 `POSTGRES_PASSWORD` variable _(root password)_
