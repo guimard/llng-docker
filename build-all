@@ -12,6 +12,9 @@ for i in $LIST; do
 	else
 		NAME=`grep 'name="yadd/' Dockerfile|sed -e 's/.*name="//' -e 's/".*$//'`
 		docker build --rm -t $NAME .
+		if test "$PUBLISH" = "yes"; then
+			docker push $NAME
+		fi
 	fi
 	)
 done

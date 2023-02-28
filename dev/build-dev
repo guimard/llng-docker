@@ -15,5 +15,11 @@ perl -MJSON -MDevscripts::Versort -lne '$a.=$_}{
 
 docker build --rm -t yadd/lemonldap-ng-dev:$VERSION-$DATE .
 
-echo
-echo "Built. Next: docker push yadd/lemonldap-ng-dev:$VERSION-$DATE"
+if test "$PUBLISH" = "yes"; then
+	echo
+	echo "docker push yadd/lemonldap-ng-dev:$VERSION-$DATE"
+	docker push yadd/lemonldap-ng-dev:$VERSION-$DATE
+else
+	echo
+	echo "Built. Next: docker push yadd/lemonldap-ng-dev:$VERSION-$DATE"
+fi
