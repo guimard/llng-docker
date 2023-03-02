@@ -32,14 +32,18 @@ LABEL maintainer="Yadd yadd@debian.org>" \
 
 COPY --from=0 /mnt/*.deb /tmp/
 
-RUN dpkg --force-overwrite --force-confold -i /tmp/*.deb
+RUN apt -y update && \
+    apt -y dist-upgrade && \
+    dpkg --force-overwrite --force-confold -i /tmp/*.deb
+
 RUN echo "Install doc" && \
     mv /etc/dpkg/dpkg.cfg.d /tmp/ && \
     ls -l /tmp/ && \
     dpkg --force-overwrite --force-confold -i /tmp/lemonldap-ng-doc*.deb && \
     mv /tmp/dpkg.cfg.d /etc/dpkg/
 
-RUN rm -rf /mnt/*.deb
+RUN rm -rf /mnt/*.deb && \
+    apt autoremove && apt clean && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /var/lib/lemonldap-ng/cache && chown www-data:www-data /var/lib/lemonldap-ng/cache
 
