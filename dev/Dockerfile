@@ -43,7 +43,7 @@ RUN echo "Install doc" && \
     mv /tmp/dpkg.cfg.d /etc/dpkg/
 
 RUN rm -rf /mnt/*.deb && \
-    apt autoremove && apt clean && rm -rf /var/lib/apt/lists/*
+    apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /var/lib/lemonldap-ng/cache && chown www-data:www-data /var/lib/lemonldap-ng/cache
 
