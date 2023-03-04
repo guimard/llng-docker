@@ -52,7 +52,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Login to Docker Hub
-        uses: docker/login-action@v1
+        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
@@ -62,7 +62,7 @@ jobs:
         with:
           images: yadd/lemonldap-ng-base
       - name: Build and push Docker image for base
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
         with:
           context: ./base
           push: true
@@ -92,7 +92,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Login to Docker Hub
-        uses: docker/login-action@v1
+        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
@@ -102,7 +102,7 @@ jobs:
         with:
           images: yadd/lemonldap-ng-portal
       - name: Build and push Docker image for portal
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
         with:
           context: ./portal
           push: true
@@ -132,7 +132,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Login to Docker Hub
-        uses: docker/login-action@v1
+        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
@@ -142,7 +142,7 @@ jobs:
         with:
           images: yadd/lemonldap-ng-cron
       - name: Build and push Docker image for cron
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
         with:
           context: ./cron
           push: true
@@ -170,7 +170,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Login to Docker Hub
-        uses: docker/login-action@v1
+        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
@@ -180,7 +180,7 @@ jobs:
         with:
           images: yadd/lemonldap-ng-manager
       - name: Build and push Docker image for manager
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
         with:
           context: ./manager
           push: true
@@ -208,7 +208,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Login to Docker Hub
-        uses: docker/login-action@v1
+        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
@@ -218,7 +218,7 @@ jobs:
         with:
           images: yadd/lemonldap-ng-full
       - name: Build and push Docker image for full
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
         with:
           context: ./full
           push: true
@@ -246,7 +246,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Login to Docker Hub
-        uses: docker/login-action@v1
+        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
@@ -256,7 +256,7 @@ jobs:
         with:
           images: yadd/lemonldap-ng-ssoaas-fastcgi-server
       - name: Build and push Docker image for SSOaaS FastCGI Server
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
         with:
           context: ./ssoaas-fastcgi-server
           push: true
@@ -293,7 +293,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Login to Docker Hub
-        uses: docker/login-action@v1
+        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
@@ -303,7 +303,7 @@ jobs:
         with:
           images: yadd/lemonldap-ng-dev
       - name: Build and push Docker image for dev
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
         with:
           context: ./dev
           push: true
