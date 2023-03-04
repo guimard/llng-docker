@@ -1,0 +1,14 @@
+#!/command/with-contenv sh
+
+# this line here is what we should have to get rid of the hard link error
+touch /etc/crontab /etc/cron.*/*
+
+if test "$HANDLER_CRON" != "yes"; then
+	rm -f /etc/cron.d/liblemonldap-ng-handler-perl
+fi
+
+if test "$PORTAL_CRON" != "yes"; then
+	rm -f /etc/cron.d/liblemonldap-ng-portal-perl
+fi
+
+cron -f

@@ -45,6 +45,9 @@ LemonLDAP::NG.
     * `PG_SAML_TABLE` = `samlsessions`
     * `PG_OIDC_TABLE` = `oidcsessions`
     * `PG_CAS_TABLE` = `cassessions`
+* Session purge tasks:
+  * `HANDLER_CRON` = `yes`
+  * `PORTAL_CRON` = `yes`
 
 **LemonLDAP::NG logs**: when using default values _(syslog)_, logs are stored in `/var/log/syslogd/` _(default S6 behavior)_
 

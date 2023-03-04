@@ -24,6 +24,10 @@ This image is then scalable _(see docker-compose example)_:
 
 ## Variables and default values
 
+> When running multiple portals using the same database, you should keep portal
+cron tasks only on one portal: Set environment variable `PORTAL_CRON` to `no`
+in all portal containers except one.
+
 See [yadd/lemonldap-ng-base](https://github.com/guimard/llng-docker/blob/master/base/README.md#readme)
 
 ## Docker-compose example

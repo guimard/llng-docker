@@ -30,6 +30,8 @@ ENV SSODOMAIN=example.com \
     DBI_CHAIN="" \
     DBI_USER="" \
     DBI_PASSWORD="" \
+    HANDLER_CRON=yes \
+    PORTAL_CRON=yes \
     DEBIAN_FRONTEND=noninteractive
 
 RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
@@ -37,7 +39,7 @@ RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
     apt-get -y dist-upgrade && \
     echo "deb http://deb.debian.org/debian" ${DEBIAN_VERSION}"-backports main" > /etc/apt/sources.list.d/backports.list && \
     apt-get -y update && \
-    apt-get -y --no-install-recommends install procps xz-utils \
+    apt-get -y --no-install-recommends install procps xz-utils cron \
     liblemonldap-ng-common-perl/${DEBIAN_VERSION}-backports \
     liblemonldap-ng-handler-perl/${DEBIAN_VERSION}-backports \
     libapache-session-browseable-perl \
