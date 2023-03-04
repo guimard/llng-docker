@@ -53,7 +53,7 @@ RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
     libhttp-parser-xs-perl liblwp-protocol-https-perl libstring-random-perl \
     libconvert-base32-perl libnet-ldap-perl libxml-libxml-perl libxml-simple-perl \
     libredis-fast-perl libredis-perl && \
-    apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/* && \
+    apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/*
 
 RUN echo "# Drop comments" && \
     perl -i -ne 'print unless /^\s*;/ or /^\s*$/' /etc/lemonldap-ng/lemonldap-ng.ini
