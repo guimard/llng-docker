@@ -11,7 +11,7 @@ RUN apt -y update && \
         libregexp-common-perl python3-sphinx \
         python3-sphinx-bootstrap-theme \
         uglifyjs yui-compressor && \
-    apt autoremove && apt clean && rm -rf /var/lib/apt/lists/*
+    apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /mnt
 

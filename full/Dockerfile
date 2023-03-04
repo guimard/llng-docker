@@ -12,7 +12,7 @@ RUN echo "# Install nginx and portal and manager libs" && \
     apt -y --no-install-recommends install \
           lemonldap-ng-doc/${DEBIAN_VERSION}-backports && \
     mv /tmp/dpkg.cfg.d /etc/dpkg/ && \
-    apt autoremove && apt clean && rm -rf /var/lib/apt/lists/*
+    apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/*
 
 RUN echo "# Install nginx configuration files" && \
     cd /etc/nginx/sites-enabled/ && \

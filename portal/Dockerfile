@@ -20,7 +20,7 @@ RUN echo "# Install nginx and portal libs" && \
         libgd-securityimage-perl libmime-tools-perl libnet-ldap-perl \
         libio-socket-timeout-perl libunicode-string-perl liblasso-perl \
         libio-string-perl libemail-sender-perl && \
-    apt autoremove && apt clean && rm -rf /var/lib/apt/lists/*
+    apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/*
 
 RUN echo "# Install nginx configuration files" && \
     cd /etc/nginx/sites-enabled/ && \

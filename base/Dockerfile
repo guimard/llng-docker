@@ -1,6 +1,16 @@
 ARG DEBIANVERSION=bullseye
 
-FROM debian:${DEBIANVERSION}-slim
+FROM debian:${DEBIANVERSION}-slim as debian-backports-updated
+
+ENV DEBIAN_VERSION=bullseye
+
+RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
+    apt-get -y update && \
+    apt-get -y dist-upgrade && \
+    echo "deb http://deb.debian.org/debian" ${DEBIAN_VERSION}"-backports main" > /etc/apt/sources.list.d/backports.list && \
+    apt-get -y update
+
+FROM debian-backports-updated
 
 ENV DEBIAN_VERSION=bullseye
 
@@ -35,10 +45,6 @@ ENV SSODOMAIN=example.com \
     DEBIAN_FRONTEND=noninteractive
 
 RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
-    apt-get -y update && \
-    apt-get -y dist-upgrade && \
-    echo "deb http://deb.debian.org/debian" ${DEBIAN_VERSION}"-backports main" > /etc/apt/sources.list.d/backports.list && \
-    apt-get -y update && \
     apt-get -y --no-install-recommends install procps xz-utils cron \
     liblemonldap-ng-common-perl/${DEBIAN_VERSION}-backports \
     liblemonldap-ng-handler-perl/${DEBIAN_VERSION}-backports \
@@ -47,18 +53,18 @@ RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
     libhttp-parser-xs-perl liblwp-protocol-https-perl libstring-random-perl \
     libconvert-base32-perl libnet-ldap-perl libxml-libxml-perl libxml-simple-perl \
     libredis-fast-perl libredis-perl && \
-    apt autoremove && apt clean && rm -rf /var/lib/apt/lists/*
+    apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/* && \
 
 RUN echo "# Drop comments" && \
     perl -i -ne 'print unless /^\s*;/ or /^\s*$/' /etc/lemonldap-ng/lemonldap-ng.ini
 
 # S6
 ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz /tmp
-RUN tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz && rm /tmp/s6-overlay-noarch.tar.xz
 ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-x86_64.tar.xz /tmp
-RUN tar -C / -Jxpf /tmp/s6-overlay-x86_64.tar.xz && rm /tmp/s6-overlay-x86_64.tar.xz
 ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/syslogd-overlay-noarch.tar.xz /tmp
-RUN tar -C / -Jxpf /tmp/syslogd-overlay-noarch.tar.xz && rm /tmp/syslogd-overlay-noarch.tar.xz
+RUN tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz && rm /tmp/s6-overlay-noarch.tar.xz && \
+    tar -C / -Jxpf /tmp/s6-overlay-x86_64.tar.xz && rm /tmp/s6-overlay-x86_64.tar.xz && \
+    tar -C / -Jxpf /tmp/syslogd-overlay-noarch.tar.xz && rm /tmp/syslogd-overlay-noarch.tar.xz
 
 VOLUME ["/etc/lemonldap-ng","/var/lib/lemonldap-ng/conf", "/var/lib/lemonldap-ng/sessions", "/var/lib/lemonldap-ng/psessions"]
 
