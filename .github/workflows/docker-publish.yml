@@ -10,7 +10,16 @@ on:
     branches: [master]
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: build_and_test
+        run: ./build-all
+
   build-and-push-pg:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -48,6 +57,7 @@ jobs:
 
   build-and-push-base:
     runs-on: ubuntu-latest
+    needs: test
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -72,8 +82,6 @@ jobs:
             yadd/lemonldap-ng-base:${{ env.VERSION }}
             yadd/lemonldap-ng-base:${{ env.VERSION }}-${{ env.DEBIANVERSION }}
           label: ${{ steps.meta.outputs.labels }}
-      - name: test
-        run: cd base && ./test
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
         env:
@@ -112,8 +120,6 @@ jobs:
             yadd/lemonldap-ng-portal:${{ env.VERSION }}
             yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DEBIANVERSION }}
           label: ${{ steps.meta.outputs.labels }}
-      - name: test
-        run: cd portal/test && docker-compose run test && docker-compose down
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
         env:

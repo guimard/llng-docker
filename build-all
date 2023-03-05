@@ -2,7 +2,7 @@
 
 set -e
 
-LIST=${LIST:-pg base portal manager full ssoaas-fastcgi-server dev}
+LIST=${LIST:-pg base portal manager full ssoaas-fastcgi-server cron dev}
 
 for i in $LIST; do
 	(
@@ -15,6 +15,17 @@ for i in $LIST; do
 		if test "$PUBLISH" = "yes"; then
 			docker push $NAME
 		fi
+	fi
+	if test -x test; then
+		./test
+	fi
+	)
+done
+for i in $LIST; do
+	(
+	cd $i
+	if test -x clean; then
+		./clean
 	fi
 	)
 done
