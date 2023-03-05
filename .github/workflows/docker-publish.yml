@@ -44,7 +44,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: ./pg
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
             yadd/lemonldap-ng-pg-database:latest
@@ -86,7 +86,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: ./base
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
             yadd/lemonldap-ng-base:latest
@@ -129,7 +129,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: ./portal
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
             yadd/lemonldap-ng-portal:latest
@@ -172,7 +172,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: ./cron
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
             yadd/lemonldap-ng-cron:latest
@@ -215,7 +215,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: ./manager
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
             yadd/lemonldap-ng-manager:latest
@@ -258,7 +258,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: ./full
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
             yadd/lemonldap-ng-full:latest
@@ -301,7 +301,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: ./ssoaas-fastcgi-server
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
             yadd/lemonldap-ng-ssoaas-fastcgi-server:latest
@@ -353,7 +353,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: ./dev
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
             yadd/lemonldap-ng-dev:latest
