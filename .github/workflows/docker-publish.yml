@@ -104,13 +104,6 @@ jobs:
           provider: dockerhub
           short_description: 'Base image for lemonldap-ng dockers'
           readme_file: 'base/README.md'
-      - name: save image
-        run: docker save yadd/lemonldap-ng-base:latest >/tmp/base.${{ env.RUNNER_ARCH }}.tar
-      - name: Upload llng images as artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: llng-image
-          path: /tmp/base.${{ env.RUNNER_ARCH }}.tar
 
   build-and-push-portal:
     needs: build-and-push-base
@@ -122,12 +115,6 @@ jobs:
         uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-      - name: Download artifacts (Docker images) from previous workflows
-        uses: actions/download-artifact@v2
-      - name: Load Docker images from previous workflows
-        run: docker load --input llng-image/base.${{ env.RUNNER_ARCH }}.tar
-        with:
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
@@ -160,13 +147,6 @@ jobs:
           provider: dockerhub
           short_description: 'LemonLDAP::NG Portal'
           readme_file: 'portal/README.md'
-      - name: save image
-        run: docker save yadd/lemonldap-ng-portal:latest >/tmp/portal.${{ env.RUNNER_ARCH }}.tar
-      - name: Upload llng images as artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: llng-image
-          path: /tmp/portal.${{ env.RUNNER_ARCH }}.tar
 
   build-and-push-cron:
     needs: build-and-push-base
@@ -178,12 +158,6 @@ jobs:
         uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-      - name: Download artifacts (Docker images) from previous workflows
-        uses: actions/download-artifact@v2
-      - name: Load Docker images from previous workflows
-        run: docker load --input llng-image/base.${{ env.RUNNER_ARCH }}.tar
-        with:
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
@@ -227,12 +201,6 @@ jobs:
         uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-      - name: Download artifacts (Docker images) from previous workflows
-        uses: actions/download-artifact@v2
-      - name: Load Docker images from previous workflows
-        run: docker load --input llng-image/base.${{ env.RUNNER_ARCH }}.tar
-        with:
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
@@ -276,14 +244,6 @@ jobs:
         uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-      - name: Download artifacts (Docker images) from previous workflows
-        uses: actions/download-artifact@v2
-      - name: Load Docker images from previous workflows
-        run: |
-          docker load --input llng-image/base.${{ env.RUNNER_ARCH }}.tar
-          docker load --input llng-image/portal.${{ env.RUNNER_ARCH }}.tar
-        with:
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
@@ -316,13 +276,6 @@ jobs:
           provider: dockerhub
           short_description: 'LemonLDAP::NG Portal and Manager'
           readme_file: 'full/README.md'
-      - name: save image
-        run: docker save yadd/lemonldap-ng-full:latest >/tmp/full.${{ env.RUNNER_ARCH }}.tar
-      - name: Upload llng images as artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: llng-image
-          path: /tmp/full.${{ env.RUNNER_ARCH }}.tar
 
   build-and-push-ssoaas-fastcgi-server:
     needs: build-and-push-base
@@ -334,12 +287,6 @@ jobs:
         uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-      - name: Download artifacts (Docker images) from previous workflows
-        uses: actions/download-artifact@v2
-      - name: Load Docker images from previous workflows
-        run: docker load --input llng-image/base.${{ env.RUNNER_ARCH }}.tar
-        with:
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
@@ -392,12 +339,6 @@ jobs:
         uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-      - name: Download artifacts (Docker images) from previous workflows
-        uses: actions/download-artifact@v2
-      - name: Load Docker images from previous workflows
-        run: docker load --input llng-image/full.${{ env.RUNNER_ARCH }}.tar
-        with:
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
