@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 set -e
 
@@ -15,6 +15,9 @@ for i in $LIST; do
 		if test "$PUBLISH" = "yes"; then
 			docker push $NAME
 		fi
+		if test "$IMAGE_EXPORT" = "yes"; then
+			docker save $NAME > /tmp/$i.tar
+		fi
 	fi
 	if test -x test; then
 		./test
@@ -29,3 +32,9 @@ for i in $LIST; do
 	fi
 	)
 done
+if test "$IMAGE_EXPORT" = "yes"; then
+	(
+	cd /tmp
+	tar czf images.tar.gz ${LIST// /.tar }.tar
+	)
+fi

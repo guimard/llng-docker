@@ -2,7 +2,7 @@ version: "3.4"
 
 services:
   auth.example.com:
-    image: yadd/lemonldap-ng-portal
+    image: yadd/lemonldap-ng-full
     environment:
       - LOGGER=stderr
       - USERLOGGER=stderr

@@ -19,11 +19,23 @@ jobs:
         run: ./build-all
         env:
           VERSION: ${{ env.VERSION }}
+          IMAGE_EXPORT: yes
+      - name: Upload frontend image as artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: llng-image
+          path: /tmp/images.tar.gz
 
   build-and-push-pg:
     needs: test
     runs-on: ubuntu-latest
     steps:
+      - name: Download artifacts (Docker images) from previous workflows
+        uses: actions/download-artifact@v2
+      - name: Load Docker images from previous workflows
+        run: |
+          (cd llng-image && tar xzf images.tar.gz)
+          for f in llng-image/*.tar; do docker load --input $f; done
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Login to Docker Hub
@@ -39,6 +51,7 @@ jobs:
       - name: Build and push Docker image for pg
         uses: docker/build-push-action@v4
         with:
+          platforms: linux/amd64,linux/arm64
           context: ./pg
           push: true
           tags: |
@@ -61,6 +74,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     steps:
+      - name: Download artifacts (Docker images) from previous workflows
+        uses: actions/download-artifact@v2
+      - name: Load Docker images from previous workflows
+        run: |
+          (cd llng-image && tar xzf images.tar.gz)
+          for f in llng-image/*.tar; do docker load --input $f; done
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Login to Docker Hub
@@ -76,6 +95,7 @@ jobs:
       - name: Build and push Docker image for base
         uses: docker/build-push-action@v4
         with:
+          platforms: linux/amd64,linux/arm64
           context: ./base
           push: true
           tags: |
@@ -99,6 +119,12 @@ jobs:
     needs: build-and-push-base
     runs-on: ubuntu-latest
     steps:
+      - name: Download artifacts (Docker images) from previous workflows
+        uses: actions/download-artifact@v2
+      - name: Load Docker images from previous workflows
+        run: |
+          (cd llng-image && tar xzf images.tar.gz)
+          for f in llng-image/*.tar; do docker load --input $f; done
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Login to Docker Hub
@@ -114,6 +140,7 @@ jobs:
       - name: Build and push Docker image for portal
         uses: docker/build-push-action@v4
         with:
+          platforms: linux/amd64,linux/arm64
           context: ./portal
           push: true
           tags: |
@@ -137,6 +164,12 @@ jobs:
     needs: build-and-push-base
     runs-on: ubuntu-latest
     steps:
+      - name: Download artifacts (Docker images) from previous workflows
+        uses: actions/download-artifact@v2
+      - name: Load Docker images from previous workflows
+        run: |
+          (cd llng-image && tar xzf images.tar.gz)
+          for f in llng-image/*.tar; do docker load --input $f; done
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Login to Docker Hub
@@ -152,6 +185,7 @@ jobs:
       - name: Build and push Docker image for cron
         uses: docker/build-push-action@v4
         with:
+          platforms: linux/amd64,linux/arm64
           context: ./cron
           push: true
           tags: |
@@ -175,6 +209,12 @@ jobs:
     needs: build-and-push-base
     runs-on: ubuntu-latest
     steps:
+      - name: Download artifacts (Docker images) from previous workflows
+        uses: actions/download-artifact@v2
+      - name: Load Docker images from previous workflows
+        run: |
+          (cd llng-image && tar xzf images.tar.gz)
+          for f in llng-image/*.tar; do docker load --input $f; done
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Login to Docker Hub
@@ -190,6 +230,7 @@ jobs:
       - name: Build and push Docker image for manager
         uses: docker/build-push-action@v4
         with:
+          platforms: linux/amd64,linux/arm64
           context: ./manager
           push: true
           tags: |
@@ -213,6 +254,12 @@ jobs:
     needs: build-and-push-portal
     runs-on: ubuntu-latest
     steps:
+      - name: Download artifacts (Docker images) from previous workflows
+        uses: actions/download-artifact@v2
+      - name: Load Docker images from previous workflows
+        run: |
+          (cd llng-image && tar xzf images.tar.gz)
+          for f in llng-image/*.tar; do docker load --input $f; done
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Login to Docker Hub
@@ -228,6 +275,7 @@ jobs:
       - name: Build and push Docker image for full
         uses: docker/build-push-action@v4
         with:
+          platforms: linux/amd64,linux/arm64
           context: ./full
           push: true
           tags: |
@@ -251,6 +299,12 @@ jobs:
     needs: build-and-push-base
     runs-on: ubuntu-latest
     steps:
+      - name: Download artifacts (Docker images) from previous workflows
+        uses: actions/download-artifact@v2
+      - name: Load Docker images from previous workflows
+        run: |
+          (cd llng-image && tar xzf images.tar.gz)
+          for f in llng-image/*.tar; do docker load --input $f; done
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Login to Docker Hub
@@ -266,6 +320,7 @@ jobs:
       - name: Build and push Docker image for SSOaaS FastCGI Server
         uses: docker/build-push-action@v4
         with:
+          platforms: linux/amd64,linux/arm64
           context: ./ssoaas-fastcgi-server
           push: true
           tags: |
@@ -289,6 +344,12 @@ jobs:
     needs: build-and-push-full
     runs-on: ubuntu-latest
     steps:
+      - name: Download artifacts (Docker images) from previous workflows
+        uses: actions/download-artifact@v2
+      - name: Load Docker images from previous workflows
+        run: |
+          (cd llng-image && tar xzf images.tar.gz)
+          for f in llng-image/*.tar; do docker load --input $f; done
       - name: Get current date
         id: date
         run: echo "::set-output name=date::$(date +'%Y%m%d')"
@@ -313,6 +374,7 @@ jobs:
       - name: Build and push Docker image for dev
         uses: docker/build-push-action@v4
         with:
+          platforms: linux/amd64,linux/arm64
           context: ./dev
           push: true
           tags: |

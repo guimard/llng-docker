@@ -25,3 +25,7 @@ else
 	echo
 	echo "Built. Next: docker push yadd/lemonldap-ng-dev:$VERSION-$DATE"
 fi
+
+if test "$IMAGE_EXPORT" = "yes"; then
+	docker save yadd/lemonldap-ng-dev:latest > /tmp/dev.tar
+fi
