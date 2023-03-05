@@ -28,7 +28,7 @@ for i in $LIST; do
 	(
 	cd $i
 	if test -x clean; then
-		./clean
+		./clean || true
 	fi
 	)
 done
