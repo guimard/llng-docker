@@ -353,5 +353,5 @@ jobs:
           push: true
           tags: |
             yadd/lemonldap-ng-dev:latest
-            #yadd/lemonldap-ng-dev:${{ env.VERSION }}-${{ steps.date.outputs.date }}
+            yadd/lemonldap-ng-dev:${{ env.DEBIANVERSION }}
           label: ${{ steps.meta.outputs.labels }}
