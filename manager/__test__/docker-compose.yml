@@ -12,7 +12,7 @@ services:
     depends_on:
       - redis
   manager.example.com:
-    image: yadd/lemonldap-ng-portal
+    image: yadd/lemonldap-ng-manager
     environment:
       - LOGGER=stderr
       - USERLOGGER=stderr
