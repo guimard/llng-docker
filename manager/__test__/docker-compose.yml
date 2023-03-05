@@ -1,0 +1,30 @@
+version: "3.4"
+
+services:
+  redis:
+    image: redis
+  auth.example.com:
+    image: yadd/lemonldap-ng-portal
+    environment:
+      - LOGGER=stderr
+      - USERLOGGER=stderr
+      - REDIS_SERVER=redis:6379
+    depends_on:
+      - redis
+  manager.example.com:
+    image: yadd/lemonldap-ng-portal
+    environment:
+      - LOGGER=stderr
+      - USERLOGGER=stderr
+      - REDIS_SERVER=redis:6379
+    depends_on:
+      - redis
+  test:
+    image: yadd/lemonldap-ng-manager-test
+    build:
+      context: .
+    depends_on:
+      auth.example.com:
+        condition: service_started
+      manager.example.com:
+        condition: service_started
