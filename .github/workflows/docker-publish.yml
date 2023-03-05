@@ -20,7 +20,7 @@ jobs:
         env:
           VERSION: ${{ env.VERSION }}
           IMAGE_EXPORT: yes
-      - name: Upload frontend image as artifact
+      - name: Upload llng images as artifact
         uses: actions/upload-artifact@v2
         with:
           name: llng-image
@@ -51,7 +51,6 @@ jobs:
       - name: Build and push Docker image for pg
         uses: docker/build-push-action@v4
         with:
-          platforms: linux/amd64,linux/arm64
           context: ./pg
           push: true
           tags: |
@@ -95,7 +94,6 @@ jobs:
       - name: Build and push Docker image for base
         uses: docker/build-push-action@v4
         with:
-          platforms: linux/amd64,linux/arm64
           context: ./base
           push: true
           tags: |
@@ -140,7 +138,6 @@ jobs:
       - name: Build and push Docker image for portal
         uses: docker/build-push-action@v4
         with:
-          platforms: linux/amd64,linux/arm64
           context: ./portal
           push: true
           tags: |
@@ -185,7 +182,6 @@ jobs:
       - name: Build and push Docker image for cron
         uses: docker/build-push-action@v4
         with:
-          platforms: linux/amd64,linux/arm64
           context: ./cron
           push: true
           tags: |
@@ -230,7 +226,6 @@ jobs:
       - name: Build and push Docker image for manager
         uses: docker/build-push-action@v4
         with:
-          platforms: linux/amd64,linux/arm64
           context: ./manager
           push: true
           tags: |
@@ -275,7 +270,6 @@ jobs:
       - name: Build and push Docker image for full
         uses: docker/build-push-action@v4
         with:
-          platforms: linux/amd64,linux/arm64
           context: ./full
           push: true
           tags: |
@@ -320,7 +314,6 @@ jobs:
       - name: Build and push Docker image for SSOaaS FastCGI Server
         uses: docker/build-push-action@v4
         with:
-          platforms: linux/amd64,linux/arm64
           context: ./ssoaas-fastcgi-server
           push: true
           tags: |
@@ -374,7 +367,6 @@ jobs:
       - name: Build and push Docker image for dev
         uses: docker/build-push-action@v4
         with:
-          platforms: linux/amd64,linux/arm64
           context: ./dev
           push: true
           tags: |
