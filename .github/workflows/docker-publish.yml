@@ -17,6 +17,8 @@ jobs:
         uses: actions/checkout@v3
       - name: build_and_test
         run: ./build-all
+        env:
+          VERSION: ${{ env.VERSION }}
 
   build-and-push-pg:
     needs: test
