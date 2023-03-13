@@ -12,11 +12,11 @@ for i in $LIST; do
 	else
 		NAME=`grep 'name="yadd/' Dockerfile|sed -e 's/.*name="//' -e 's/".*$//'`
 		docker build --rm -t $NAME .
-		if test "$PUBLISH" = "yes"; then
-			docker push $NAME
-		fi
 		if test "$IMAGE_EXPORT" = "yes"; then
 			docker save $NAME > /tmp/$i.tar
+		fi
+		if test "$PUBLISH" = "yes"; then
+			docker push $NAME
 		fi
 	fi
 	if test -x test; then
