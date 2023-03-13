@@ -19,8 +19,9 @@ docker build --rm -t yadd/lemonldap-ng-dev:$VERSION-$DATE -t yadd/lemonldap-ng-d
 
 if test "$PUBLISH" = "yes"; then
 	echo
-	echo "docker push yadd/lemonldap-ng-dev:$VERSION-$DATE"
-	docker push yadd/lemonldap-ng-dev:$VERSION-$DATE yadd/lemonldap-ng-dev:latest
+	#echo "docker push yadd/lemonldap-ng-dev:$VERSION-$DATE"
+	#docker push yadd/lemonldap-ng-dev:$VERSION-$DATE yadd/lemonldap-ng-dev:latest
+	docker push yadd/lemonldap-ng-dev:latest
 else
 	echo
 	echo "Built. Next: docker push yadd/lemonldap-ng-dev:$VERSION-$DATE"

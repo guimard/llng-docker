@@ -49,7 +49,7 @@ jobs:
           tags: |
             yadd/lemonldap-ng-pg-database:latest
             yadd/lemonldap-ng-pg-database:${{ env.PGVERSION }}
-            yadd/lemonldap-ng-pg-database:${{ env.PGVERSION }}-bullseye
+            yadd/lemonldap-ng-pg-database:${{ env.PGVERSION }}-${{ env.DEBIANVERSION }}
           label: ${{ steps.meta.outputs.labels }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
