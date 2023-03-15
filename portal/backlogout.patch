@@ -537,7 +537,7 @@ index f06942910..e36429d01 100644
      # Exported Vars
      if (
          ref( $self->conf->{oidcServiceDynamicRegistrationExportedVars} ) eq
-@@ -2184,22 +2238,82 @@ sub logout {
+@@ -2184,22 +2238,85 @@ sub logout {
                  return PE_ERROR;
              }
              if ( my $url = $rpConf->{oidcRPMetaDataOptionsLogoutUrl} ) {
@@ -611,6 +611,8 @@ index f06942910..e36429d01 100644
 +                        $logoutToken->{sid} =
 +                          $self->getSidFromSession( $rp, $req->{sessionInfo} );
 +                    }
++                    $self->logger->debug( "Logout token content: "
++                          . JSON::to_json($logoutToken) );
 +                    my $jwt  = $self->createJWT( $logoutToken, $alg, $rp );
 +                    my $resp = $self->ua->post(
 +                        $url,
@@ -619,13 +621,14 @@ index f06942910..e36429d01 100644
 +                    );
 +                    $resp->is_error
 +                      ? $self->logger->warn(
-+                        "OIDC back channel: unable to unlog $userId from $rp")
++                        "OIDC back channel: unable to unlog $userId from $rp: "
++                          . $resp->status_line )
 +                      : $self->logger->info(
 +                        "OIDC back channel: user $userId unlogged from $rp");
                  }
              }
          }
-@@ -2284,58 +2398,59 @@ sub metadata {
+@@ -2284,58 +2401,59 @@ sub metadata {
              issuer => $issuer,
  
              # Endpoints
@@ -707,7 +710,7 @@ index f06942910..e36429d01 100644
      # request_object_signing_alg_values_supported
      # request_object_encryption_alg_values_supported
      # request_object_encryption_enc_values_supported
-@@ -2343,7 +2458,6 @@ sub metadata {
+@@ -2343,7 +2461,6 @@ sub metadata {
      # token_endpoint_auth_signing_alg_values_supported
      # display_values_supported
      # claim_types_supported
@@ -715,7 +718,7 @@ index f06942910..e36429d01 100644
      # service_documentation
      # claims_locales_supported
      # ui_locales_supported
-@@ -2493,11 +2607,12 @@ sub _generateIDToken {
+@@ -2493,11 +2610,12 @@ sub _generateIDToken {
          acr       => $id_token_acr,  # Authentication Context Class Reference
          azp       => $client_id,     # Authorized party, this is used for logout
                                       # TODO amr
@@ -729,7 +732,7 @@ index f06942910..e36429d01 100644
      }
  
      # Decided by response_type or forced in RP config
-@@ -2509,7 +2624,7 @@ sub _generateIDToken {
+@@ -2509,7 +2627,7 @@ sub _generateIDToken {
  
          foreach ( keys %$claims ) {
              $id_token_payload_hash->{$_} = $claims->{$_}
