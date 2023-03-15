@@ -1,0 +1,897 @@
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Auth/OpenIDConnect.pm b/usr/share/perl5/Lemonldap/NG/Portal/Auth/OpenIDConnect.pm
+index 4c4654559..fa4c0e7b1 100644
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Auth/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Auth/OpenIDConnect.pm
+@@ -2,16 +2,17 @@ package Lemonldap::NG::Portal::Auth::OpenIDConnect;
+ 
+ use strict;
+ use Mouse;
+-use MIME::Base64 qw/encode_base64 decode_base64/;
+-use Scalar::Util qw/looks_like_number/;
+-use Lemonldap::NG::Common::JWT qw(getJWTPayload);
++use MIME::Base64                           qw/encode_base64 decode_base64/;
++use Scalar::Util                           qw/looks_like_number/;
++use Lemonldap::NG::Common::JWT             qw(getJWTPayload);
+ use Lemonldap::NG::Portal::Main::Constants qw(
+   PE_OK
+   PE_IDPCHOICE
+   PE_OIDC_AUTH_ERROR
++  PE_SENDRESPONSE
+ );
+ 
+-our $VERSION = '2.0.16';
++our $VERSION = '2.17.0';
+ 
+ extends qw(
+   Lemonldap::NG::Portal::Main::Auth
+@@ -20,8 +21,9 @@ extends qw(
+ 
+ # INTERFACE
+ 
+-has opList => ( is => 'rw', isa => 'ArrayRef', default => sub { [] } );
+-has path => ( is => 'rw', default => 'oauth2' );
++has opList      => ( is => 'rw', isa     => 'ArrayRef', default => sub { [] } );
++has path        => ( is => 'rw', default => 'oauth2' );
++has endpointsRe => ( is => 'rw' );
+ 
+ use constant sessionKind => 'OIDC';
+ 
+@@ -71,14 +73,26 @@ sub init {
+           };
+     }
+ 
++    my $portal = $self->conf->{portal};
++    my $re     = '^/' . $self->path . '/(?:' . join(
++        '|',
++        map {
++            my $s = $self->conf->{$_};
++            $s =~ s/^$portal\/*//;
++            $s =~ s/#PORTAL#\/*//;
++            $s
++        } ( qw(
++              oidcServiceMetaDataFrontChannelURI
++              oidcServiceMetaDataBackChannelURI
++            )
++        )
++    ) . ')(?:[\?/].*)?$';
++
++    $self->endpointsRe(qr/$re/);
++
+     # If this module has already been loaded,
+     # skip routes to avoid a warning in conf
+     if ( !$self->p->loadedModules->{ ref($self) } ) {
+-        $self->addRouteFromConf(
+-            'Unauth',
+-            oidcServiceMetaDataFrontChannelURI => 'alreadyLoggedOut',
+-            oidcServiceMetaDataBackChannelURI  => 'backLogout',
+-        );
+         $self->addRouteFromConf(
+             'Auth',
+             oidcServiceMetaDataFrontChannelURI => 'frontLogout',
+@@ -100,6 +114,20 @@ sub init {
+ 
+ sub extractFormInfo {
+     my ( $self, $req ) = @_;
++    if ( $req->uri =~ $self->endpointsRe ) {
++        my $path = $req->path;
++        my $tmp  = $self->path;
++        $path =~ s#^/*\Q$tmp\E/*##o;
++        $path =~ s#/.*$##;
++        if ( $path eq $self->conf->{oidcServiceMetaDataBackChannelURI} ) {
++            $req->response( $self->backLogout($req) );
++            return PE_SENDRESPONSE;
++        }
++        elsif ( $path eq $self->conf->{oidcServiceMetaDataFrontChannelURI} ) {
++            $req->response( $self->searchAndLogout($req) );
++            return PE_SENDRESPONSE;
++        }
++    }
+ 
+     # Check callback
+     if ( $req->param( $self->conf->{oidcRPCallbackGetParam} ) ) {
+@@ -245,6 +273,10 @@ sub extractFormInfo {
+         $req->data->{refresh_token} = $refresh_token if $refresh_token;
+         $req->data->{id_token}      = $id_token;
+ 
++        # Remember sid claim if given
++        $req->data->{op_sid} = $id_token_payload_hash->{sid}
++          if $id_token_payload_hash->{sid};
++
+         # If access token TTL is given save expiration date
+         # (with security margin)
+         if ($expires_in) {
+@@ -351,6 +383,10 @@ sub setAuthSessionInfo {
+           $req->data->{access_token_eol};
+     }
+ 
++    if ( $req->data->{op_sid} ) {
++        $req->{sessionInfo}->{_oidc_sid} = $req->data->{op_sid};
++    }
++
+     # Keep ID Token in session
+     my $store_IDToken = $self->conf->{oidcOPMetaDataOptions}->{$op}
+       ->{oidcOPMetaDataOptionsStoreIDToken};
+@@ -368,6 +404,8 @@ sub setAuthSessionInfo {
+ sub authLogout {
+     my ( $self, $req ) = @_;
+ 
++    return PE_OK if $req->data->{oidcSkipLogout};
++
+     my $op = $req->{sessionInfo}->{_oidc_OP};
+ 
+     # Find endession endpoint
+@@ -400,32 +438,222 @@ sub getDisplayType {
+     return "logo";
+ }
+ 
+-sub alreadyLoggedOut {
++sub searchAndLogout {
+     my ( $self, $req ) = @_;
+     $self->userLogger->info(
+-        'Front-channel logout request for an already logged out user');
+-    my $img = $self->conf->{staticPrefix} . '/common/icons/ok.png';
++        'Front-channel logout request called without cookie');
++    $req->data->{frontLogoutSearch} = 1;
++    return $self->frontLogout($req);
++}
++
++sub frontLogout {
++    my ( $self, $req ) = @_;
++
++    # No double disconnect
++    $req->data->{oidcSkipLogout} = 1;
+ 
+-    # No need to protect this frame
++    # Response should be displayed in an iframe
+     $req->frame(1);
+-    my $frame = qq'<html><body><img src="$img"></body></html>';
+-    return [
++
++    # TODO check iss and sid
++    my $iss        = $req->param('iss');
++    my $sid        = $req->param('sid');
++    my $badRequest = 0;
++    my $logName    = 'OIDC FC Logout';
++
++    my $img      = $self->conf->{staticPrefix} . '/common/icons/ok.png';
++    my $frame    = qq'<html><body><img src="$img"></body></html>';
++    my $response = [
+         200,
+-        [ 'Content-Type' => 'text/html', 'Content-Length' => length($frame) ],
++        [
++            'Content-Type'   => 'text/html',
++            'Content-Length' => length($frame)
++        ],
+         [$frame]
+     ];
+-}
+ 
+-sub frontLogout {
+-    my ( $self, $req ) = @_;
+-    return $self->p->sendError( $req,
+-        'Front Channel logout is not implemented', 501 );
++    # LLNG requires sid and iss
++    unless ( $iss and $sid ) {
++        $self->userLogger->error(
++            'OIDC Front-Channel-Logout called without sid and iss');
++        $badRequest++;
++    }
++    elsif ( $req->data->{frontLogoutSearch} ) {
++        my %store = %{ $self->conf->{globalStorageOptions} };
++        $store{backend} = $self->conf->{globalStorage};
++        my $oidcSessions =
++          Lemonldap::NG::Common::Apache::Session->searchOn( \%store,
++            '_oidc_sid', $sid );
++        my @sessionToDelete = keys %$oidcSessions;
++        foreach (@sessionToDelete) {
++            if ( my $as = $self->p->getApacheSession($_) ) {
++                if ( $self->p->_deleteSession( $req, $as, 1 ) ) {
++                    $self->logger->debug(
++                        "$logName: session $_ deleted from global storage");
++                }
++                else {
++                    $self->logger->error(
++                        "$logName: unable to delete session $_");
++                    $self->logger->error( $as->error );
++                }
++            }
++        }
++        return $response;
++    }
++    else {
++        unless ( $req->userData->{_oidc_sid} and $req->userData->{_oidc_OP} ) {
++            $self->logger->error(
++                "$logName: key _oidc_sid not stored in session");
++            $badRequest++;
++        }
++        else {
++            if ( $sid ne $req->userData->{_oidc_sid} ) {
++                $self->userLogger->error(
++                    'OIDC Front-Channel-Logout: sid mismatch');
++                $badRequest++;
++            }
++        }
++    }
++    if ($badRequest) {
++        return $self->p->sendError( $req, 'Bad OIDC Logout Request', 200 );
++    }
++    return $self->p->do(
++        $req,
++        [
++            @{ $self->p->beforeLogout },
++            'authLogout',
++            'deleteSession',
++            sub {
++                $req->response($response);
++                return PE_SENDRESPONSE;
++            }
++        ]
++    );
+ }
+ 
++# Implements https://openid.net/specs/openid-connect-backchannel-1_0.html
+ sub backLogout {
+     my ( $self, $req ) = @_;
+-    return $self->p->sendError( $req, 'Back Channel logout is not implemented',
+-        501 );
++    my $logName = 'OIDC BC Logout';
++
++    # REQUIRED CHECKS
++
++    # Back channel requires POST
++    return $self->p->sendError( $req, 'Only POST allowed', 400 )
++      if $req->method ne 'POST';
++
++    # Back channel requires logout_token
++    my $content = $req->body_parameters;
++    return $self->p->sendError( $req, 'logout_token not found', 400 )
++      unless $content and $content->{logout_token};
++
++    # Decode token
++    my $logoutToken = $content->{logout_token};
++    my $payload     = getJWTPayload($logoutToken)
++      or
++      return $self->p->sendError( $req, 'Could not decode logout token', 400 );
++
++    # TODO: validate "alg" header => prohibit "none" value
++
++    # Required fields
++    foreach (qw(iss aud iat jti events)) {
++        return $self->p->sendError( $req, "Missing $_", 400 )
++          unless $payload->{$_};
++    }
++    return $self->p->sendError( $req, 'Missing sub/sid', 400 )
++      unless $payload->{sub} or $payload->{sid};
++
++    # Get iss and found related OP
++    my $op;
++    foreach ( keys %{ $self->oidcOPList } ) {
++        if ( $self->oidcOPList->{$_}->{conf}->{issuer} eq $payload->{iss} ) {
++            $op = $_;
++            last;
++        }
++    }
++    return $self->p->sendError( $req, 'Issuer not found', 400 ) unless $op;
++
++    # Verify signature
++    return $self->p->sendError( $req, 'Bad signature', 400 )
++      unless $self->verifyJWTSignature( $logoutToken, $op );
++
++    # Verify audience
++    return $self->p->error( $req, 'Bad aud', 400 )
++      unless ref $payload->{aud} eq 'ARRAY';
++    return $self->p->error( $req, 'Client ID not found in audience array', 400 )
++      unless grep {
++        $_ eq $self->conf->{oidcOPMetaDataOptions}->{$op}
++          ->{oidcOPMetaDataOptionsClientID}
++      } @{ $payload->{aud} };
++
++    # Verify iat
++    return $self->p->error( $req, 'Token too old', 400 )
++      unless $payload->{iat} +
++      ( $self->conf->{oidcOPMetaDataOptions}->{$op}
++          ->{oidcOPMetaDataOptionsIDTokenMaxAge} // 30 ) > time;
++
++    # Verify events
++    return $self->p->error( $req, 'Bad events', 400 )
++      unless ref $payload->{events} eq 'HASH'
++      and $payload->{events}->{ $self->BACKCHANNEL_EVENTSKEY() }
++      and ref $payload->{events}->{ $self->BACKCHANNEL_EVENTSKEY() } eq 'HASH';
++
++    # Verify nonce
++    return $self->p->error( $req, 'Bad request', 400 ) if $payload->{nonce};
++
++    # Now request is valid, even if session isn't found, response will be 200
++
++    # Find session
++    my $uid   = $payload->{sub};
++    my $sid   = $payload->{sid};
++    my %store = %{ $self->conf->{globalStorageOptions} };
++    $store{backend} = $self->conf->{globalStorage};
++    my @userSessions;
++    if ($sid) {
++        my $oidcSessions =
++          Lemonldap::NG::Common::Apache::Session->searchOn( \%store,
++            '_oidc_sid', $sid );
++        @userSessions = keys %$oidcSessions;
++    }
++    else {
++        my $oidcSessions =
++          Lemonldap::NG::Common::Apache::Session->searchOn( \%store,
++            '_user', $uid );
++        @userSessions =
++          grep {
++                  $oidcSessions->{$_}->{_oidc_OP}
++              and $oidcSessions->{$_}->{_oidc_OP} eq $op;
++          } keys %$oidcSessions;
++    }
++    if (@userSessions) {
++        if ($#userSessions) {
++            $self->logger->warn(
++"$logName: more than one link found between $uid and $op, cleanong all"
++            );
++        }
++        foreach (@userSessions) {
++            if ( my $as = $self->p->getApacheSession($_) ) {
++                if ( $self->p->_deleteSession( $req, $as, 1 ) ) {
++                    $self->logger->debug(
++                        "$logName: session $_ deleted from global storage");
++                }
++                else {
++                    $self->logger->error(
++                        "$logName: unable to delete session $_");
++                    $self->logger->error( $as->error );
++                }
++            }
++            else {
++                $self->logger->info(
++                    "$logName: session $_ for user $uid already deleted");
++            }
++        }
++    }
++    else {
++        $self->logger->warn("$logName: no session found for $uid");
++    }
++
++    return [ 200, [], [] ];
+ }
+ 
+ 1;
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm b/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
+index f06942910..e36429d01 100644
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
+@@ -1,7 +1,7 @@
+ package Lemonldap::NG::Portal::Issuer::OpenIDConnect;
+ 
+ use strict;
+-use JSON qw(from_json to_json);
++use JSON                       qw(from_json to_json);
+ use Lemonldap::NG::Common::JWT qw(getJWTPayload);
+ use Mouse;
+ use Lemonldap::NG::Common::FormEncode;
+@@ -22,7 +22,7 @@ use Lemonldap::NG::Portal::Main::Constants qw(
+ );
+ use String::Random qw/random_string/;
+ 
+-our $VERSION = '2.0.15';
++our $VERSION = '2.17.0';
+ 
+ extends qw(
+   Lemonldap::NG::Portal::Main::Issuer
+@@ -360,29 +360,6 @@ sub run {
+                 return $self->reAuth($req);
+             }
+ 
+-            my $max_age         = $oidc_request->{'max_age'};
+-            my $_lastAuthnUTime = $req->{sessionInfo}->{_lastAuthnUTime};
+-            if ( $max_age && time > $_lastAuthnUTime + $max_age ) {
+-                $self->logger->debug(
+-"Reauthentication forced because authentication time ($_lastAuthnUTime) is too old (>$max_age s)"
+-                );
+-                $req->pdata->{targetAuthnLevel} = $spAuthnLevel;
+-                return $self->reAuth($req);
+-            }
+-
+-            # Check if we have sufficient auth level
+-            my $authenticationLevel =
+-              $req->{sessionInfo}->{authenticationLevel} || 0;
+-            if ( $authenticationLevel < $spAuthnLevel ) {
+-                $self->logger->debug(
+-                        "Insufficient authentication level for service $rp"
+-                      . " (has: $authenticationLevel, want: $spAuthnLevel)" );
+-
+-                # Reauth with sp auth level as target
+-                $req->pdata->{targetAuthnLevel} = $spAuthnLevel;
+-                return $self->upgradeAuth($req);
+-            }
+-
+             # Check scope validity
+             # We use a slightly more relaxed version of
+             # https://tools.ietf.org/html/rfc6749#appendix-A.4
+@@ -451,6 +428,29 @@ sub run {
+                 }
+             }
+ 
++            my $max_age         = $oidc_request->{'max_age'};
++            my $_lastAuthnUTime = $req->{sessionInfo}->{_lastAuthnUTime};
++            if ( $max_age && time > $_lastAuthnUTime + $max_age ) {
++                $self->logger->debug(
++"Reauthentication forced because authentication time ($_lastAuthnUTime) is too old (>$max_age s)"
++                );
++                $req->pdata->{targetAuthnLevel} = $spAuthnLevel;
++                return $self->reAuth($req);
++            }
++
++            # Check if we have sufficient auth level
++            my $authenticationLevel =
++              $req->{sessionInfo}->{authenticationLevel} || 0;
++            if ( $authenticationLevel < $spAuthnLevel ) {
++                $self->logger->debug(
++                        "Insufficient authentication level for service $rp"
++                      . " (has: $authenticationLevel, want: $spAuthnLevel)" );
++
++                # Reauth with sp auth level as target
++                $req->pdata->{targetAuthnLevel} = $spAuthnLevel;
++                return $self->upgradeAuth($req);
++            }
++
+             # Compute scopes
+             my $req_scope = $oidc_request->{'scope'};
+             my $scope     = $self->getScope( $req, $rp, $req_scope );
+@@ -1011,8 +1011,11 @@ sub run {
+                 # trivial to bypass
+                 my $payload = getJWTPayload($id_token_hint);
+                 my $azp     = $payload->{azp};
++                my $sid     = $payload->{sid};
++                my $sub     = $payload->{sub};
+ 
+                 # Check bypassConfirm parameter for rp using audience
++                my $rp;
+                 foreach ( keys %{ $self->conf->{oidcRPMetaDataOptions} } ) {
+                     my $logout_rp = $_;
+                     my $rpid =
+@@ -1027,9 +1030,34 @@ sub run {
+                         $self->logger->debug(
+                             "Bypass logout confirm for RP $logout_rp")
+                           if $bypassConfirm;
++                        $rp = $logout_rp;
+                         last;
+                     }
+                 }
++
++                unless ($rp) {
++                    $self->userLogger->error(
++                        "ID Token hint azp doesn't match any known RP");
++                    $bypassConfirm = 0;
++                }
++
++                my $user_id =
++                  $self->getUserIDForRP( $req, $rp, $req->{sessionInfo} );
++                unless ( $sub eq $user_id ) {
++                    $self->userLogger->error(
++                        "ID Token hint sub $sub does not match user $user_id");
++                    $bypassConfirm = 0;
++                }
++                else {
++                    if ( $self->getSidFromSession( $rp, $req->{sessionInfo} ) ne
++                        $sid )
++                    {
++                        $self->userLogger->error(
++                            "ID Token hint `sid` does not match user session");
++                        $bypassConfirm = 0;
++                    }
++                }
++
+             }
+ 
+             # Ask consent for logout
+@@ -2004,7 +2032,8 @@ sub registration {
+ 
+     $self->logger->debug("Client metadata received: $client_metadata_json");
+ 
+-    my $client_metadata = $self->decodeClientMetadata($client_metadata_json);
++    my $client_metadata = $self->decodeClientMetadata($client_metadata_json)
++      or return $self->p->sendError( $req, 'invalid_client_metadata', 400 );
+     my $registration_response = {};
+ 
+     # Check redirect_uris
+@@ -2029,7 +2058,13 @@ sub registration {
+       $client_metadata->{id_token_signed_response_alg} || "RS256";
+     my $userinfo_signed_response_alg =
+       $client_metadata->{userinfo_signed_response_alg};
+-    my $redirect_uris = $client_metadata->{redirect_uris};
++    my $redirect_uris          = $client_metadata->{redirect_uris};
++    my $backchannel_logout_uri = $client_metadata->{backchannel_logout_uri};
++    my $backchannel_logout_session_required =
++      $client_metadata->{backchannel_logout_session_required};
++    my $frontchannel_logout_uri = $client_metadata->{backchannel_logout_uri};
++    my $frontchannel_logout_session_required =
++      $client_metadata->{frontchannel_logout_session_required};
+ 
+     # Register RP in global configuration
+     my $conf = $self->confAcc->getConf( { raw => 1, noCache => 1 } );
+@@ -2055,6 +2090,25 @@ sub registration {
+       ->{oidcRPMetaDataOptionsUserInfoSignAlg} = $userinfo_signed_response_alg
+       if defined $userinfo_signed_response_alg;
+ 
++    if ($frontchannel_logout_uri) {
++        $conf->{oidcRPMetaDataOptions}->{$rp}->{oidcRPMetaDataOptionsLogoutType}
++          = 'front';
++        $conf->{oidcRPMetaDataOptions}->{$rp}->{oidcRPMetaDataOptionsLogoutUrl}
++          = $frontchannel_logout_uri;
++        $conf->{oidcRPMetaDataOptions}->{$rp}
++          ->{oidcRPMetaDataOptionsLogoutSessionRequired} =
++          $frontchannel_logout_session_required;
++    }
++    elsif ($backchannel_logout_uri) {
++        $conf->{oidcRPMetaDataOptions}->{$rp}->{oidcRPMetaDataOptionsLogoutType}
++          = 'back';
++        $conf->{oidcRPMetaDataOptions}->{$rp}->{oidcRPMetaDataOptionsLogoutUrl}
++          = $backchannel_logout_uri;
++        $conf->{oidcRPMetaDataOptions}->{$rp}
++          ->{oidcRPMetaDataOptionsLogoutSessionRequired} =
++          $backchannel_logout_session_required;
++    }
++
+     # Exported Vars
+     if (
+         ref( $self->conf->{oidcServiceDynamicRegistrationExportedVars} ) eq
+@@ -2184,22 +2238,82 @@ sub logout {
+                 return PE_ERROR;
+             }
+             if ( my $url = $rpConf->{oidcRPMetaDataOptionsLogoutUrl} ) {
++
++                # FRONT CHANNEL
+                 if ( $rpConf->{oidcRPMetaDataOptionsLogoutType} eq 'front' ) {
+                     if ( $rpConf->{oidcRPMetaDataOptionsLogoutSessionRequired} )
+                     {
+-                        my $user_id = $self->getUserIDForRP( $req, $rp,
+-                            $req->{sessionInfo} );
+                         $url .= ( $url =~ /\?/ ? '&' : '?' )
+                           . build_urlencoded(
+                             iss => $self->iss,
+-                            sid => $user_id
++                            sid => $self->getSidFromSession(
++                                $rp, $req->{sessionInfo}
++                            )
+                           );
+                     }
+                     $req->info( qq'<iframe src="$url" class="noborder">'
+                           . '</iframe>' );
+                 }
+-                else {
+-                    # TODO #1194
++
++                # BACK CHANNEL
++                elsif ( $rpConf->{oidcRPMetaDataOptionsLogoutType} eq 'back' ) {
++
++                    # Logout token must contain:
++                    #  - iss: issuer identifier
++                    #  - sub: subject id (user id)
++                    #  OR/AND
++                    #  - sid: OP session id given to the RP
++                    #  - aud: audience
++                    #  - iat: issue at time
++                    #  - jti: JWT token id
++                    #  - events: should be :
++                    #   { 'http://schemas.openid.net/event/backchannel-logout"
++                    #     => {} } # or a JSON object
++                    #
++                    # Logout token should be send using a POST request:
++                    #
++                    #   POST /backChannelUri HTTP/1.1
++                    #   Host: rp
++                    #   Content-Type: application/x-www-form-urlencoded
++                    #
++                    #   logout_token=<JWT value>
++                    #
++                    # RP response should be 200 (204 accepted) or 400 for errors
++                    my $alg = $self->conf->{oidcRPMetaDataOptions}->{$rp}
++                      ->{oidcRPMetaDataOptionsAccessTokenSignAlg} || "RS256";
++                    $self->logger->debug(
++                        "Access Token signature algorithm: $alg");
++                    my $userId =
++                      $self->getUserIDForRP( $req, $rp, $req->userData );
++                    my $logoutToken = {
++                        iss => $self->iss,
++                        sub => $userId,
++                        aud => $self->getAudiences($rp),
++                        iat => time,
++
++                        # Random string: no response expected from RP
++                        jti => join( "",
++                            map { [ "0" .. "9", 'A' .. 'Z' ]->[ rand 36 ] }
++                              1 .. 8 ),
++                        events => { $self->BACKCHANNEL_EVENTSKEY => {} },
++                    };
++                    if ( $self->conf->{oidcRPMetaDataOptions}->{$rp}
++                        ->{oidcRPMetaDataOptionsLogoutSessionRequired} )
++                    {
++                        $logoutToken->{sid} =
++                          $self->getSidFromSession( $rp, $req->{sessionInfo} );
++                    }
++                    my $jwt  = $self->createJWT( $logoutToken, $alg, $rp );
++                    my $resp = $self->ua->post(
++                        $url,
++                        { logout_token => $jwt },
++                        'Content-Type' => 'application/x-www-form-urlencoded',
++                    );
++                    $resp->is_error
++                      ? $self->logger->warn(
++                        "OIDC back channel: unable to unlog $userId from $rp")
++                      : $self->logger->info(
++                        "OIDC back channel: user $userId unlogged from $rp");
+                 }
+             }
+         }
+@@ -2284,58 +2398,59 @@ sub metadata {
+             issuer => $issuer,
+ 
+             # Endpoints
++            authorization_endpoint => $baseUrl . $authorize_uri,
+             token_endpoint         => $baseUrl . $token_uri,
+             userinfo_endpoint      => $baseUrl . $userinfo_uri,
+             jwks_uri               => $baseUrl . $jwks_uri,
+-            authorization_endpoint => $baseUrl . $authorize_uri,
+-            end_session_endpoint   => $baseUrl . $endsession_uri,
+-
+-            #check_session_iframe   => $baseUrl . $checksession_uri,
+-            introspection_endpoint => $baseUrl . $introspection_uri,
+-
+-            # Logout capabilities
+-            backchannel_logout_supported          => JSON::false,
+-            backchannel_logout_session_supported  => JSON::false,
+-            frontchannel_logout_supported         => JSON::true,
+-            frontchannel_logout_session_supported => JSON::true,
+             (
+                 $self->conf->{oidcServiceAllowDynamicRegistration}
+                 ? ( registration_endpoint => $baseUrl . $registration_uri )
+                 : ()
+             ),
++            end_session_endpoint => $baseUrl . $endsession_uri,
++
++            #check_session_iframe   => $baseUrl . $checksession_uri,
++            introspection_endpoint => $baseUrl . $introspection_uri,
+ 
+             # Scopes
+             scopes_supported => [qw/openid profile email address phone/],
+-            response_types_supported              => $response_types,
+-            grant_types_supported                 => $grant_types,
+-            acr_values_supported                  => \@acr,
+-            subject_types_supported               => ["public"],
++            response_types_supported => $response_types,
++            response_modes_supported => [ "query", "fragment", "form_post", ],
++            grant_types_supported    => $grant_types,
++            acr_values_supported     => \@acr,
++            subject_types_supported  => ["public"],
+             token_endpoint_auth_methods_supported =>
+               [qw/client_secret_post client_secret_basic/],
+             introspection_endpoint_auth_methods_supported =>
+               [qw/client_secret_post client_secret_basic/],
+-            claims_supported                 => [qw/sub iss auth_time acr/],
++            claims_supported                 => [qw/sub iss auth_time acr sid/],
+             request_parameter_supported      => JSON::true,
+             request_uri_parameter_supported  => JSON::true,
+             require_request_uri_registration => JSON::false,
+-            response_modes_supported => [ "query", "fragment", "form_post", ],
+ 
+             # Algorithms
+             id_token_signing_alg_values_supported =>
+               [qw/none HS256 HS384 HS512 RS256 RS384 RS512/],
++
++            # id_token_encryption_alg_values_supported
++            # id_token_encryption_enc_values_supported
+             userinfo_signing_alg_values_supported =>
+               [qw/none HS256 HS384 HS512 RS256 RS384 RS512/],
+ 
++            # userinfo_encryption_alg_values_supported
++            # userinfo_encryption_enc_values_supported
++
+             # PKCE
+             code_challenge_methods_supported => [qw/plain S256/],
++
++            # Logout supported methods
++            frontchannel_logout_supported         => JSON::true,
++            frontchannel_logout_session_supported => JSON::true,
++            backchannel_logout_supported          => JSON::true,
++            backchannel_logout_session_supported  => JSON::true,
+         }
+     );
+ 
+-    # id_token_encryption_alg_values_supported
+-    # id_token_encryption_enc_values_supported
+-
+-    # userinfo_encryption_alg_values_supported
+-    # userinfo_encryption_enc_values_supported
+     # request_object_signing_alg_values_supported
+     # request_object_encryption_alg_values_supported
+     # request_object_encryption_enc_values_supported
+@@ -2343,7 +2458,6 @@ sub metadata {
+     # token_endpoint_auth_signing_alg_values_supported
+     # display_values_supported
+     # claim_types_supported
+-    # RECOMMENDED # claims_supported
+     # service_documentation
+     # claims_locales_supported
+     # ui_locales_supported
+@@ -2493,11 +2607,12 @@ sub _generateIDToken {
+         acr       => $id_token_acr,  # Authentication Context Class Reference
+         azp       => $client_id,     # Authorized party, this is used for logout
+                                      # TODO amr
++        sid       => $self->getSidFromSession( $rp, $sessionInfo ), # Session id
+     };
+ 
+     for ( keys %{$extra_claims} ) {
+         $id_token_payload_hash->{$_} = $extra_claims->{$_}
+-          if $extra_claims->{$_};
++          if $extra_claims->{$_} and not $id_token_payload_hash->{$_};
+     }
+ 
+     # Decided by response_type or forced in RP config
+@@ -2509,7 +2624,7 @@ sub _generateIDToken {
+ 
+         foreach ( keys %$claims ) {
+             $id_token_payload_hash->{$_} = $claims->{$_}
+-              unless ( $_ eq "sub" );
++              unless ( $_ eq "sub" or $_ eq "sid" );
+         }
+     }
+ 
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
+index 4c84af886..4ee0837b8 100644
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
+@@ -27,7 +27,10 @@ use Crypt::URandom;
+ 
+ use Lemonldap::NG::Portal::Main::Constants qw(PE_OK PE_REDIRECT PE_ERROR);
+ 
+-our $VERSION = '2.0.15';
++our $VERSION = '2.17.0';
++
++use constant BACKCHANNEL_EVENTSKEY =>
++  'http://schemas.openid.net/event/backchannel-logout';
+ 
+ # OpenID Connect standard claims
+ use constant PROFILE => [
+@@ -742,7 +745,7 @@ sub checkIDTokenValidity {
+     # Check audience
+     if ( ref $id_token->{aud} ) {
+         my @audience = @{ $id_token->{aud} };
+-        unless ( grep $_ eq $client_id, @audience ) {
++        unless ( grep { $_ eq $client_id } @audience ) {
+             $self->logger->error("Client ID not found in audience array");
+             return 0;
+         }
+@@ -798,12 +801,12 @@ sub checkIDTokenValidity {
+ 
+     # Check acr
+     my $acr = $id_token->{acr};
+-    if ( defined $acr_values ) {
++    if ($acr_values) {
+         unless ($acr) {
+             $self->logger->error("ACR was not returned by OP $op");
+             return 0;
+         }
+-        unless ( $acr_values =~ /\b$acr\b/i ) {
++        unless ( grep { $_ eq $acr } split( /[\s,]+/, $acr_values ) ) {
+             $self->logger->error(
+                 "ACR $acr not listed in request ACR values ($acr_values)");
+             return 0;
+@@ -1003,6 +1006,10 @@ sub decodeJSON {
+ 
+     eval { $json_hash = from_json( $json, { allow_nonref => 1 } ); };
+     return undef if ($@);
++    unless ( ref $json_hash ) {
++        $self->logger->error("Wanted a JSON object, got: $json_hash");
++        return undef;
++    }
+ 
+     return $json_hash;
+ }
+@@ -1115,6 +1122,7 @@ sub makeJWT {
+         iat       => time,                        # Issued time
+         jti       => $id,                         # Access Token session ID
+         scope     => $scope,                      # Scope
++        sid       => $self->getSidFromSession( $rp, $sessionInfo ), # Session id
+     };
+ 
+     my $claims =
+@@ -1125,7 +1133,8 @@ sub makeJWT {
+         ->{oidcRPMetaDataOptionsAccessTokenClaims} )
+     {
+         foreach ( keys %$claims ) {
+-            $access_token_payload->{$_} = $claims->{$_};
++            $access_token_payload->{$_} = $claims->{$_}
++              unless $access_token_payload->{$_};
+         }
+     }
+     else {
+@@ -1213,20 +1222,8 @@ sub updateRefreshToken {
+ sub updateToken {
+     my ( $self, $id, $infos ) = @_;
+ 
+-    my %storage = (
+-        storageModule        => $self->conf->{oidcStorage},
+-        storageModuleOptions => $self->conf->{oidcStorageOptions},
+-    );
+-
+-    unless ( $storage{storageModule} ) {
+-        %storage = (
+-            storageModule        => $self->conf->{globalStorage},
+-            storageModuleOptions => $self->conf->{globalStorageOptions},
+-        );
+-    }
+-
+     my $oidcSession = Lemonldap::NG::Common::Session->new( {
+-            %storage,
++            $self->_storeOpts(),
+             cacheModule        => $self->conf->{localSessionStorage},
+             cacheModuleOptions => $self->conf->{localSessionStorageOptions},
+             id                 => $id,
+@@ -1248,22 +1245,11 @@ sub updateToken {
+ # @return Lemonldap::NG::Common::Session object
+ sub getOpenIDConnectSession {
+     my ( $self, $id, $type, $ttl, $info ) = @_;
+-    my %storage = (
+-        storageModule        => $self->conf->{oidcStorage},
+-        storageModuleOptions => $self->conf->{oidcStorageOptions},
+-    );
+ 
+     $ttl ||= $self->conf->{timeout};
+ 
+-    unless ( $storage{storageModule} ) {
+-        %storage = (
+-            storageModule        => $self->conf->{globalStorage},
+-            storageModuleOptions => $self->conf->{globalStorageOptions},
+-        );
+-    }
+-
+     my $oidcSession = Lemonldap::NG::Common::Session->new( {
+-            %storage,
++            $self->_storeOpts(),
+             cacheModule        => $self->conf->{localSessionStorage},
+             cacheModuleOptions => $self->conf->{localSessionStorageOptions},
+             id                 => $id,
+@@ -1347,7 +1333,7 @@ sub storeState {
+     return $self->state_ott->createToken($infos);
+ }
+ 
+-# Extract state information into $self
++# Extract state information into $req
+ sub extractState {
+     my ( $self, $req, $state ) = @_;
+ 
+@@ -2434,11 +2420,32 @@ sub getUserIDForRP {
+       : $data->{$user_id_attribute};
+ }
+ 
++# Return storage options
++sub _storeOpts {
++    my ($self) = @_;
++    my $storage =
++      $self->conf->{oidcStorage}
++      ? {
++        storageModule        => $self->conf->{oidcStorage},
++        storageModuleOptions => $self->conf->{oidcStorageOptions},
++      }
++      : {
++        storageModule        => $self->conf->{globalStorage},
++        storageModuleOptions => $self->conf->{globalStorageOptions},
++      };
++    return %$storage;
++}
++
+ sub generateNonce {
+     my ($self) = @_;
+     return encode_base64url( Crypt::URandom::urandom(16) );
+ }
+ 
++sub getSidFromSession {
++    my ( $self, $rp, $sessionInfo ) = @_;
++    return Digest::SHA::hmac_sha256_base64($sessionInfo->{_session_id} . ':' . $rp );
++}
++
+ 1;
+ 
+ __END__

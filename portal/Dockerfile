@@ -9,7 +9,7 @@ RUN echo "# Install nginx and portal libs" && \
     apt -y --no-install-recommends install nginx \
         lemonldap-ng-fastcgi-server/${DEBIAN_VERSION}-backports \
         liblemonldap-ng-portal-perl/${DEBIAN_VERSION}-backports \
-        gsfonts \
+        gsfonts patch \
         libcrypt-u2f-server-perl libgeoip2-perl \
         libglib-perl libgssapi-perl libhttp-browserdetect-perl \
         libimage-magick-perl liblasso-perl libnet-facebook-oauth2-perl \
@@ -21,6 +21,10 @@ RUN echo "# Install nginx and portal libs" && \
         libio-socket-timeout-perl libunicode-string-perl liblasso-perl \
         libio-string-perl libemail-sender-perl && \
     apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/*
+
+COPY backlogout.patch .
+
+RUN patch -p1 < backlogout.patch && rm -f backlogout.patch
 
 RUN echo "# Install nginx configuration files" && \
     cd /etc/nginx/sites-enabled/ && \
