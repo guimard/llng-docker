@@ -79,3 +79,10 @@ fi
 
 # Drop any cache
 rm -rf /var/lib/lemonldap-ng/cache/*/*
+
+KEY=`/usr/share/docker-llng/updateConf get key`
+
+if test "$KEY" = ""; then
+	echo "Update configuration key"
+	/usr/share/docker-llng/updateConf set key `cat /proc/sys/kernel/random/uuid | sed 's/[-]//g'` 2>&1 | perl -pe 's/\w{32}/<hidden for security>/'
+fi
