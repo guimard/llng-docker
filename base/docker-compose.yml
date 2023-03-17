@@ -15,6 +15,7 @@ services:
     environment:
       - PG_SERVER=db
       - REDIS_SERVER=qwerty
+      - FORCE_KEY_REGENERATION=yes
     depends_on:
       db:
         condition: service_healthy

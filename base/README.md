@@ -18,6 +18,9 @@ LemonLDAP::NG.
 * Upload local configuration into PostgreSQL database if:
   * `PG_SERVER` is given AND
   * PostgreSQL table is empty
+* Initialize LLNG configuration key to a random value if not already initialized or if `FORCE_KEY_REGENERATION` is set to `yes`
+
+> It is generaly a good idea to set this value to `yes`
 
 ## Variables and default values
 
@@ -26,6 +29,7 @@ LemonLDAP::NG.
 * `LOGLEVEL` = `info` _(possible values: debug, info, notice, warn, error)_
 * `LOGGER` = `syslog` _(possible values: stderr, syslog)_
 * `USERLOGGER` = `syslog` _(possible values: stderr, syslog)_
+* `FORCE_KEY_REGENERATION` = `no`
 * Configuration and persistent session storage
   * `PG_SERVER` =
   * `PG_DATABASE` = `lemonldapng`

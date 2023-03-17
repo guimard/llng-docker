@@ -53,6 +53,7 @@ ENV SSODOMAIN=example.com \
     DBI_PASSWORD="" \
     HANDLER_CRON=yes \
     PORTAL_CRON=yes \
+    FORCE_KEY_REGENERATION=no \
     DEBIAN_FRONTEND=noninteractive
 
 RUN echo "# Install packages from ${DEBIAN_VERSION}" && \

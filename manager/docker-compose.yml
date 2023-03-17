@@ -28,6 +28,7 @@ services:
       - REDIS_SERVER=redis:6379
       - LOGGER=stderr
       - USERLOGGER=stderr
+      - FORCE_KEY_REGENERATION=yes
     depends_on:
       db:
         condition: service_healthy
