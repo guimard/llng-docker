@@ -5,4 +5,5 @@ s#__PORT__#80#g;
 s#__DNSDOMAIN__#$ENV{SSODOMAIN}#g;
 s#__MANAGERSITEDIR__#/usr/share/lemonldap-ng/manager/htdocs/#g;
 s#__MANAGERSTATICDIR__#/usr/share/lemonldap-ng/manager/htdocs/static/#g;
+s#__DEFDOCDIR__#/usr/share/doc/lemonldap-ng/#g;
 ' /etc/lemonldap-ng/manager-nginx.conf
