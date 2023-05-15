@@ -2,17 +2,7 @@ diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Auth/OpenIDConnect.pm b/usr/sha
 index 4c4654559..fa4c0e7b1 100644
 --- a/usr/share/perl5/Lemonldap/NG/Portal/Auth/OpenIDConnect.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Portal/Auth/OpenIDConnect.pm
-@@ -2,16 +2,17 @@ package Lemonldap::NG::Portal::Auth::OpenIDConnect;
- 
- use strict;
- use Mouse;
--use MIME::Base64 qw/encode_base64 decode_base64/;
--use Scalar::Util qw/looks_like_number/;
--use Lemonldap::NG::Common::JWT qw(getJWTPayload);
-+use MIME::Base64                           qw/encode_base64 decode_base64/;
-+use Scalar::Util                           qw/looks_like_number/;
-+use Lemonldap::NG::Common::JWT             qw(getJWTPayload);
- use Lemonldap::NG::Portal::Main::Constants qw(
+@@ -9,9 +9,10 @@
    PE_OK
    PE_IDPCHOICE
    PE_OIDC_AUTH_ERROR
@@ -24,14 +14,10 @@ index 4c4654559..fa4c0e7b1 100644
  
  extends qw(
    Lemonldap::NG::Portal::Main::Auth
-@@ -20,8 +21,9 @@ extends qw(
+@@ -22,6 +23,7 @@
  
- # INTERFACE
- 
--has opList => ( is => 'rw', isa => 'ArrayRef', default => sub { [] } );
--has path => ( is => 'rw', default => 'oauth2' );
-+has opList      => ( is => 'rw', isa     => 'ArrayRef', default => sub { [] } );
-+has path        => ( is => 'rw', default => 'oauth2' );
+ has opList => ( is => 'rw', isa => 'ArrayRef', default => sub { [] } );
+ has path => ( is => 'rw', default => 'oauth2' );
 +has endpointsRe => ( is => 'rw' );
  
  use constant sessionKind => 'OIDC';
@@ -48,12 +34,6 @@ index 4c4654559..fa4c0e7b1 100644
 -            oidcServiceMetaDataFrontChannelURI => 'alreadyLoggedOut',
 -            oidcServiceMetaDataBackChannelURI  => 'backLogout',
 -        );
--        $self->addRouteFromConf(
--            'Auth',
--            oidcServiceMetaDataFrontChannelURI => 'frontLogout',
--            oidcServiceMetaDataBackChannelURI  => 'backLogout',
--        );
--    }
 +    my $portal = $self->conf->{portal};
 +    my $re     = '^/' . $self->path . '/(?:' . join(
 +        '|',
@@ -71,11 +51,12 @@ index 4c4654559..fa4c0e7b1 100644
 +
 +    $self->endpointsRe(qr/$re/);
 +
-+    $self->addRouteFromConf(
-+        'Auth',
-+        oidcServiceMetaDataFrontChannelURI => 'frontLogout',
-+        oidcServiceMetaDataBackChannelURI  => 'backLogout',
-+    );
+         $self->addRouteFromConf(
+             'Auth',
+             oidcServiceMetaDataFrontChannelURI => 'frontLogout',
+             oidcServiceMetaDataBackChannelURI  => 'backLogout',
+         );
+-    }
  
      @list =
        sort {
@@ -155,8 +136,6 @@ index 4c4654559..fa4c0e7b1 100644
 -    # No need to protect this frame
 +    # Response should be displayed in an iframe
      $req->frame(1);
--    my $frame = qq'<html><body><img src="$img"></body></html>';
--    return [
 +
 +    # TODO check iss and sid
 +    my $iss        = $req->param('iss');
@@ -165,7 +144,8 @@ index 4c4654559..fa4c0e7b1 100644
 +    my $logName    = 'OIDC FC Logout';
 +
 +    my $img      = $self->conf->{staticPrefix} . '/common/icons/ok.png';
-+    my $frame    = qq'<html><body><img src="$img"></body></html>';
+     my $frame = qq'<html><body><img src="$img"></body></html>';
+-    return [
 +    my $response = [
          200,
 -        [ 'Content-Type' => 'text/html', 'Content-Length' => length($frame) ],
