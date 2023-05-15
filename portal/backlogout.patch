@@ -36,10 +36,24 @@ index 4c4654559..fa4c0e7b1 100644
  
  use constant sessionKind => 'OIDC';
  
-@@ -71,14 +73,26 @@ sub init {
+@@ -71,20 +73,28 @@ sub init {
            };
      }
  
+-    # If this module has already been loaded,
+-    # skip routes to avoid a warning in conf
+-    if ( !$self->p->loadedModules->{ ref($self) } ) {
+-        $self->addRouteFromConf(
+-            'Unauth',
+-            oidcServiceMetaDataFrontChannelURI => 'alreadyLoggedOut',
+-            oidcServiceMetaDataBackChannelURI  => 'backLogout',
+-        );
+-        $self->addRouteFromConf(
+-            'Auth',
+-            oidcServiceMetaDataFrontChannelURI => 'frontLogout',
+-            oidcServiceMetaDataBackChannelURI  => 'backLogout',
+-        );
+-    }
 +    my $portal = $self->conf->{portal};
 +    my $re     = '^/' . $self->path . '/(?:' . join(
 +        '|',
@@ -57,18 +71,15 @@ index 4c4654559..fa4c0e7b1 100644
 +
 +    $self->endpointsRe(qr/$re/);
 +
-     # If this module has already been loaded,
-     # skip routes to avoid a warning in conf
-     if ( !$self->p->loadedModules->{ ref($self) } ) {
--        $self->addRouteFromConf(
--            'Unauth',
--            oidcServiceMetaDataFrontChannelURI => 'alreadyLoggedOut',
--            oidcServiceMetaDataBackChannelURI  => 'backLogout',
--        );
-         $self->addRouteFromConf(
-             'Auth',
-             oidcServiceMetaDataFrontChannelURI => 'frontLogout',
-@@ -100,6 +114,20 @@ sub init {
++    $self->addRouteFromConf(
++        'Auth',
++        oidcServiceMetaDataFrontChannelURI => 'frontLogout',
++        oidcServiceMetaDataBackChannelURI  => 'backLogout',
++    );
+ 
+     @list =
+       sort {
+@@ -100,6 +110,20 @@ sub init {
  
  sub extractFormInfo {
      my ( $self, $req ) = @_;
@@ -89,7 +100,7 @@ index 4c4654559..fa4c0e7b1 100644
  
      # Check callback
      if ( $req->param( $self->conf->{oidcRPCallbackGetParam} ) ) {
-@@ -245,6 +273,10 @@ sub extractFormInfo {
+@@ -245,6 +269,10 @@ sub extractFormInfo {
          $req->data->{refresh_token} = $refresh_token if $refresh_token;
          $req->data->{id_token}      = $id_token;
  
@@ -100,7 +111,7 @@ index 4c4654559..fa4c0e7b1 100644
          # If access token TTL is given save expiration date
          # (with security margin)
          if ($expires_in) {
-@@ -351,6 +383,10 @@ sub setAuthSessionInfo {
+@@ -351,6 +379,10 @@ sub setAuthSessionInfo {
            $req->data->{access_token_eol};
      }
  
@@ -111,7 +122,7 @@ index 4c4654559..fa4c0e7b1 100644
      # Keep ID Token in session
      my $store_IDToken = $self->conf->{oidcOPMetaDataOptions}->{$op}
        ->{oidcOPMetaDataOptionsStoreIDToken};
-@@ -368,6 +404,8 @@ sub setAuthSessionInfo {
+@@ -368,6 +400,8 @@ sub setAuthSessionInfo {
  sub authLogout {
      my ( $self, $req ) = @_;
  
@@ -120,7 +131,7 @@ index 4c4654559..fa4c0e7b1 100644
      my $op = $req->{sessionInfo}->{_oidc_OP};
  
      # Find endession endpoint
-@@ -400,32 +438,222 @@ sub getDisplayType {
+@@ -400,32 +434,222 @@ sub getDisplayType {
      return "logo";
  }
  
@@ -766,7 +777,7 @@ index 4c84af886..4ee0837b8 100644
              $self->logger->error("Client ID not found in audience array");
              return 0;
          }
-@@ -798,12 +801,12 @@ sub checkIDTokenValidity {
+@@ -798,7 +801,7 @@ sub checkIDTokenValidity {
  
      # Check acr
      my $acr = $id_token->{acr};
@@ -775,13 +786,7 @@ index 4c84af886..4ee0837b8 100644
          unless ($acr) {
              $self->logger->error("ACR was not returned by OP $op");
              return 0;
-         }
--        unless ( $acr_values =~ /\b$acr\b/i ) {
-+        unless ( grep { $_ eq $acr } split( /[\s,]+/, $acr_values ) ) {
-             $self->logger->error(
-                 "ACR $acr not listed in request ACR values ($acr_values)");
-             return 0;
-@@ -1003,6 +1006,10 @@ sub decodeJSON {
+@@ -1003,6 +1006,10 @@
  
      eval { $json_hash = from_json( $json, { allow_nonref => 1 } ); };
      return undef if ($@);
@@ -865,7 +870,30 @@ index 4c84af886..4ee0837b8 100644
  sub extractState {
      my ( $self, $req, $state ) = @_;
  
-@@ -2434,11 +2420,32 @@ sub getUserIDForRP {
+@@ -2330,6 +2316,11 @@ sub getRequestJWT {
+ 
+ sub addRouteFromConf {
+     my ( $self, $type, %subs ) = @_;
++
++    # avoid a warning in logs when route is already defined
++    my $getter = { "Auth" => "authRoutes", "Unauth" => "unAuthRoutes" }->{$type}
++      || "${type}Routes";
++
+     my $adder = "add${type}Route";
+     foreach ( keys %subs ) {
+         my $sub  = $subs{$_};
+@@ -2338,6 +2329,10 @@ sub addRouteFromConf {
+             $self->logger->error("$_ parameter not defined");
+             next;
+         }
++
++        # Avoid warning if loading modules twice
++        next if $self->p->$getter->{GET}->{ $self->path }->{$path};
++
+         $self->$adder(
+             $self->path => { $path => $sub },
+             [ 'GET', 'POST' ]
+@@ -2434,11 +2429,32 @@ sub getUserIDForRP {
        : $data->{$user_id_attribute};
  }
  
