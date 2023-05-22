@@ -60,14 +60,17 @@ RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
     apt-get -y --no-install-recommends install procps cron \
     liblemonldap-ng-common-perl/${DEBIAN_VERSION}-backports \
     liblemonldap-ng-handler-perl/${DEBIAN_VERSION}-backports \
-    libapache-session-browseable-perl \
+    libapache-session-browseable-perl libapache-session-ldap-perl \
     libdbi-perl libdbd-pg-perl libnet-cidr-perl \
     libhttp-parser-xs-perl liblwp-protocol-https-perl libstring-random-perl \
     libconvert-base32-perl libnet-ldap-perl libxml-libxml-perl libxml-simple-perl \
     libredis-fast-perl libredis-perl patch && \
     apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/*
 
-RUN echo "# Drop comments" && \
+COPY syslogopt.patch .
+
+RUN patch -p1 < syslogopt.patch && rm -f syslogopt.patch && \
+    echo "# Drop comments" && \
     perl -i -ne 'print unless /^\s*;/ or /^\s*$/' /etc/lemonldap-ng/lemonldap-ng.ini
 
 VOLUME ["/etc/lemonldap-ng","/var/lib/lemonldap-ng/conf", "/var/lib/lemonldap-ng/sessions", "/var/lib/lemonldap-ng/psessions"]
