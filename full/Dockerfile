@@ -14,6 +14,10 @@ RUN echo "# Install nginx and portal and manager libs" && \
     mv /tmp/dpkg.cfg.d /etc/dpkg/ && \
     apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/*
 
+COPY backlogout.patch .
+
+RUN patch -p1 < backlogout.patch && rm -f backlogout.patch
+
 RUN echo "# Install nginx configuration files" && \
     cd /etc/nginx/sites-enabled/ && \
     ln -s ../../lemonldap-ng/manager-nginx.conf

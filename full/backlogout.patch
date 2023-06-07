@@ -1,0 +1,13 @@
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Attributes.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Attributes.pm
+@@ -2513,6 +2513,10 @@
+                                                  'default' => 'front',
+                                                  'select' => [
+                                                                {
++                                                                 'k' => 'back',
++                                                                 'v' => 'Back Channel'
++                                                               },
++                                                               {
+                                                                  'k' => 'front',
+                                                                  'v' => 'Front Channel'
+                                                                }

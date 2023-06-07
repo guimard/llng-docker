@@ -1,9 +1,10 @@
 name: Build and Publish Docker Images
 
 env:
-  VERSION: 2.0.16
+  VERSION: 2.16.1
+  DEBIANVERSION: 2.0.16+ds-4~bpo11+2
   PGVERSION: 13
-  DEBIANVERSION: bullseye
+  DEBIANRELEASE: bullseye
 
 on:
   push:
@@ -49,7 +50,7 @@ jobs:
           tags: |
             yadd/lemonldap-ng-pg-database:latest
             yadd/lemonldap-ng-pg-database:${{ env.PGVERSION }}
-            yadd/lemonldap-ng-pg-database:${{ env.PGVERSION }}-${{ env.DEBIANVERSION }}
+            yadd/lemonldap-ng-pg-database:${{ env.PGVERSION }}-${{ env.DEBIANRELEASE }}
           label: ${{ steps.meta.outputs.labels }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
@@ -92,7 +93,7 @@ jobs:
             yadd/lemonldap-ng-base:latest
             yadd/lemonldap-ng-base:stable
             yadd/lemonldap-ng-base:${{ env.VERSION }}
-            yadd/lemonldap-ng-base:${{ env.VERSION }}-${{ env.DEBIANVERSION }}
+            yadd/lemonldap-ng-base:${{ env.VERSION }}-${{ env.DEBIANRELEASE }}
           label: ${{ steps.meta.outputs.labels }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
@@ -135,7 +136,7 @@ jobs:
             yadd/lemonldap-ng-portal:latest
             yadd/lemonldap-ng-portal:stable
             yadd/lemonldap-ng-portal:${{ env.VERSION }}
-            yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DEBIANVERSION }}
+            yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DEBIANRELEASE }}
           label: ${{ steps.meta.outputs.labels }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
@@ -178,7 +179,7 @@ jobs:
             yadd/lemonldap-ng-cron:latest
             yadd/lemonldap-ng-cron:stable
             yadd/lemonldap-ng-cron:${{ env.VERSION }}
-            yadd/lemonldap-ng-cron:${{ env.VERSION }}-${{ env.DEBIANVERSION }}
+            yadd/lemonldap-ng-cron:${{ env.VERSION }}-${{ env.DEBIANRELEASE }}
           label: ${{ steps.meta.outputs.labels }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
@@ -221,7 +222,7 @@ jobs:
             yadd/lemonldap-ng-manager:latest
             yadd/lemonldap-ng-manager:stable
             yadd/lemonldap-ng-manager:${{ env.VERSION }}
-            yadd/lemonldap-ng-manager:${{ env.VERSION }}-${{ env.DEBIANVERSION }}
+            yadd/lemonldap-ng-manager:${{ env.VERSION }}-${{ env.DEBIANRELEASE }}
           label: ${{ steps.meta.outputs.labels }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
@@ -264,7 +265,7 @@ jobs:
             yadd/lemonldap-ng-full:latest
             yadd/lemonldap-ng-full:stable
             yadd/lemonldap-ng-full:${{ env.VERSION }}
-            yadd/lemonldap-ng-full:${{ env.VERSION }}-${{ env.DEBIANVERSION }}
+            yadd/lemonldap-ng-full:${{ env.VERSION }}-${{ env.DEBIANRELEASE }}
           label: ${{ steps.meta.outputs.labels }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
@@ -307,7 +308,7 @@ jobs:
             yadd/lemonldap-ng-ssoaas-fastcgi-server:latest
             yadd/lemonldap-ng-ssoaas-fastcgi-server:stable
             yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ env.VERSION }}
-            yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ env.VERSION }}-${{ env.DEBIANVERSION }}
+            yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ env.VERSION }}-${{ env.DEBIANRELEASE }}
           label: ${{ steps.meta.outputs.labels }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
@@ -333,7 +334,7 @@ jobs:
           TAG_NAME: |
             latest
             ${{ env.VERSION }}-${{ steps.date.outputs.date }}
-            ${{ env.VERSION }}-${{ steps.date.outputs.date }}-${{ env.DEBIANVERSION }}
+            ${{ env.VERSION }}-${{ steps.date.outputs.date }}-${{ env.DEBIANRELEASE }}
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Set up QEMU
@@ -353,5 +354,5 @@ jobs:
           push: true
           tags: |
             yadd/lemonldap-ng-dev:latest
-            yadd/lemonldap-ng-dev:${{ env.DEBIANVERSION }}
+            yadd/lemonldap-ng-dev:${{ env.DEBIANRELEASE }}
           label: ${{ steps.meta.outputs.labels }}
