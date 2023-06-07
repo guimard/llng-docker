@@ -77,6 +77,10 @@ VOLUME ["/etc/lemonldap-ng","/var/lib/lemonldap-ng/conf", "/var/lib/lemonldap-ng
 
 COPY install /
 
+COPY russian-language.patch .
+
+RUN patch -p1 < russian-language.patch && rm -f russian-language.patch
+
 # DEBUG
 #CMD ["cat","/var/lib/lemonldap-ng/conf/lmConf-1.json"]
 
