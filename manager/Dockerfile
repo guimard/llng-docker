@@ -32,6 +32,8 @@ RUN echo "# Install nginx configuration files" && \
 
 RUN (echo ""; echo "daemon off;") >> /etc/nginx/nginx.conf
 
+RUN perl -i -pe 's#access_log .*;#access_log /dev/stdout;#; s#error_log .*;#error_log /dev/stdout info;#' /etc/nginx/nginx.conf
+
 COPY install /
 
 EXPOSE 80
