@@ -18,7 +18,7 @@ COPY backlogout.patch .
 
 COPY accept-mobile-url.patch .
 
-RUN patch -p1 < backlogout.patch && rm -f backlogout.patch \
+RUN patch -p1 < backlogout.patch && rm -f backlogout.patch && \
     patch -p1 < accept-mobile-url.patch && rm -f accept-mobile-url.patch
 
 RUN echo "# Install nginx configuration files" && \
