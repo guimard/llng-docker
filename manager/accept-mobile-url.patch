@@ -1,5 +1,3 @@
-diff --git a/lemonldap-ng-manager/lib/Lemonldap/NG/Manager/Attributes.pm b/lemonldap-ng-manager/lib/Lemonldap/NG/Manager/Attributes.pm
-index 588dce5a8..6b3e22d3b 100644
 --- a/usr/share/Lemonldap/NG/Lemonldap/NG/Manager/Attributes.pm
 +++ b/usr/share/Lemonldap/NG/Lemonldap/NG/Manager/Attributes.pm
 @@ -2546,7 +2546,7 @@ m[^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
@@ -11,8 +9,6 @@ index 588dce5a8..6b3e22d3b 100644
          },
          'oidcRPMetaDataOptionsOfflineSessionExpiration' => {
              'type' => 'int'
-diff --git a/lemonldap-ng-manager/lib/Lemonldap/NG/Manager/Build/Attributes.pm b/lemonldap-ng-manager/lib/Lemonldap/NG/Manager/Build/Attributes.pm
-index 7a2056c9e..644fae96b 100644
 --- a/usr/share/Lemonldap/NG/Lemonldap/NG/Manager/Build/Attributes.pm
 +++ b/usr/share/Lemonldap/NG/Lemonldap/NG/Manager/Build/Attributes.pm
 @@ -4674,7 +4674,7 @@ m{^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
