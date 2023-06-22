@@ -1,5 +1,5 @@
---- a/usr/share/Lemonldap/NG/Lemonldap/NG/Manager/Attributes.pm
-+++ b/usr/share/Lemonldap/NG/Lemonldap/NG/Manager/Attributes.pm
+--- a/usr/share/Lemonldap/NG/Manager/Attributes.pm
++++ b/usr/share/Lemonldap/NG/Manager/Attributes.pm
 @@ -2546,7 +2546,7 @@ m[^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
              'type' => 'select'
          },
@@ -9,8 +9,8 @@
          },
          'oidcRPMetaDataOptionsOfflineSessionExpiration' => {
              'type' => 'int'
---- a/usr/share/Lemonldap/NG/Lemonldap/NG/Manager/Build/Attributes.pm
-+++ b/usr/share/Lemonldap/NG/Lemonldap/NG/Manager/Build/Attributes.pm
+--- a/usr/share/Lemonldap/NG/Manager/Build/Attributes.pm
++++ b/usr/share/Lemonldap/NG/Manager/Build/Attributes.pm
 @@ -4674,7 +4674,7 @@ m{^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
              documentation => 'Bypass logout confirmation'
          },
