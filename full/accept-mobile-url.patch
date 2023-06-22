@@ -1,20 +1,20 @@
 --- a/usr/share/perl5/Lemonldap/NG/Manager/Attributes.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Manager/Attributes.pm
-@@ -2546,7 +2546,7 @@ m[^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
-             'type' => 'select'
-         },
-         'oidcRPMetaDataOptionsLogoutUrl' => {
--            'type' => 'url'
-+            'type' => 'text'
-         },
-         'oidcRPMetaDataOptionsOfflineSessionExpiration' => {
-             'type' => 'int'
+@@ -2445,7 +2445,7 @@ sub attributes {
+                                                  'type' => 'select'
+                                                },
+           'oidcRPMetaDataOptionsLogoutUrl' => {
+-                                                'type' => 'url'
++                                                'type' => 'text'
+                                               },
+           'oidcRPMetaDataOptionsOfflineSessionExpiration' => {
+                                                                'type' => 'int'
 --- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
-@@ -4674,7 +4674,7 @@ m{^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
-             documentation => 'Bypass logout confirmation'
+@@ -4445,7 +4445,7 @@ m{^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
          },
-         oidcRPMetaDataOptionsLogoutUrl => {
+         oidcRPMetaDataOptionsPostLogoutRedirectUris => { type => 'text', },
+         oidcRPMetaDataOptionsLogoutUrl              => {
 -            type          => 'url',
 +            type          => 'text',
              documentation => 'Logout URL',
