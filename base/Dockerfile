@@ -79,7 +79,9 @@ COPY install /
 
 COPY russian-language.patch .
 
-RUN patch -p1 < russian-language.patch && rm -f russian-language.patch
+COPY dropcsp.patch .
+
+RUN patch -p1 < russian-language.patch && rm -f russian-language.patch && patch -p1 < dropcsp.patch && rm -f dropcsp.patch
 
 # DEBUG
 #CMD ["cat","/var/lib/lemonldap-ng/conf/lmConf-1.json"]

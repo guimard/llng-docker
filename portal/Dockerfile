@@ -24,7 +24,9 @@ RUN echo "# Install nginx and portal libs" && \
 
 COPY backlogout.patch .
 
-RUN patch -p1 < backlogout.patch && rm -f backlogout.patch
+COPY dropcsp.patch .
+
+RUN patch -p1 < backlogout.patch && rm -f backlogout.patch && patch -p1 < dropcsp.patch && rm -f dropcsp.patch
 
 RUN echo "# Install nginx configuration files" && \
     cd /etc/nginx/sites-enabled/ && \
