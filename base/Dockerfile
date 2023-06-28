@@ -73,7 +73,7 @@ RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
 #    echo "# Drop comments" && \
 #    perl -i -ne 'print unless /^\s*;/ or /^\s*$/' /etc/lemonldap-ng/lemonldap-ng.ini
 
-VOLUME ["/etc/lemonldap-ng","/var/lib/lemonldap-ng/conf", "/var/lib/lemonldap-ng/sessions", "/var/lib/lemonldap-ng/psessions"]
+VOLUME ["/etc/lemonldap-ng","/var/lib/lemonldap-ng/conf", "/var/lib/lemonldap-ng/sessions", "/var/lib/lemonldap-ng/psessions", "/usr/share/lemonldap-ng", "/usr/share/perl5/Lemonldap/NG"]
 
 COPY install /
 
