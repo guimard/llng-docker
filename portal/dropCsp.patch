@@ -1,0 +1,129 @@
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm b/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
+index 47bbf96..4da1500 100644
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
+@@ -148,6 +148,7 @@ sub ssoMatch {
+ # run() manages only "authorize" and "logout" endpoints.
+ sub run {
+     my ( $self, $req, $path ) = @_;
++    $req->data->{dropCsp} = 1 if $self->conf->{oidcDropCspHeaders};
+ 
+     # Check activation rule
+     unless ( $self->rule->( $req, $req->sessionInfo ) ) {
+@@ -1142,6 +1143,7 @@ sub run {
+ # Handle token endpoint
+ sub token {
+     my ( $self, $req ) = @_;
++    $req->data->{dropCsp} = 1 if $self->conf->{oidcDropCspHeaders};
+     $self->logger->debug("URL detected as an OpenID Connect TOKEN URL");
+ 
+     my $rp = $self->checkEndPointAuthenticationCredentials($req);
+@@ -1853,6 +1855,7 @@ sub _handleRefreshTokenGrant {
+ # Handle userinfo endpoint
+ sub userInfo {
+     my ( $self, $req ) = @_;
++    $req->data->{dropCsp} = 1 if $self->conf->{oidcDropCspHeaders};
+     $self->logger->debug("URL detected as an OpenID Connect USERINFO URL");
+ 
+     my $access_token = $self->getEndPointAccessToken($req);
+@@ -1936,6 +1939,7 @@ sub _getSessionFromAccessTokenData {
+ 
+ sub introspection {
+     my ( $self, $req ) = @_;
++    $req->data->{dropCsp} = 1 if $self->conf->{oidcDropCspHeaders};
+     $self->logger->debug("URL detected as an OpenID Connect INTROSPECTION URL");
+ 
+     my $rp = $self->checkEndPointAuthenticationCredentials($req);
+@@ -1986,6 +1990,7 @@ sub introspection {
+ # Handle jwks endpoint
+ sub jwks {
+     my ( $self, $req ) = @_;
++    $req->data->{dropCsp} = 1 if $self->conf->{oidcDropCspHeaders};
+     $self->logger->debug("URL detected as an OpenID Connect JWKS URL");
+ 
+     my $jwks = { keys => [] };
+@@ -2010,6 +2015,7 @@ sub jwks {
+ # Handle register endpoint
+ sub registration {
+     my ( $self, $req ) = @_;
++    $req->data->{dropCsp} = 1 if $self->conf->{oidcDropCspHeaders};
+     $self->logger->debug("URL detected as an OpenID Connect REGISTRATION URL");
+ 
+     # TODO: check Initial Access Token
+@@ -2160,6 +2166,7 @@ sub registration {
+ # Handle logout endpoint for unauthenticated users
+ sub endSessionDone {
+     my ( $self, $req ) = @_;
++    $req->data->{dropCsp} = 1 if $self->conf->{oidcDropCspHeaders};
+     $self->logger->debug("URL  detected as an OpenID Connect END SESSION URL");
+     $self->logger->debug("User is already logged out");
+ 
+@@ -2206,6 +2213,7 @@ sub endSessionDone {
+ # Handle checksession endpoint
+ sub checkSession {
+     my ( $self, $req ) = @_;
++    $req->data->{dropCsp} = 1 if $self->conf->{oidcDropCspHeaders};
+     $self->logger->debug("URL detected as an OpenID Connect CHECK SESSION URL");
+ 
+     # TODO: access_control_allow_origin => '*'
+@@ -2229,6 +2237,7 @@ sub badAuthRequest {
+ # Nothing to do here
+ sub logout {
+     my ( $self, $req ) = @_;
++    $req->data->{dropCsp} = 1 if $self->conf->{oidcDropCspHeaders};
+     if ( my $s = $req->userData->{_oidcConnectedRP} ) {
+         my @rps = grep /\w/, split( ',', $s );
+         foreach my $rp (@rps) {
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm b/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm
+index 7516d9a..da5ab85 100644
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm
+@@ -944,7 +944,7 @@ sub sendHtml {
+       'Pragma'        => 'no-cache',                               # HTTP 1.0
+       'Expires'       => '0';                                      # Proxies
+ 
+-    $self->setCorsHeaderFromConfig($res);
++    $self->setCorsHeaderFromConfig($res) unless $req->data->{dropCsp};
+ 
+     if (    $self->conf->{strictTransportSecurityMax_Age}
+         and $self->conf->{portal} =~ /^https:/ )
+@@ -1029,8 +1029,10 @@ sub sendHtml {
+     }
+ 
+     # Set CSP header
+-    push @{ $res->[1] }, 'Content-Security-Policy' => $csp;
+-    $self->logger->debug("Apply following CSP: $csp");
++    unless ( $req->data->{dropCsp} ) {
++        push @{ $res->[1] }, 'Content-Security-Policy' => $csp;
++        $self->logger->debug("Apply following CSP: $csp");
++    }
+     return $res;
+ }
+ 
+@@ -1218,7 +1220,7 @@ sub corsPreflight {
+     my @headers;
+     my $res = [ 204, \@headers, [] ];
+ 
+-    $self->setCorsHeaderFromConfig($res);
++    $self->setCorsHeaderFromConfig($res) unless $req->data->{dropCsp};
+ 
+     return $res;
+ }
+@@ -1252,7 +1254,7 @@ sub sendJSONresponse {
+ 
+     }
+     else {
+-        $self->setCorsHeaderFromConfig($res);
++        $self->setCorsHeaderFromConfig($res) unless $req->data->{dropCsp};
+     }
+     return $res;
+ }
+@@ -1261,7 +1263,7 @@ sub sendRawHtml {
+     my ($self) = $_[0];
+     my $res = Lemonldap::NG::Common::PSGI::sendRawHtml(@_);
+ 
+-    $self->setCorsHeaderFromConfig($res);
++    $self->setCorsHeaderFromConfig($res) unless $_[1]->{data}->{dropCsp};
+ 
+     return $res;
+ }
