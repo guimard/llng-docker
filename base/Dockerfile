@@ -61,6 +61,7 @@ RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
     liblemonldap-ng-common-perl/${DEBIAN_VERSION}-backports \
     liblemonldap-ng-handler-perl/${DEBIAN_VERSION}-backports \
     libapache-session-browseable-perl libapache-session-ldap-perl \
+    libapache-session-memcached-perl libapache-session-mongodb-perl \
     libdbi-perl libdbd-pg-perl libnet-cidr-perl \
     libhttp-parser-xs-perl liblwp-protocol-https-perl libstring-random-perl \
     libconvert-base32-perl libnet-ldap-perl libxml-libxml-perl libxml-simple-perl \
