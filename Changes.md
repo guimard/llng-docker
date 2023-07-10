@@ -1,5 +1,6 @@
 # Changes
 
+* 2023-07-10: revert + add appgrid.patch
 * 2023-07-05: add libapache-session-mongodb-perl
 * 2023-06-28: add switch "oidcDropCspHeaders"
 * 2023-05-23: add libapache-session-ldap-perl

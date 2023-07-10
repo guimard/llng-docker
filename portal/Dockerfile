@@ -26,8 +26,11 @@ COPY backlogout.patch .
 
 COPY dropCsp.patch .
 
+COPY appgrid.patch .
+
 RUN patch -p1 < backlogout.patch && rm -f backlogout.patch && \
-    patch -p1 < dropCsp.patch && rm -f dropCsp.patch
+    patch -p1 < dropCsp.patch && rm -f dropCsp.patch && \
+    patch -p1 < appgrid.patch && rm -f appgrid.patch
 
 RUN echo "# Install nginx configuration files" && \
     cd /etc/nginx/sites-enabled/ && \

@@ -1,0 +1,109 @@
+diff --git a/usr/share/perl5/Lemonldap/NG/Handler/Lib/OAuth2.pm b/usr/share/perl5/Lemonldap/NG/Handler/Lib/OAuth2.pm
+index 129ea713c..5c9f18253 100644
+--- a/usr/share/perl5/Lemonldap/NG/Handler/Lib/OAuth2.pm
++++ b/usr/share/perl5/Lemonldap/NG/Handler/Lib/OAuth2.pm
+@@ -73,7 +73,7 @@ sub retrieveSession {
+ }
+ 
+ sub fetchId {
+-    my ( $class, $req ) = @_;
++    my ( $class, $req, $oauth2Only ) = @_;
+ 
+     my $access_token;
+     my $authorization = $req->{env}->{HTTP_AUTHORIZATION};
+@@ -84,7 +84,9 @@ sub fetchId {
+         $class->logger->debug( 'Found OAuth2 access token ' . $access_token );
+     }
+     else {
+-        return $class->Lemonldap::NG::Handler::Main::fetchId($req);
++        return $oauth2Only
++          ? undef
++          : $class->Lemonldap::NG::Handler::Main::fetchId($req);
+     }
+ 
+     # Get access token session
+@@ -125,6 +127,8 @@ sub fetchId {
+         return "O-$_session_id";
+     }
+ 
++    return undef if $oauth2Only;
++
+     my $value = $class->Lemonldap::NG::Handler::Main::fetchId($req);
+     unless ($value) {
+         $req->data->{oauth2_error} = 'invalid_token';
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Lib/OAuth2Handler.pm b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OAuth2Handler.pm
+new file mode 100644
+index 000000000..bb2f280a8
+--- /dev/null
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OAuth2Handler.pm
+@@ -0,0 +1,43 @@
++package Lemonldap::NG::Portal::Lib::OAuth2Handler;
++
++use Lemonldap::NG::Handler::PSGI::OAuth2;
++
++sub addOauth2Route {
++    my ( $self, $path, $subNameOrHash, $unAuthSubName, $methods ) = @_;
++    $self->addUnauthRoute(
++        $path, $subNameOrHash, $methods,
++
++        # Transform method to see if Oauth2 token is available
++        sub {
++            my ($subName) = @_;
++            return sub {
++                shift;
++                my ($req) = @_;
++                if ( &tryAuth( $self, $req ) ) {
++                    return ref $subName
++                      ? $subName->( $self, @_ )
++                      : $self->$subName(@_);
++                }
++                else {
++                    return ref $unAuthSubName
++                      ? $unAuthSubName->( $self, @_ )
++                      : $self->$unAuthSubName(@_);
++                }
++            }
++        }
++    );
++    return $self;
++}
++
++sub tryAuth {
++    my ( $self, $req ) = @_;
++    my $id = Lemonldap::NG::Handler::PSGI::OAuth2->fetchId( $req, 1 );
++    return undef unless $id;
++    my $data =
++      Lemonldap::NG::Handler::PSGI::OAuth2->retrieveSession( $req, $id );
++    return undef unless $data;
++    $req->userData($data);
++    return 1;
++}
++
++1;
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/RESTServer.pm b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/RESTServer.pm
+index 71997891f..e8ddfad81 100644
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/RESTServer.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/RESTServer.pm
+@@ -256,6 +256,22 @@ sub init {
+     return 1;
+ }
+ 
++sub addAuthRoute {
++    my ( $self, $path, $subNameOrHash, $methods ) = @_;
++    $self->SUPER::addAuthRoute( $path, $subNameOrHash, $methods );
++    if ( $self->conf->{restAllowOauth2} ) {
++        require Lemonldap::NG::Portal::Lib::OAuth2Handler;
++        Lemonldap::NG::Portal::Lib::OAuth2Handler::addOauth2Route( $self,
++            $path, $subNameOrHash, 'forbidden', $methods );
++    }
++    return $self;
++}
++
++sub forbidden {
++    my ( $self, $req ) = @_;
++    return $self->p->sendError( $req, 'Authentication required', 401 );
++}
++
+ sub newSession {
+     my ( $self, $req, $id ) = @_;
+ 
