@@ -6,7 +6,7 @@ LABEL maintainer="Yadd yadd@debian.org>" \
 
 RUN apt update && apt install -y cron && \
     cd /tmp/ && \
-    apt-get download liblemonldap-ng-portal-perl/${DEBIAN_VERSION}-backports && \
+    apt-get download liblemonldap-ng-portal-perl${LLNGDIST} && \
     dpkg -x liblemonldap-ng-portal-perl*.deb portal && \
     cp portal/usr/share/lemonldap-ng/bin/purgeCentralCache /usr/share/lemonldap-ng/bin/ && \
     cp portal/etc/cron.d/liblemonldap-ng-portal-perl /etc/cron.d/ && \

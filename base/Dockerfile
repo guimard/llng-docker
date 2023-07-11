@@ -1,8 +1,8 @@
-ARG DEBIANVERSION=bullseye
+ARG DEBIANVERSION=bookworm
 
 FROM debian:${DEBIANVERSION}-slim as debian-backports-updated
 
-ENV DEBIAN_VERSION=bullseye
+ENV DEBIAN_VERSION=bookworm
 
 RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
     apt-get -y update && \
@@ -25,7 +25,9 @@ RUN tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz && rm /tmp/s6-overlay-noarch.ta
 
 FROM debian-backports-updated-with-s6
 
-ENV DEBIAN_VERSION=bullseye
+ENV DEBIAN_VERSION="bookworm"
+#ENV LLNGDIST="/bookworm-backports"
+ENV LLNGDIST=
 
 LABEL maintainer="Yadd yadd@debian.org>" \
       name="yadd/lemonldap-ng-base" \
@@ -58,11 +60,12 @@ ENV SSODOMAIN=example.com \
 
 RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
     apt-get -y --no-install-recommends install procps cron \
-    liblemonldap-ng-common-perl/${DEBIAN_VERSION}-backports \
-    liblemonldap-ng-handler-perl/${DEBIAN_VERSION}-backports \
+    liblemonldap-ng-common-perl${LLNGDIST} \
+    liblemonldap-ng-handler-perl${LLNGDIST} \
     libapache-session-browseable-perl libapache-session-ldap-perl \
-    libapache-session-memcached-perl \
+    libapache-session-mongodb-perl \
     libdbi-perl libdbd-pg-perl libnet-cidr-perl \
+    libapache-session-mongodb-perl libdbi-perl libdbd-pg-perl libnet-cidr-perl \
     libhttp-parser-xs-perl liblwp-protocol-https-perl libstring-random-perl \
     libconvert-base32-perl libnet-ldap-perl libxml-libxml-perl libxml-simple-perl \
     libredis-fast-perl libredis-perl patch && \

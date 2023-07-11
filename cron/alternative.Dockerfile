@@ -1,8 +1,8 @@
-ARG DEBIANVERSION=bullseye
+ARG DEBIANVERSION=bookworm
 
 FROM debian:${DEBIANVERSION}-slim as debian-backports-updated
 
-ENV DEBIAN_VERSION=bullseye
+ENV DEBIAN_VERSION=bookworm
 
 RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
     apt-get -y update && \
@@ -12,7 +12,9 @@ RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
 
 FROM debian-backports-updated
 
-ENV DEBIAN_VERSION=bullseye
+ENV DEBIAN_VERSION=bookworm
+#ENV LLNGDIST="/bookworm-backports"
+ENV LLNGDIST=
 
 LABEL maintainer="Yadd yadd@debian.org>" \
       name="yadd/lemonldap-ng-cron" \
@@ -20,8 +22,8 @@ LABEL maintainer="Yadd yadd@debian.org>" \
 
 WORKDIR /mnt
 
-RUN echo "deb-src http://deb.debian.org/debian" ${DEBIAN_VERSION}"-backports main" > /etc/apt/sources.list.d/bsrc.list && \
-    apt update && \
+#RUN echo "deb-src http://deb.debian.org/debian" ${DEBIAN_VERSION}"-backports main" > /etc/apt/sources.list.d/bsrc.list && \
+RUN apt update && \
     apt install -y xz-utils \
     libapache-session-browseable-perl \
     libdbi-perl libdbd-pg-perl \
@@ -30,7 +32,7 @@ RUN echo "deb-src http://deb.debian.org/debian" ${DEBIAN_VERSION}"-backports mai
     libmouse-perl libwww-perl liburi-perl \
     libconfig-inifiles-perl libcache-cache-perl \
     && \
-    apt-get source --download-only lemonldap-ng && \
+    apt-get source --download-only lemonldap-ng${LLNGDIST} && \
     mkdir -p /usr/share/lemonldap-ng/bin && \
     tar xJf *.orig.tar.xz && \
     cd lemon*/ && \
@@ -43,8 +45,8 @@ RUN echo "deb-src http://deb.debian.org/debian" ${DEBIAN_VERSION}"-backports mai
       < lemonldap-ng-handler/eg/scripts/purgeLocalCache.cron.d \
       > /etc/cron.d/liblemonldap-ng-handler-perl && \
     cd /mnt && \
-    rm -rf * && \
-    apt-get download liblemonldap-ng-common-perl/${DEBIAN_VERSION}-backports && \
+    rm -rf * /lemon && \
+    apt-get download liblemonldap-ng-common-perl${LLNGDIST} && \
     dpkg -x liblemonldap-ng-common-perl*.deb common && \
     mv common/usr/share/perl5/Lemonldap /usr/share/perl5/ && \
     rm -rf * /etc/services.d/cron && \

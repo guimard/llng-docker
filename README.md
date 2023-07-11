@@ -18,7 +18,7 @@ The [yadd/lemonldap-ng-base](./base) isn't directly usable, just a base
 to build Lemonldap::NG components.
 
 Image uses [S6 overlay](https://github.com/just-containers/s6-overlay) except
-PostgreSQL database, based on [postgres:bullseye](https://hub.docker.com/_/postgres).
+PostgreSQL database, based on [postgres:bookworm](https://hub.docker.com/_/postgres).
 
 [LemonLDAP::NG](https://lemonldap-ng.org) is installed using
 [Debian backports packages](https://backports.debian.org/), so using the

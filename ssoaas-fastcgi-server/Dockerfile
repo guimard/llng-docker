@@ -7,7 +7,7 @@ RUN echo "# Install libs" && \
     apt -y update && \
     apt -y dist-upgrade && \
     apt install -y --no-install-recommends \
-        lemonldap-ng-fastcgi-server/${DEBIAN_VERSION}-backports \
+        lemonldap-ng-fastcgi-server${LLNGDIST} \
         libfcgi-engine-perl && \
     apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/*
 

@@ -7,10 +7,10 @@ RUN echo "# Install nginx and portal and manager libs" && \
     apt -y update && \
     apt -y dist-upgrade && \
     apt -y --no-install-recommends install nginx \
-          liblemonldap-ng-manager-perl/${DEBIAN_VERSION}-backports && \
+          liblemonldap-ng-manager-perl${LLNGDIST} && \
     mv /etc/dpkg/dpkg.cfg.d /tmp/ && \
     apt -y --no-install-recommends install \
-          lemonldap-ng-doc/${DEBIAN_VERSION}-backports && \
+          lemonldap-ng-doc${LLNGDIST} && \
     mv /tmp/dpkg.cfg.d /etc/dpkg/ && \
     apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/*
 

@@ -2,9 +2,9 @@ name: Build and Publish Docker Images
 
 env:
   VERSION: 2.16.1
-  DEBIANVERSION: 2.0.16+ds-4~bpo11+2
-  PGVERSION: 13
-  DEBIANRELEASE: bullseye
+  DEBIANVERSION: 2.16.1+ds-2
+  PGVERSION: 15
+  DEBIANRELEASE: bookworm
 
 on:
   push:

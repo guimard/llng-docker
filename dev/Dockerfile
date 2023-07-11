@@ -1,5 +1,5 @@
 # Build packages
-ARG DEBIAN_VERSION=bullseye
+ARG DEBIAN_VERSION=bookworm
 FROM debian:${DEBIAN_VERSION}-slim
 
 ARG BRANCH=v2.0

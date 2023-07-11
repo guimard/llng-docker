@@ -8,8 +8,8 @@ RUN echo "# Install nginx and manager libs" && \
     apt -y update && \
     apt -y dist-upgrade && \
     apt -y --no-install-recommends install nginx \
-      lemonldap-ng-fastcgi-server/${DEBIAN_VERSION}-backports \
-      liblemonldap-ng-manager-perl/${DEBIAN_VERSION}-backports \
+      lemonldap-ng-fastcgi-server${LLNGDIST} \
+      liblemonldap-ng-manager-perl${LLNGDIST} \
       libglib-perl libgssapi-perl libsoap-lite-perl fonts-urw-base35 \
       libcrypt-openssl-bignum-perl libemail-sender-perl \
       libconvert-base32-perl libio-string-perl libipc-run-perl \
@@ -18,7 +18,7 @@ RUN echo "# Install nginx and manager libs" && \
       libio-string-perl && \
     mv /etc/dpkg/dpkg.cfg.d /tmp/ && \
     apt -y --no-install-recommends install \
-      lemonldap-ng-doc/${DEBIAN_VERSION}-backports && \
+      lemonldap-ng-doc${LLNGDIST} && \
     mv /tmp/dpkg.cfg.d /etc/dpkg/ && \
     apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/*
 

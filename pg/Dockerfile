@@ -1,4 +1,4 @@
-FROM postgres:13-bullseye
+FROM postgres:15-bookworm
 
 LABEL maintainer="Yadd yadd@debian.org>" \
       name="yadd/lemonldap-ng-pg-database" \

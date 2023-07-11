@@ -1,4 +1,4 @@
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 RUN apt update && apt dist-upgrade -y && apt install -y mocha node-supertest node-he
 

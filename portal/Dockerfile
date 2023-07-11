@@ -7,8 +7,8 @@ RUN echo "# Install nginx and portal libs" && \
     apt -y update && \
     apt -y dist-upgrade && \
     apt -y --no-install-recommends install nginx \
-        lemonldap-ng-fastcgi-server/${DEBIAN_VERSION}-backports \
-        liblemonldap-ng-portal-perl/${DEBIAN_VERSION}-backports \
+        lemonldap-ng-fastcgi-server${LLNGDIST} \
+        liblemonldap-ng-portal-perl${LLNGDIST} \
         gsfonts patch \
         libcrypt-u2f-server-perl libgeoip2-perl \
         libglib-perl libgssapi-perl libhttp-browserdetect-perl \
