@@ -13,8 +13,8 @@
  templateDir  = /usr/share/lemonldap-ng/manager/htdocs/templates
  
  ; languages: available languages for manager interface
--languages    = en, fr, it, vi, ar, tr, pl, zh_TW, es, he
-+languages    = en, fr, vi, ar, ru, tr, pl, it, zh_TW, es, he
+-languages    = en, fr, it, vi, ar, tr, pl, zh_TW, es, he, pt_BR
++languages    = en, fr, vi, ar, ru, tr, pl, it, zh_TW, es, he, pt_BR
  
  ; Manager modules enabled
  ; Set here the list of modules you want to see in manager interface
