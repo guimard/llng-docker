@@ -28,9 +28,12 @@ COPY dropCsp.patch .
 
 COPY appgrid.patch .
 
+COPY auth-by-api.patch .
+
 RUN patch -p1 < backlogout.patch && rm -f backlogout.patch && \
     patch -p1 < dropCsp.patch && rm -f dropCsp.patch && \
-    patch -p1 < appgrid.patch && rm -f appgrid.patch
+    patch -p1 < appgrid.patch && rm -f appgrid.patch && \
+    patch -p1 < auth-by-api.patch && rm -f auth-by-api.patch
 
 RUN echo "# Install nginx configuration files" && \
     cd /etc/nginx/sites-enabled/ && \

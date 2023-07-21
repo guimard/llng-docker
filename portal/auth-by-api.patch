@@ -1,0 +1,12 @@
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm b/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm
+index 2376d13fe..51d6ac58f 100644
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm
+@@ -1227,6 +1227,7 @@ sub corsPreflight {
+ 
+ sub sendJSONresponse {
+     my ( $self, $req, $j, %args ) = @_;
++    $j->{token} = $req->token if $req->token;
+     my $res = Lemonldap::NG::Common::PSGI::sendJSONresponse(@_);
+ 
+     # Handle caching

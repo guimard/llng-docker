@@ -1,5 +1,7 @@
 # Changes
 
+* 2023-07-21: auth by API
+* 2023-07-13: Propage env variales to FastCGI server
 * 2023-07-10: revert + add appgrid.patch
 * 2023-07-05: add libapache-session-mongodb-perl
 * 2023-06-28: add switch "oidcDropCspHeaders"
