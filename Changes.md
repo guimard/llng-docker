@@ -1,5 +1,6 @@
 # Changes
 
+* 2023-07-25: languages API
 * 2023-07-21: auth by API
 * 2023-07-13: Propage env variales to FastCGI server
 * 2023-07-10: revert + add appgrid.patch

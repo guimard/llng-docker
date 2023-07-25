@@ -1,0 +1,104 @@
+diff --git a/usr/share/perl5/Lemonldap/NG/Common/Languages.pm b/usr/share/perl5/Lemonldap/NG/Common/Languages.pm
+new file mode 100644
+index 000000000..cf1544c5f
+--- /dev/null
++++ b/usr/share/perl5/Lemonldap/NG/Common/Languages.pm
+@@ -0,0 +1,27 @@
++package Lemonldap::NG::Common::Languages;
++
++use strict;
++use Exporter 'import';
++
++our @EXPORT = qw(langName);
++
++use constant langName => {
++    ar    => 'العربية',
++    de    => 'Deutsch',
++    en    => 'English',
++    es    => 'Español',
++    fi    => 'Suomi',
++    fr    => 'Français',
++    he    => 'עברית',
++    it    => 'Italiano',
++    pl    => 'Polski',
++    pt    => 'Português',
++    pt_BR => 'Português (Brasil)',
++    ru    => 'Русский',
++    tr    => 'Türkçe',
++    vi    => 'Tiếng Việt',
++    zh    => '中文',
++    zh_TW => '台湾华文',
++};
++
++1;
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Main/Init.pm b/usr/share/perl5/Lemonldap/NG/Portal/Main/Init.pm
+index a73d7875e..a8dfac84a 100644
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Init.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Init.pm
+@@ -283,7 +283,7 @@ sub reloadConf {
+         [ $self->{templateDir}, $self->conf->{templateDir} . '/bootstrap' ] );
+ 
+     $self->{staticPrefix} = $self->conf->{staticPrefix} || '/static';
+-    $self->{languages}    = $self->conf->{languages}    || '/';
++    $self->{languages}    = $self->conf->{languages}    || 'en';
+ 
+     # Initialize session DBs
+     unless ( $self->conf->{globalStorage} ) {
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/RESTServer.pm b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/RESTServer.pm
+index fcf029beb..c55afe2c3 100644
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/RESTServer.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/RESTServer.pm
+@@ -49,6 +49,9 @@
+ #   * GET    /myapplications                               : get my appplications
+ #                                                            list
+ #
++# - Other (always)
++#   * /languages : get available languages
++#
+ # There is no conflict with SOAP server, they can be used together
+ 
+ package Lemonldap::NG::Portal::Plugins::RESTServer;
+@@ -57,6 +60,7 @@ use strict;
+ use Mouse;
+ use JSON qw(from_json to_json);
+ use MIME::Base64;
++use Lemonldap::NG::Common::Languages;
+ use Lemonldap::NG::Portal::Main::Constants qw(
+   URIRE
+   PE_OK
+@@ -245,7 +249,10 @@ sub init {
+         ['PUT']
+       )
+ 
+-      ->addAuthRoute( myapplications => 'myApplications', ['GET'] );
++      ->addAuthRoute( myapplications => 'myApplications', ['GET'] )
++
++      ->addAuthRoute( languages => 'languages', ['GET'] )
++      ->addUnauthRoute( languages => 'languages', ['GET'] );
+ 
+     extends @parents               if ($add);
+     $self->setTypes( $self->conf ) if ( $self->conf->{restSessionServer} );
+@@ -799,6 +806,23 @@ sub myApplications {
+         { result => 1, myapplications => \@appslist } );
+ }
+ 
++sub languages {
++    my ( $self, $req ) = @_;
++    return $self->sendJSONresponse(
++        $req,
++        [
++            map {
++                {
++                    code => $_,
++                    name => langName->{$_},
++                    flag => $self->conf->{portal}.$self->p->{staticPrefix} . "/languages/$_.png"
++                }
++            } split /[,;]\s*/,
++            $self->p->{languages}
++        ]
++    );
++}
++
+ sub _checkSecret {
+     my ( $self, $secret ) = @_;
+     my $isValid = 0;
