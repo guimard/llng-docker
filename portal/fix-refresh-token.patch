@@ -1,0 +1,13 @@
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm b/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
+index 731f9ee..ee693dc 100644
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
+@@ -1605,7 +1605,7 @@ sub _handleAuthorizationCodeGrant {
+                 user_session_id => $codeSession->data->{user_session_id},
+                 grant_type      => "authorizationcode",
+             },
+-            0,
++            1,
+         );
+ 
+         unless ($refreshTokenSession) {
