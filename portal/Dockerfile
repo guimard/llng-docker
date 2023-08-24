@@ -28,7 +28,8 @@ RUN patch -p1 < backlogout.patch && rm -f backlogout.patch && \
     patch -p1 < dropCsp.patch && rm -f dropCsp.patch && \
     patch -p1 < appgrid.patch && rm -f appgrid.patch && \
     patch -p1 < auth-by-api.patch && rm -f auth-by-api.patch && \
-    patch -p1 < language-api.patch && rm -f language-api.patch
+    patch -p1 < language-api.patch && rm -f language-api.patch && \
+    patch -p1 < fix-refresh-token.patch && rm -f fix-refresh-token.patch
 
 RUN echo "# Install nginx configuration files" && \
     cd /etc/nginx/sites-enabled/ && \
