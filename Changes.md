@@ -1,5 +1,6 @@
 # Changes
 
+* 2023-08-28: JWT type
 * 2023-07-25: languages API
 * 2023-07-21: auth by API
 * 2023-07-13: Propage env variales to FastCGI server

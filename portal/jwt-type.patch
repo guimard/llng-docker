@@ -1,0 +1,11 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
+@@ -1137,7 +1137,7 @@ sub makeJWT {
+       || "RS256";
+     $self->logger->debug("Access Token signature algorithm: $alg");
+ 
+-    my $jwt = $self->createJWT( $access_token_payload, $alg, $rp, "at+JWT" );
++    my $jwt = $self->createJWT( $access_token_payload, $alg, $rp );
+ 
+     return $jwt;
+ }

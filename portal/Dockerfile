@@ -24,11 +24,13 @@ RUN echo "# Install nginx and portal libs" && \
 
 COPY *.patch /
 
-RUN patch -p1 < backlogout.patch && rm -f backlogout.patch && \
-    patch -p1 < dropCsp.patch && rm -f dropCsp.patch && \
-    patch -p1 < appgrid.patch && rm -f appgrid.patch && \
-    patch -p1 < auth-by-api.patch && rm -f auth-by-api.patch && \
-    patch -p1 < language-api.patch && rm -f language-api.patch
+RUN patch -p1 < backlogout.patch  && \
+    patch -p1 < dropCsp.patch && \
+    patch -p1 < appgrid.patch && \
+    patch -p1 < auth-by-api.patch && \
+    patch -p1 < language-api.patch && \
+    patch -p1 < jwt-type.patch && \
+    rm -f *.patch
 
 RUN echo "# Install nginx configuration files" && \
     cd /etc/nginx/sites-enabled/ && \
