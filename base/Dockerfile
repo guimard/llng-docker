@@ -63,9 +63,9 @@ RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
     liblemonldap-ng-common-perl${LLNGDIST} \
     liblemonldap-ng-handler-perl${LLNGDIST} \
     libapache-session-browseable-perl libapache-session-ldap-perl \
-    libapache-session-mongodb-perl \
+    libapache-session-mongodb-perl libapache-session-sqlite3-perl \
+    libapache-session-wrapper-perl \
     libdbi-perl libdbd-pg-perl libnet-cidr-perl \
-    libapache-session-mongodb-perl libdbi-perl libdbd-pg-perl libnet-cidr-perl \
     libhttp-parser-xs-perl liblwp-protocol-https-perl libstring-random-perl \
     libconvert-base32-perl libnet-ldap-perl libxml-libxml-perl libxml-simple-perl \
     libredis-fast-perl libredis-perl patch && \
