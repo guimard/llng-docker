@@ -51,7 +51,6 @@ jobs:
             yadd/lemonldap-ng-pg-database:latest
             yadd/lemonldap-ng-pg-database:${{ env.PGVERSION }}
             yadd/lemonldap-ng-pg-database:${{ env.PGVERSION }}-${{ env.DEBIANRELEASE }}
-          label: ${{ steps.meta.outputs.labels }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
         env:
@@ -94,7 +93,6 @@ jobs:
             yadd/lemonldap-ng-base:stable
             yadd/lemonldap-ng-base:${{ env.VERSION }}
             yadd/lemonldap-ng-base:${{ env.VERSION }}-${{ env.DEBIANRELEASE }}
-          label: ${{ steps.meta.outputs.labels }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
         env:
@@ -137,7 +135,6 @@ jobs:
             yadd/lemonldap-ng-portal:stable
             yadd/lemonldap-ng-portal:${{ env.VERSION }}
             yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DEBIANRELEASE }}
-          label: ${{ steps.meta.outputs.labels }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
         env:
@@ -180,7 +177,6 @@ jobs:
             yadd/lemonldap-ng-cron:stable
             yadd/lemonldap-ng-cron:${{ env.VERSION }}
             yadd/lemonldap-ng-cron:${{ env.VERSION }}-${{ env.DEBIANRELEASE }}
-          label: ${{ steps.meta.outputs.labels }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
         env:
@@ -223,7 +219,6 @@ jobs:
             yadd/lemonldap-ng-manager:stable
             yadd/lemonldap-ng-manager:${{ env.VERSION }}
             yadd/lemonldap-ng-manager:${{ env.VERSION }}-${{ env.DEBIANRELEASE }}
-          label: ${{ steps.meta.outputs.labels }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
         env:
@@ -266,7 +261,6 @@ jobs:
             yadd/lemonldap-ng-full:stable
             yadd/lemonldap-ng-full:${{ env.VERSION }}
             yadd/lemonldap-ng-full:${{ env.VERSION }}-${{ env.DEBIANRELEASE }}
-          label: ${{ steps.meta.outputs.labels }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
         env:
@@ -309,7 +303,6 @@ jobs:
             yadd/lemonldap-ng-ssoaas-fastcgi-server:stable
             yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ env.VERSION }}
             yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ env.VERSION }}-${{ env.DEBIANRELEASE }}
-          label: ${{ steps.meta.outputs.labels }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
         env:
@@ -355,4 +348,3 @@ jobs:
           tags: |
             yadd/lemonldap-ng-dev:latest
             yadd/lemonldap-ng-dev:${{ env.DEBIANRELEASE }}
-          label: ${{ steps.meta.outputs.labels }}
