@@ -4,6 +4,10 @@ const supertest = require('supertest')
 const assert = require('assert')
 
 describe('LLNG portal', () => {
+  before(function (done) {
+    setTimeout(done, 5000); // Wait 5 secondes
+  });
+
   const request = supertest.agent('http://auth.example.com')
   let token=''
   it('should give token', (done) => {
