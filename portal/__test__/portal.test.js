@@ -5,6 +5,10 @@ const assert = require('assert');
 const request = supertest.agent('http://auth.example.com');
 
 describe('LLNG portal', () => {
+  before(function (done) {
+    setTimeout(done, 5000); // Wait 5 secondes
+  });
+
   let token=''
   let llid=''
   it('should return 401 to unauthenticated JSON request', done => {
