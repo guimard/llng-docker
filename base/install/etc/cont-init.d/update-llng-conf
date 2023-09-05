@@ -6,13 +6,13 @@ perl -i -pe 's/^logLevel\s*=.*$/logLevel=$ENV{LOGLEVEL}/' /etc/lemonldap-ng/lemo
 
 # Fix logger
 if test "$LOGGER" = "stderr"; then
-	echo "Set logger to Lemonldap::NG::Common::Logger::Std"
-	perl -i -ne 'print unless /^logger\s*=/;print "logger = Lemonldap::NG::Common::Logger::Std\n" if/^\[\s*all\s*\]/;' /etc/lemonldap-ng/lemonldap-ng.ini;
+    echo "Set logger to Lemonldap::NG::Common::Logger::Std"
+    perl -i -ne 'print unless /^logger\s*=/;print "logger = Lemonldap::NG::Common::Logger::Std\n" if/^\[\s*all\s*\]/;' /etc/lemonldap-ng/lemonldap-ng.ini;
 fi
 
 if test "$USERLOGGER" = "stderr"; then
-	echo "Set userLogger to Lemonldap::NG::Common::Logger::Std"
-	perl -i -ne 'print unless /^userLogger\s*=/;print "userLogger = Lemonldap::NG::Common::Logger::Std\n" if/^\[\s*all\s*\]/;' /etc/lemonldap-ng/lemonldap-ng.ini;
+    echo "Set userLogger to Lemonldap::NG::Common::Logger::Std"
+    perl -i -ne 'print unless /^userLogger\s*=/;print "userLogger = Lemonldap::NG::Common::Logger::Std\n" if/^\[\s*all\s*\]/;' /etc/lemonldap-ng/lemonldap-ng.ini;
 fi
 
 # OPTIONAL DATABASE FOR CONFIGURATION
@@ -66,6 +66,19 @@ fi
 /usr/share/docker-llng/updateConf "setDomain" $SSODOMAIN
 /usr/share/docker-llng/updateConf "set" portal $PORTAL
 
+if test "$CROWDSEC_SERVER" != ""; then
+    echo "Configure LLNG to use $CROWDSEC_SERVER as Crowdsec server"
+    /usr/share/docker-llng/updateConf set crowdsec 1
+    /usr/share/docker-llng/updateConf set crowdsecUrl $CROWDSEC_SERVER
+    if test "$CROWDSEC_POLICY" != ""; then
+        POLICY=$CROWDSEC_POLICY
+    else
+        POLICY=reject
+    fi
+    /usr/share/docker-llng/updateConf set crowdsecAction $POLICY
+    /usr/share/docker-llng/updateConf set crowdsecKey $CROWDSEC_KEY
+fi
+
 # If Redis server is given, let's use it for sessions
 if test "$REDIS_SERVER" != ""; then
     echo "Change configuration to use Redis for sessions"
@@ -83,6 +96,6 @@ rm -rf /var/lib/lemonldap-ng/cache/*/*
 KEY=`/usr/share/docker-llng/updateConf get key`
 
 if test "$KEY" = "" -o "$FORCE_KEY_REGENERATION" = "yes"; then
-	echo "Update configuration key"
-	/usr/share/docker-llng/updateConf set key `cat /proc/sys/kernel/random/uuid | sed 's/[-]//g'` 2>&1 | perl -pe 's/\w{32}/<hidden for security>/'
+    echo "Update configuration key"
+    /usr/share/docker-llng/updateConf set key `cat /proc/sys/kernel/random/uuid | sed 's/[-]//g'` 2>&1 | perl -pe 's/\w{32}/<hidden for security>/'
 fi

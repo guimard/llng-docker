@@ -1,5 +1,6 @@
 # Changes
 
+* 2023-09-05: Add crowdsec parameters
 * 2023-09-01: Switch to Bookworm
 * 2023-08-28: JWT type
 * 2023-07-25: languages API

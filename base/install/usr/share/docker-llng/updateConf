@@ -26,7 +26,7 @@ elsif ( $ARGV[0] eq 'setDomain' ) {
     my $currentDomain = $conf->{domain};
     print STDERR "Current domain: $currentDomain\n";
     my $newDomain = $ARGV[1];
-    if ( $newDomain ne $currentDomain ) {
+    if ( $newDomain and ( $newDomain ne $currentDomain ) ) {
         print STDERR "New domain: $newDomain\n";
         delete $conf->{cipher};
         my $content = JSON::to_json($conf);

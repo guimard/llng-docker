@@ -34,6 +34,9 @@ LABEL maintainer="Yadd yadd@debian.org>" \
       version="v1.0"
 
 ENV SSODOMAIN=example.com \
+    CROWDSEC_SERVER= \
+    CROWDSEC_POLICY=reject \
+    CROWDSEC_KEY= \
     PORTAL=http://auth.example.com/ \
     LOGLEVEL=info \
     LOGGER=syslog \
