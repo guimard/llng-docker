@@ -22,13 +22,6 @@ RUN echo "# Install nginx and manager libs" && \
     mv /tmp/dpkg.cfg.d /etc/dpkg/ && \
     apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/*
 
-COPY backlogout.patch .
-
-COPY accept-mobile-url.patch .
-
-RUN patch -p1 < backlogout.patch && rm -f backlogout.patch && \
-    patch -p1 < accept-mobile-url.patch && rm -f accept-mobile-url.patch
-
 RUN echo "# Install nginx configuration files" && \
     cd /etc/nginx/sites-enabled/ && \
     ln -s ../../lemonldap-ng/manager-nginx.conf

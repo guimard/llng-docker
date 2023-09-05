@@ -26,8 +26,8 @@ RUN tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz && rm /tmp/s6-overlay-noarch.ta
 FROM debian-backports-updated-with-s6
 
 ENV DEBIAN_VERSION="bookworm"
-#ENV LLNGDIST="/bookworm-backports"
-ENV LLNGDIST=
+ENV LLNGDIST="/bookworm-backports"
+#ENV LLNGDIST=
 
 LABEL maintainer="Yadd yadd@debian.org>" \
       name="yadd/lemonldap-ng-base" \
@@ -61,7 +61,7 @@ ENV SSODOMAIN=example.com \
     FORCE_KEY_REGENERATION=no \
     DEBIAN_FRONTEND=noninteractive
 
-RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
+RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     apt-get -y --no-install-recommends install procps cron \
     liblemonldap-ng-common-perl${LLNGDIST} \
     liblemonldap-ng-handler-perl${LLNGDIST} \
@@ -83,10 +83,6 @@ RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
 VOLUME ["/etc/lemonldap-ng","/var/lib/lemonldap-ng/conf", "/var/lib/lemonldap-ng/sessions", "/var/lib/lemonldap-ng/psessions"]
 
 COPY install /
-
-COPY russian-language.patch .
-
-RUN patch -p1 < russian-language.patch && rm -f russian-language.patch
 
 # DEBUG
 #CMD ["cat","/var/lib/lemonldap-ng/conf/lmConf-1.json"]

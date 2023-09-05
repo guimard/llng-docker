@@ -24,11 +24,7 @@ RUN echo "# Install nginx and portal libs" && \
 
 COPY *.patch /
 
-RUN patch -p1 < backlogout.patch  && \
-    patch -p1 < dropCsp.patch && \
-    patch -p1 < appgrid.patch && \
-    patch -p1 < auth-by-api.patch && \
-    patch -p1 < language-api.patch && \
+RUN patch -p1 < appgrid.patch && \
     patch -p1 < jwt-type.patch && \
     rm -f *.patch
 
