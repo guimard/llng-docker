@@ -7,8 +7,14 @@ use JSON;
 my $confAcc = Lemonldap::NG::Common::Conf->new( {} );
 my $cfgNum  = $confAcc->lastCfg();
 my $conf    = $confAcc->getConf( { cfgNum => $cfgNum, noCache => 1 } );
+delete $conf->{cipher};
 if ( $ARGV[0] eq 'get' ) {
-    print $conf->{ $ARGV[1] } . "\n";
+    if ( ref $conf->{ $ARGV[1] } ) {
+        print JSON::to_json( $conf->{ $ARGV[1] } );
+    }
+    else {
+        print $conf->{ $ARGV[1] } . "\n";
+    }
 }
 elsif ( $ARGV[0] eq 'set' ) {
     if ( $conf->{ $ARGV[1] } ne $ARGV[2] ) {
