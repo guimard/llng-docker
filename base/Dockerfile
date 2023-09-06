@@ -72,7 +72,9 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     libhttp-parser-xs-perl liblwp-protocol-https-perl libstring-random-perl \
     libconvert-base32-perl libnet-ldap-perl libxml-libxml-perl libxml-simple-perl \
     libredis-fast-perl libredis-perl patch && \
-    apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/*
+    apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/* && \
+    mkdir -p /var/lib/lemonldap-ng/cache && \
+    chown www-data:www-data /var/lib/lemonldap-ng/cache
 
 #COPY syslogopt.patch .
 #
