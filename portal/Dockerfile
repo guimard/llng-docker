@@ -26,6 +26,7 @@ COPY *.patch /
 
 RUN patch -p1 < appgrid.patch && \
     patch -p1 < jwt-type.patch && \
+    patch -p1 < little-security-fixes.patch && \
     rm -f *.patch
 
 RUN echo "# Install nginx configuration files" && \
