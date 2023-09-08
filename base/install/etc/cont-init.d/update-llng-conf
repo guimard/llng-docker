@@ -59,7 +59,24 @@ if test "$DBI_CHAIN" != ""; then
        /usr/share/docker-llng/updateConf set casStorageOptions "{TableName=>'$PG_CAS_TABLE',DataSource=>'$DBI_CHAIN',UserName=>'$DBI_USER',Password=>'$DBI_PASSWORD',Commit=>1}"
      fi
    else
-     echo "Previous configuration found, skipping session storage changes"
+     echo "Previous configuration found, skipping configuration conversion"
+   fi
+elif [ "$LDAP_URL" != "" ]; then
+   echo "Configuring lemonldap-ng.ini to use database for configuration"
+   # 2 - Save current INI file
+   cp /etc/lemonldap-ng/lemonldap-ng.ini /etc/lemonldap-ng/lemonldap-ng-file.ini
+   perl -i -pe 's/^\s*type\s*=\s*File\s*$/type=LDAP\n/;
+     s/^\s*dirName\s*=.*$/ldapServer=$ENV{LDAP_URL}\nldapConfBase=$ENV{LDAP_CONF_BASE}\nldapBindDN=$ENV{LDAP_CONF_DN}\nldapBindPassword=$ENV{LDAP_CONF_PASSWORD}\n/;
+   ' /etc/lemonldap-ng/lemonldap-ng.ini
+   if [ "$LDAP_CONF_DN" != "" ]; then
+     CONF=`perl -MNet::LDAP -e '$ldap=Net::LDAP->new(["'$LDAP_URL'"])or die"No LDAP";$b=$ldap->bind("'$LDAP_CONF_DN'",password=>"'"$LDAP_CONF_PASSWORD"'");die if $b->code;$s=$ldap->search(base=>"'$LDAP_CONF_BASE'",filter=>"(objectClass=applicationProcess,scope=>"one")");print $s->code ? 0 : "MANY"'`
+   else
+     CONF=`perl -MNet::LDAP -e '$ldap=Net::LDAP->new(["'$LDAP_URL'"])or die"No LDAP";$s=$ldap->search(base=>"'$LDAP_CONF_BASE'",filter=>"(objectClass=applicationProcess,scope=>"one")");print $s->code ? 0 : "MANY"'`
+   fi
+   if test "$CONF" = "0"; then
+     /usr/share/lemonldap-ng/bin/convertConfig --new=/etc/lemonldap-ng/lemonldap-ng.ini --current=/etc/lemonldap-ng/lemonldap-ng-file.ini
+   else
+     echo "Previous configuration found, skipping configuration conversion"
    fi
 fi
 
