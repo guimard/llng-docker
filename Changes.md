@@ -1,5 +1,9 @@
 # Changes
 
+* 2023-09-08:
+  * import some little security fixes from 2.18.0
+  * add experimental LDAP support for configuration
+  * add override system for any Lemonldap-NG configuration key
 * 2023-09-06: keep old /var/lib/lemonldap-ng/cache
 * 2023-09-05: Add crowdsec parameters
 * 2023-09-01: Switch to Bookworm

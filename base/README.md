@@ -58,6 +58,21 @@ LemonLDAP::NG.
 
 **LemonLDAP::NG logs**: when using default values _(syslog)_, logs are stored in `/var/log/syslogd/` _(default S6 behavior)_
 
+### Override Lemonldap::NG configuration parameters
+
+You can easily override any Lemonldap::NG configuration parameter using a
+environment variable set to `OVERRIDE_<parameter name>`. For example, to set
+`checkXSS`to 0 and `exportedVars` to `{"Name":"cn"}` in a docker-compose.yml
+file, use:
+
+```yaml
+  environment:
+    - OVERRIDE_checkXSS=0
+    - OVERRIDE_exportedVars={"Name":"cn"}
+```
+
+Note that JSON notation is supported only for objects and arrays.
+
 ## Docker-compose example
 
 ```yaml
@@ -79,6 +94,7 @@ services:
       - REDIS_SERVER=redis:6379
       - LOGGER=stderr
       - USERLOGGER=stderr
+      - OVERRIDE_exportedVars={"cn":"cn","mail":"mail","uid":"uid"}
     depends_on:
       db:
         condition: service_healthy

@@ -47,16 +47,16 @@ if test "$DBI_CHAIN" != ""; then
    if test "$CONF" = "0"; then
      /usr/share/lemonldap-ng/bin/convertConfig --new=/etc/lemonldap-ng/lemonldap-ng.ini --current=/etc/lemonldap-ng/lemonldap-ng-file.ini
      /usr/share/docker-llng/updateConf set persistentStorage "Apache::Session::Browseable::PgJSON"
-     /usr/share/docker-llng/updateConf set persistentStorageOptions "{TableName=>'$PG_PERSISTENT_SESSIONS_TABLE',DataSource=>'$DBI_CHAIN',UserName=>'$DBI_USER',Password=>'$DBI_PASSWORD',Commit=>1}"
+     /usr/share/docker-llng/updateConf set persistentStorageOptions '{"TableName":"'$PG_PERSISTENT_SESSIONS_TABLE'","DataSource":"'$DBI_CHAIN'","UserName":"'$DBI_USER'","Password":"'$DBI_PASSWORD'","Commit":1}'
      if test "$REDIS_SERVER" = ""; then
        /usr/share/docker-llng/updateConf set globalStorage "Apache::Session::Browseable::PgJSON"
-       /usr/share/docker-llng/updateConf set globalStorageOptions "{TableName=>'$PG_SESSIONS_TABLE',DataSource=>'$DBI_CHAIN',UserName=>'$DBI_USER',Password=>'$DBI_PASSWORD',Commit=>1}"
+       /usr/share/docker-llng/updateConf set globalStorageOptions '{"TableName":"'$PG_SESSIONS_TABLE'","DataSource":"'$DBI_CHAIN'","UserName":"'$DBI_USER'","Password":"'$DBI_PASSWORD'","Commit":1}'
        /usr/share/docker-llng/updateConf set samlStorage "Apache::Session::Browseable::PgJSON"
-       /usr/share/docker-llng/updateConf set samlStorageOptions "{TableName=>'$PG_SAML_TABLE',DataSource=>'$DBI_CHAIN',UserName=>'$DBI_USER',Password=>'$DBI_PASSWORD',Commit=>1}"
+       /usr/share/docker-llng/updateConf set samlStorageOptions '{"TableName":"'$PG_SAML_TABLE'","DataSource":"'$DBI_CHAIN'","UserName":"'$DBI_USER'","Password":"'$DBI_PASSWORD'","Commit":1}'
        /usr/share/docker-llng/updateConf set oidcStorage "Apache::Session::Browseable::PgJSON"
-       /usr/share/docker-llng/updateConf set oidcStorageOptions "{TableName=>'$PG_OIDC_TABLE',DataSource=>'$DBI_CHAIN',UserName=>'$DBI_USER',Password=>'$DBI_PASSWORD',Commit=>1}"
+       /usr/share/docker-llng/updateConf set oidcStorageOptions '{"TableName":"'$PG_OIDC_TABLE'","DataSource":"'$DBI_CHAIN'","UserName":"'$DBI_USER'","Password":"'$DBI_PASSWORD'","Commit":1}'
        /usr/share/docker-llng/updateConf set casStorage "Apache::Session::Browseable::PgJSON"
-       /usr/share/docker-llng/updateConf set casStorageOptions "{TableName=>'$PG_CAS_TABLE',DataSource=>'$DBI_CHAIN',UserName=>'$DBI_USER',Password=>'$DBI_PASSWORD',Commit=>1}"
+       /usr/share/docker-llng/updateConf set casStorageOptions '{"TableName":"'$PG_CAS_TABLE'","DataSource":"'$DBI_CHAIN'","UserName":"'$DBI_USER'","Password":"'$DBI_PASSWORD'","Commit":1}'
      fi
    else
      echo "Previous configuration found, skipping configuration conversion"
@@ -101,7 +101,7 @@ if test "$REDIS_SERVER" != ""; then
     echo "Change configuration to use Redis for sessions"
     REDIS_INDEXES=${REDIS_INDEXES:-uid mail}
     /usr/share/docker-llng/updateConf set globalStorage 'Apache::Session::Browseable::Redis'
-    /usr/share/docker-llng/updateConf set globalStorageOptions "{server=>'$REDIS_SERVER',Index=>'$REDIS_INDEXES'}"
+    /usr/share/docker-llng/updateConf set globalStorageOptions '{"server":"'$REDIS_SERVER'","Index":"'$REDIS_INDEXES'"}'
     /usr/share/docker-llng/updateConf set forceGlobalStorageIssuerOTT 1
     /usr/share/docker-llng/updateConf set tokenUseGlobalStorage 1
     /usr/share/docker-llng/updateConf set forceGlobalStorageUpgradeOTT 1
@@ -116,3 +116,11 @@ if test "$KEY" = "" -o "$FORCE_KEY_REGENERATION" = "yes"; then
     echo "Update configuration key"
     /usr/share/docker-llng/updateConf set key `cat /proc/sys/kernel/random/uuid | sed 's/[-]//g'` 2>&1 | perl -pe 's/\w{32}/<hidden for security>/'
 fi
+
+KEYS=`(env | grep OVERRIDE || true) | sed -e 's/=.*$//'`
+for key in `(env | grep OVERRIDE || true) | sed -e 's/=.*$//'`; do
+    KEYNAME=${key#OVERRIDE_}
+    VAL=$(eval "echo \$$key")
+    echo "Set $KEYNAME to $VAL"
+    /usr/share/docker-llng/updateConf set $KEYNAME "$VAL"
+done
