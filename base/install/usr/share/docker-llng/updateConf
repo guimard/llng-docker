@@ -23,6 +23,7 @@ elsif ( $ARGV[0] eq 'set' ) {
           . " to $ARGV[2]\n";
         if ( $ARGV[2] =~ /^[\{\[].*[\]\}]$/ ) {
             $ARGV[2] = eval { JSON::from_json( $ARGV[2] ) };
+            die "Bad value for $ARGV[1]: $@" if $@;
         }
         $conf->{ $ARGV[1] } = $ARGV[2];
         my $res = $confAcc->saveConf( $conf, force => 1, cfgNumFixed => 1 );

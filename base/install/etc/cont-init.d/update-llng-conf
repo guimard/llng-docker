@@ -42,21 +42,21 @@ if test "$DBI_CHAIN" != ""; then
    s/^\s*dirName\s*=.*$/dbiChain=$ENV{DBI_CHAIN}\ndbiUser=$ENV{DBI_USER}\ndbiPassword=$ENV{DBI_PASSWORD}\ndbiTable=$ENV{DBI_TABLE}\n/;
    ' /etc/lemonldap-ng/lemonldap-ng.ini
    # 5 - Check if there is already a configuration stored in SQL database
-   CONF=`perl -MDBI -MDBD::Pg -e '$dbh=DBI->connect("'$DBI_CHAIN'","'$DBI_USER'","'$DBI_PASSWORD'",{ RaiseError => 1});$r=$dbh->selectall_arrayref("SELECT * FROM '$DBI_TABLE'");print scalar @$r'`
+   CONF=`perl -MDBI -MDBD::Pg -e '$dbh=DBI->connect("'"$DBI_CHAIN"'","'"$DBI_USER"'","'"$DBI_PASSWORD"'",{ RaiseError => 1});$r=$dbh->selectall_arrayref("SELECT * FROM '"$DBI_TABLE"'");print scalar @$r'`
    # 6 - If no configuration in current server, let's convert current "File" configuration into database
    if test "$CONF" = "0"; then
      /usr/share/lemonldap-ng/bin/convertConfig --new=/etc/lemonldap-ng/lemonldap-ng.ini --current=/etc/lemonldap-ng/lemonldap-ng-file.ini
      /usr/share/docker-llng/updateConf set persistentStorage "Apache::Session::Browseable::PgJSON"
-     /usr/share/docker-llng/updateConf set persistentStorageOptions '{"TableName":"'$PG_PERSISTENT_SESSIONS_TABLE'","DataSource":"'$DBI_CHAIN'","UserName":"'$DBI_USER'","Password":"'$DBI_PASSWORD'","Commit":1}'
+     /usr/share/docker-llng/updateConf set persistentStorageOptions '{"TableName":"'"$PG_PERSISTENT_SESSIONS_TABLE"'","DataSource":"'"$DBI_CHAIN"'","UserName":"'"$DBI_USER"'","Password":"'"$DBI_PASSWORD"'","Commit":1}'
      if test "$REDIS_SERVER" = ""; then
        /usr/share/docker-llng/updateConf set globalStorage "Apache::Session::Browseable::PgJSON"
-       /usr/share/docker-llng/updateConf set globalStorageOptions '{"TableName":"'$PG_SESSIONS_TABLE'","DataSource":"'$DBI_CHAIN'","UserName":"'$DBI_USER'","Password":"'$DBI_PASSWORD'","Commit":1}'
+       /usr/share/docker-llng/updateConf set globalStorageOptions '{"TableName":"'"$PG_SESSIONS_TABLE"'","DataSource":"'"$DBI_CHAIN"'","UserName":"'"$DBI_USER"'","Password":"'"$DBI_PASSWORD"'","Commit":1}'
        /usr/share/docker-llng/updateConf set samlStorage "Apache::Session::Browseable::PgJSON"
-       /usr/share/docker-llng/updateConf set samlStorageOptions '{"TableName":"'$PG_SAML_TABLE'","DataSource":"'$DBI_CHAIN'","UserName":"'$DBI_USER'","Password":"'$DBI_PASSWORD'","Commit":1}'
+       /usr/share/docker-llng/updateConf set samlStorageOptions '{"TableName":"'"$PG_SAML_TABLE"'","DataSource":"'"$DBI_CHAIN"'","UserName":"'"$DBI_USER"'","Password":"'"$DBI_PASSWORD"'","Commit":1}'
        /usr/share/docker-llng/updateConf set oidcStorage "Apache::Session::Browseable::PgJSON"
-       /usr/share/docker-llng/updateConf set oidcStorageOptions '{"TableName":"'$PG_OIDC_TABLE'","DataSource":"'$DBI_CHAIN'","UserName":"'$DBI_USER'","Password":"'$DBI_PASSWORD'","Commit":1}'
+       /usr/share/docker-llng/updateConf set oidcStorageOptions '{"TableName":"'"$PG_OIDC_TABLE"'","DataSource":"'"$DBI_CHAIN"'","UserName":"'"$DBI_USER"'","Password":"'"$DBI_PASSWORD"'","Commit":1}'
        /usr/share/docker-llng/updateConf set casStorage "Apache::Session::Browseable::PgJSON"
-       /usr/share/docker-llng/updateConf set casStorageOptions '{"TableName":"'$PG_CAS_TABLE'","DataSource":"'$DBI_CHAIN'","UserName":"'$DBI_USER'","Password":"'$DBI_PASSWORD'","Commit":1}'
+       /usr/share/docker-llng/updateConf set casStorageOptions '{"TableName":"'"$PG_CAS_TABLE"'","DataSource":"'"$DBI_CHAIN"'","UserName":"'"$DBI_USER"'","Password":"'"$DBI_PASSWORD"'","Commit":1}'
      fi
    else
      echo "Previous configuration found, skipping configuration conversion"
@@ -69,9 +69,9 @@ elif [ "$LDAP_URL" != "" ]; then
      s/^\s*dirName\s*=.*$/ldapServer=$ENV{LDAP_URL}\nldapConfBase=$ENV{LDAP_CONF_BASE}\nldapBindDN=$ENV{LDAP_CONF_DN}\nldapBindPassword=$ENV{LDAP_CONF_PASSWORD}\n/;
    ' /etc/lemonldap-ng/lemonldap-ng.ini
    if [ "$LDAP_CONF_DN" != "" ]; then
-     CONF=`perl -MNet::LDAP -e '$ldap=Net::LDAP->new(["'$LDAP_URL'"])or die"No LDAP";$b=$ldap->bind("'$LDAP_CONF_DN'",password=>"'"$LDAP_CONF_PASSWORD"'");die if $b->code;$s=$ldap->search(base=>"'$LDAP_CONF_BASE'",filter=>"(objectClass=applicationProcess,scope=>"one")");print $s->code ? 0 : "MANY"'`
+     CONF=`perl -MNet::LDAP -e '$ldap=Net::LDAP->new(["'"$LDAP_URL"'"])or die"No LDAP";$b=$ldap->bind("'"$LDAP_CONF_DN"'",password=>"'"$LDAP_CONF_PASSWORD"'");die if $b->code;$s=$ldap->search(base=>"'"$LDAP_CONF_BASE"'",filter=>"(objectClass=applicationProcess,scope=>"one")");print $s->code ? 0 : "MANY"'`
    else
-     CONF=`perl -MNet::LDAP -e '$ldap=Net::LDAP->new(["'$LDAP_URL'"])or die"No LDAP";$s=$ldap->search(base=>"'$LDAP_CONF_BASE'",filter=>"(objectClass=applicationProcess,scope=>"one")");print $s->code ? 0 : "MANY"'`
+     CONF=`perl -MNet::LDAP -e '$ldap=Net::LDAP->new(["'"$LDAP_URL"'"])or die"No LDAP";$s=$ldap->search(base=>"'"$LDAP_CONF_BASE"'",filter=>"(objectClass=applicationProcess,scope=>"one")");print $s->code ? 0 : "MANY"'`
    fi
    if test "$CONF" = "0"; then
      /usr/share/lemonldap-ng/bin/convertConfig --new=/etc/lemonldap-ng/lemonldap-ng.ini --current=/etc/lemonldap-ng/lemonldap-ng-file.ini
@@ -80,20 +80,20 @@ elif [ "$LDAP_URL" != "" ]; then
    fi
 fi
 
-/usr/share/docker-llng/updateConf "setDomain" $SSODOMAIN
-/usr/share/docker-llng/updateConf "set" portal $PORTAL
+/usr/share/docker-llng/updateConf "setDomain" "$SSODOMAIN"
+/usr/share/docker-llng/updateConf "set" portal "$PORTAL"
 
 if test "$CROWDSEC_SERVER" != ""; then
     echo "Configure LLNG to use $CROWDSEC_SERVER as Crowdsec server"
     /usr/share/docker-llng/updateConf set crowdsec 1
-    /usr/share/docker-llng/updateConf set crowdsecUrl $CROWDSEC_SERVER
+    /usr/share/docker-llng/updateConf set crowdsecUrl "$CROWDSEC_SERVER"
     if test "$CROWDSEC_POLICY" != ""; then
-        POLICY=$CROWDSEC_POLICY
+        POLICY="$CROWDSEC_POLICY"
     else
         POLICY=reject
     fi
-    /usr/share/docker-llng/updateConf set crowdsecAction $POLICY
-    /usr/share/docker-llng/updateConf set crowdsecKey $CROWDSEC_KEY
+    /usr/share/docker-llng/updateConf set crowdsecAction "$POLICY"
+    /usr/share/docker-llng/updateConf set crowdsecKey "$CROWDSEC_KEY"
 fi
 
 # If Redis server is given, let's use it for sessions
@@ -101,7 +101,7 @@ if test "$REDIS_SERVER" != ""; then
     echo "Change configuration to use Redis for sessions"
     REDIS_INDEXES=${REDIS_INDEXES:-uid mail}
     /usr/share/docker-llng/updateConf set globalStorage 'Apache::Session::Browseable::Redis'
-    /usr/share/docker-llng/updateConf set globalStorageOptions '{"server":"'$REDIS_SERVER'","Index":"'$REDIS_INDEXES'"}'
+    /usr/share/docker-llng/updateConf set globalStorageOptions '{"server":"'"$REDIS_SERVER"'","Index":"'"$REDIS_INDEXES"'"}'
     /usr/share/docker-llng/updateConf set forceGlobalStorageIssuerOTT 1
     /usr/share/docker-llng/updateConf set tokenUseGlobalStorage 1
     /usr/share/docker-llng/updateConf set forceGlobalStorageUpgradeOTT 1
@@ -122,5 +122,5 @@ for key in `(env | grep OVERRIDE || true) | sed -e 's/=.*$//'`; do
     KEYNAME=${key#OVERRIDE_}
     VAL=$(eval "echo \$$key")
     echo "Set $KEYNAME to $VAL"
-    /usr/share/docker-llng/updateConf set $KEYNAME "$VAL"
+    /usr/share/docker-llng/updateConf set "$KEYNAME" "$VAL"
 done
