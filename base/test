@@ -7,4 +7,6 @@ docker-compose run base /usr/share/docker-llng/updateConf get persistentStorage|
 docker-compose run base /usr/share/docker-llng/updateConf get globalStorage|grep Apache::Session::Browseable::Redis
 docker-compose run base /usr/share/docker-llng/updateConf get domain|grep debian.org
 docker-compose run base /usr/share/docker-llng/updateConf get authChoiceModules|grep 1_LDAP
+docker-compose run base /usr/share/docker-llng/updateConf get applicationList 1sample catname|grep "Some applications"
+docker-compose run base /usr/share/docker-llng/updateConf get exportedVars aa|grep bb
 docker-compose down

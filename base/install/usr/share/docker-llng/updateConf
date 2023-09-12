@@ -8,31 +8,39 @@ my $confAcc = Lemonldap::NG::Common::Conf->new( {} );
 my $cfgNum  = $confAcc->lastCfg();
 my $conf    = $confAcc->getConf( { cfgNum => $cfgNum, noCache => 1 } );
 delete $conf->{cipher};
-if ( $ARGV[0] eq 'get' ) {
-    if ( ref $conf->{ $ARGV[1] } ) {
-        print JSON::to_json( $conf->{ $ARGV[1] } );
+
+my $command = shift @ARGV or die "Missing command";
+
+if ( $command eq 'get' ) {
+    my ( $c, $key, $offset ) = follow( $conf, @ARGV );
+    if ( ref $c->{$key} ) {
+        print JSON::to_json( $c->{$key} );
     }
     else {
-        print $conf->{ $ARGV[1] } . "\n";
+        print $c->{$key} . "\n";
     }
 }
-elsif ( $ARGV[0] eq 'set' ) {
-    if ( $conf->{ $ARGV[1] } ne $ARGV[2] ) {
-        print STDERR "Key $ARGV[1] updated from "
-          . $conf->{ $ARGV[1] }
-          . " to $ARGV[2]\n";
-        if ( $ARGV[2] =~ /^[\{\[].*[\]\}]$/ ) {
-            $ARGV[2] = eval { JSON::from_json( $ARGV[2] ) };
+elsif ( $command eq 'set' ) {
+    my $val = pop @ARGV;
+    die "Missing key and value" unless @ARGV;
+    my ( $c, $key, $offset ) = follow( $conf, @ARGV );
+    if ( $c->{$key} ne $val ) {
+        my $realVal = $val;
+        if ( $val =~ /^[\{\[].*[\]\}]$/ ) {
+            $realVal = eval { JSON::from_json($val) };
             die "Bad value for $ARGV[1]: $@" if $@;
         }
-        $conf->{ $ARGV[1] } = $ARGV[2];
+        $c->{$key} = $realVal;
         my $res = $confAcc->saveConf( $conf, force => 1, cfgNumFixed => 1 );
+        print STDERR "Key $offset$key updated from "
+          . $c->{$key}
+          . " to $val\n";
     }
 }
-elsif ( $ARGV[0] eq 'setDomain' ) {
+elsif ( $command eq 'setDomain' ) {
     my $currentDomain = $conf->{domain};
     print STDERR "Current domain: $currentDomain\n";
-    my $newDomain = $ARGV[1];
+    my $newDomain = $ARGV[0] or die "Missing domain";
     if ( $newDomain and ( $newDomain ne $currentDomain ) ) {
         print STDERR "New domain: $newDomain\n";
         delete $conf->{cipher};
@@ -44,5 +52,25 @@ elsif ( $ARGV[0] eq 'setDomain' ) {
     }
 }
 else {
-    die "Unknown command: '$ARGV[1]'";
+    die "Unknown command: '$command'";
+}
+
+sub follow {
+    my ( $conf, @keys ) = @_;
+    my $offset = '';
+    while ( @keys > 1 ) {
+        my $key = shift @keys;
+        die "Unable to find $offset$key" unless exists $conf->{$key};
+        $offset .= "$key/";
+        $conf = $conf->{$key};
+    }
+    return ( $conf, $keys[0], $offset );
+}
+
+sub set {
+    my ( $conf, $key, $val, $offset ) = @_;
+    if ( $val =~ /^[\{\[].*[\]\}]$/ ) {
+        $ARGV[2] = eval { JSON::from_json( $ARGV[2] ) };
+        die "Bad value for $ARGV[1]: $@" if $@;
+    }
 }

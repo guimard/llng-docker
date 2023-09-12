@@ -122,5 +122,5 @@ for key in `(env | grep OVERRIDE || true) | sed -e 's/=.*$//'`; do
     KEYNAME=${key#OVERRIDE_}
     VAL=$(eval "echo \$$key")
     echo "Set $KEYNAME to $VAL"
-    /usr/share/docker-llng/updateConf set "$KEYNAME" "$VAL"
+    /usr/share/docker-llng/updateConf set `echo $KEYNAME|perl -pe 's/_/\n/g'` "$VAL"
 done

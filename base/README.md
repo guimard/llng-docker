@@ -73,6 +73,15 @@ file, use:
 
 Note that JSON notation is supported only for objects and arrays.
 
+To modify subkeys, use "\_" separator. For example to set the subkey "uid" of
+key "ldapExportedVars" to "cn", use:
+```yaml
+  environment:
+    - OVERRIDE_ldapExportedVars_uid=cn
+```
+
+Note that the container key _(here ldapExportedVars)_ must exist.
+
 ## Docker-compose example
 
 ```yaml

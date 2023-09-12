@@ -1,5 +1,6 @@
 # Changes
 
+* 2023-09-12: improve override system (subkeys)
 * 2023-09-08:
   * import some little security fixes from 2.18.0
   * add experimental LDAP support for configuration
