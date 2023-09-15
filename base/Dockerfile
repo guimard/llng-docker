@@ -77,8 +77,9 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     libconvert-base32-perl libnet-ldap-perl libxml-libxml-perl libxml-simple-perl \
     libredis-fast-perl libredis-perl patch && \
     apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/* && \
-    mkdir -p /var/lib/lemonldap-ng/cache && \
-    chown www-data:www-data /var/lib/lemonldap-ng/cache
+    mkdir -p /var/lib/lemonldap-ng/cache /run/llng-fastcgi-server && \
+    chown www-data:www-data /var/lib/lemonldap-ng/cache /run/llng-fastcgi-server && \
+    chmod 750 /run/llng-fastcgi-server
 
 #COPY syslogopt.patch .
 #
