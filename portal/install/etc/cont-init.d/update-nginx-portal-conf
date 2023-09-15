@@ -1,5 +1,7 @@
 #!/command/with-contenv sh
 
+PORTAL=${PORTAL:-auth.example.com}
+SSODOMAIN=${SSODOMAIN:-example.com}
 HOSTNAME=${PORTAL#*://}
 HOSTNAME=${HOSTNAME%/*}
 export HOSTNAME
