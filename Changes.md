@@ -1,5 +1,6 @@
 # Changes
 
+* 2023-09-18: add YAML support
 * 2023-09-18: Build alternative "no-s6" and add related tags
 * 2023-09-15: force create /run/llng-fastcgi-server
 * 2023-09-12: improve override system (subkeys)
