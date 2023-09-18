@@ -1,4 +1,5 @@
-FROM yadd/lemonldap-ng-base
+ARG BASE=
+FROM ${BASE}
 LABEL maintainer="Yadd yadd@debian.org>" \
       name="yadd/lemonldap-ng-ssoaas-fastcgi-server" \
       version="v1.0"

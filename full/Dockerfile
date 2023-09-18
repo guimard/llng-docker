@@ -1,4 +1,5 @@
-FROM yadd/lemonldap-ng-portal
+ARG PORTALBASE=
+FROM ${PORTALBASE}
 LABEL maintainer="Yadd yadd@debian.org>" \
       name="yadd/lemonldap-ng-full" \
       version="v1.0"
