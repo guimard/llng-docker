@@ -9,7 +9,9 @@ docker-compose example to see how to do this using redis and
 ## Tags
 
 * `stable`: latest lemonldap-ng\* packages from Debian backports
+* `stable-no-s6`: the same without [S6-overlay](https://github.com/just-containers/s6-overlay)
 * `2.x.x`: versioned lemonldap-ng\* packages from Debian backports
+* `2.x.x-no-s6`: the same without [S6-overlay](https://github.com/just-containers/s6-overlay)
 
 ## Features _(inherited from [yadd/lemonldap-ng-base](https://github.com/guimard/llng-docker/blob/master/base/README.md#readme))_
 
