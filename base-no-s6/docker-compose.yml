@@ -1,0 +1,25 @@
+version: "3.4"
+
+services:
+  db:
+    image: yadd/lemonldap-ng-pg-database
+    environment:
+      - POSTGRES_PASSWORD=zz
+    healthcheck:
+      test: "exit 0"
+  base:
+    image: yadd/lemonldap-ng-base-no-s6
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    environment:
+      - PG_SERVER=db
+      - REDIS_SERVER=qwerty
+      - FORCE_KEY_REGENERATION=yes
+      - OVERRIDE_domain=debian.org
+      - OVERRIDE_authChoiceModules={"1_LDAP":"Demo;Demo;Null;;;{}","2_SAML":"SAML;SAML;Null;;;{}"}
+      - OVERRIDE_applicationList_1sample_catname="Some applications"
+      - OVERRIDE_exportedVars_aa=bb
+    depends_on:
+      db:
+        condition: service_healthy

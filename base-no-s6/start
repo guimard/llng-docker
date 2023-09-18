@@ -1,0 +1,16 @@
+#!/bin/bash
+
+
+for INITSCRIPT in /etc/cont-init.d/*; do
+	sh $INITSCRIPT
+done
+
+for STARTDIR in /etc/services.d/*; do
+	NAME=${STARTDIR##*/}
+	echo "Starting service: $NAME"
+	start-stop-daemon -C --background --oknodo --start --exec $STARTDIR/run
+done
+
+echo "ARGS $@"
+
+"$@"

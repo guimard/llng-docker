@@ -1,0 +1,126 @@
+#!/command/with-contenv sh
+
+# Fix logLevel
+echo "Set logLevel to $LOGLEVEL"
+perl -i -pe 's/^logLevel\s*=.*$/logLevel=$ENV{LOGLEVEL}/' /etc/lemonldap-ng/lemonldap-ng.ini
+
+# Fix logger
+if test "$LOGGER" = "stderr"; then
+    echo "Set logger to Lemonldap::NG::Common::Logger::Std"
+    perl -i -ne 'print unless /^logger\s*=/;print "logger = Lemonldap::NG::Common::Logger::Std\n" if/^\[\s*all\s*\]/;' /etc/lemonldap-ng/lemonldap-ng.ini;
+fi
+
+if test "$USERLOGGER" = "stderr"; then
+    echo "Set userLogger to Lemonldap::NG::Common::Logger::Std"
+    perl -i -ne 'print unless /^userLogger\s*=/;print "userLogger = Lemonldap::NG::Common::Logger::Std\n" if/^\[\s*all\s*\]/;' /etc/lemonldap-ng/lemonldap-ng.ini;
+fi
+
+# OPTIONAL DATABASE FOR CONFIGURATION
+#
+# 1 - Check for PostgreSQL server
+if [ "$PG_SERVER" != "" ]; then
+   PG_DATABASE=${PG_DATABASE:-lemonldap-ng}
+   DEFAULT_DBI_CHAIN="DBI:Pg:database=$PG_DATABASE;host=$PG_SERVER"
+   DBI_CHAIN=${DBI_CHAIN:-$DEFAULT_DBI_CHAIN}
+   export DBI_CHAIN
+fi
+
+if test "$DBI_CHAIN" != ""; then
+   echo "Configuring lemonldap-ng.ini to use database for configuration"
+   # 2 - Save current INI file
+   cp /etc/lemonldap-ng/lemonldap-ng.ini /etc/lemonldap-ng/lemonldap-ng-file.ini
+   # 3 - Build DBI variables if not given
+   DBI_USER=${DBI_USER:-$PG_USER}
+   DBI_PASSWORD=${DBI_PASSWORD:-$PG_PASSWORD}
+   DBI_TABLE=${DBI_TABLE:-$PG_TABLE}
+   export DBI_USER
+   export DBI_PASSWORD
+   export DBI_TABLE
+   # 4 - Build new INI file
+   set -e
+   perl -i -pe 's/^\s*type\s*=\s*File\s*$/type=CDBI\n/;
+   s/^\s*dirName\s*=.*$/dbiChain=$ENV{DBI_CHAIN}\ndbiUser=$ENV{DBI_USER}\ndbiPassword=$ENV{DBI_PASSWORD}\ndbiTable=$ENV{DBI_TABLE}\n/;
+   ' /etc/lemonldap-ng/lemonldap-ng.ini
+   # 5 - Check if there is already a configuration stored in SQL database
+   CONF=`perl -MDBI -MDBD::Pg -e '$dbh=DBI->connect("'"$DBI_CHAIN"'","'"$DBI_USER"'","'"$DBI_PASSWORD"'",{ RaiseError => 1});$r=$dbh->selectall_arrayref("SELECT * FROM '"$DBI_TABLE"'");print scalar @$r'`
+   # 6 - If no configuration in current server, let's convert current "File" configuration into database
+   if test "$CONF" = "0"; then
+     /usr/share/lemonldap-ng/bin/convertConfig --new=/etc/lemonldap-ng/lemonldap-ng.ini --current=/etc/lemonldap-ng/lemonldap-ng-file.ini
+     /usr/share/docker-llng/updateConf set persistentStorage "Apache::Session::Browseable::PgJSON"
+     /usr/share/docker-llng/updateConf set persistentStorageOptions '{"TableName":"'"$PG_PERSISTENT_SESSIONS_TABLE"'","DataSource":"'"$DBI_CHAIN"'","UserName":"'"$DBI_USER"'","Password":"'"$DBI_PASSWORD"'","Commit":1}'
+     if test "$REDIS_SERVER" = ""; then
+       /usr/share/docker-llng/updateConf set globalStorage "Apache::Session::Browseable::PgJSON"
+       /usr/share/docker-llng/updateConf set globalStorageOptions '{"TableName":"'"$PG_SESSIONS_TABLE"'","DataSource":"'"$DBI_CHAIN"'","UserName":"'"$DBI_USER"'","Password":"'"$DBI_PASSWORD"'","Commit":1}'
+       /usr/share/docker-llng/updateConf set samlStorage "Apache::Session::Browseable::PgJSON"
+       /usr/share/docker-llng/updateConf set samlStorageOptions '{"TableName":"'"$PG_SAML_TABLE"'","DataSource":"'"$DBI_CHAIN"'","UserName":"'"$DBI_USER"'","Password":"'"$DBI_PASSWORD"'","Commit":1}'
+       /usr/share/docker-llng/updateConf set oidcStorage "Apache::Session::Browseable::PgJSON"
+       /usr/share/docker-llng/updateConf set oidcStorageOptions '{"TableName":"'"$PG_OIDC_TABLE"'","DataSource":"'"$DBI_CHAIN"'","UserName":"'"$DBI_USER"'","Password":"'"$DBI_PASSWORD"'","Commit":1}'
+       /usr/share/docker-llng/updateConf set casStorage "Apache::Session::Browseable::PgJSON"
+       /usr/share/docker-llng/updateConf set casStorageOptions '{"TableName":"'"$PG_CAS_TABLE"'","DataSource":"'"$DBI_CHAIN"'","UserName":"'"$DBI_USER"'","Password":"'"$DBI_PASSWORD"'","Commit":1}'
+     fi
+   else
+     echo "Previous configuration found, skipping configuration conversion"
+   fi
+elif [ "$LDAP_URL" != "" ]; then
+   echo "Configuring lemonldap-ng.ini to use database for configuration"
+   # 2 - Save current INI file
+   cp /etc/lemonldap-ng/lemonldap-ng.ini /etc/lemonldap-ng/lemonldap-ng-file.ini
+   perl -i -pe 's/^\s*type\s*=\s*File\s*$/type=LDAP\n/;
+     s/^\s*dirName\s*=.*$/ldapServer=$ENV{LDAP_URL}\nldapConfBase=$ENV{LDAP_CONF_BASE}\nldapBindDN=$ENV{LDAP_CONF_DN}\nldapBindPassword=$ENV{LDAP_CONF_PASSWORD}\n/;
+   ' /etc/lemonldap-ng/lemonldap-ng.ini
+   if [ "$LDAP_CONF_DN" != "" ]; then
+     CONF=`perl -MNet::LDAP -e '$ldap=Net::LDAP->new(["'"$LDAP_URL"'"])or die"No LDAP";$b=$ldap->bind("'"$LDAP_CONF_DN"'",password=>"'"$LDAP_CONF_PASSWORD"'");die if $b->code;$s=$ldap->search(base=>"'"$LDAP_CONF_BASE"'",filter=>"(objectClass=applicationProcess,scope=>"one")");print $s->code ? 0 : "MANY"'`
+   else
+     CONF=`perl -MNet::LDAP -e '$ldap=Net::LDAP->new(["'"$LDAP_URL"'"])or die"No LDAP";$s=$ldap->search(base=>"'"$LDAP_CONF_BASE"'",filter=>"(objectClass=applicationProcess,scope=>"one")");print $s->code ? 0 : "MANY"'`
+   fi
+   if test "$CONF" = "0"; then
+     /usr/share/lemonldap-ng/bin/convertConfig --new=/etc/lemonldap-ng/lemonldap-ng.ini --current=/etc/lemonldap-ng/lemonldap-ng-file.ini
+   else
+     echo "Previous configuration found, skipping configuration conversion"
+   fi
+fi
+
+/usr/share/docker-llng/updateConf "setDomain" "$SSODOMAIN"
+/usr/share/docker-llng/updateConf "set" portal "$PORTAL"
+
+if test "$CROWDSEC_SERVER" != ""; then
+    echo "Configure LLNG to use $CROWDSEC_SERVER as Crowdsec server"
+    /usr/share/docker-llng/updateConf set crowdsec 1
+    /usr/share/docker-llng/updateConf set crowdsecUrl "$CROWDSEC_SERVER"
+    if test "$CROWDSEC_POLICY" != ""; then
+        POLICY="$CROWDSEC_POLICY"
+    else
+        POLICY=reject
+    fi
+    /usr/share/docker-llng/updateConf set crowdsecAction "$POLICY"
+    /usr/share/docker-llng/updateConf set crowdsecKey "$CROWDSEC_KEY"
+fi
+
+# If Redis server is given, let's use it for sessions
+if test "$REDIS_SERVER" != ""; then
+    echo "Change configuration to use Redis for sessions"
+    REDIS_INDEXES=${REDIS_INDEXES:-uid mail}
+    /usr/share/docker-llng/updateConf set globalStorage 'Apache::Session::Browseable::Redis'
+    /usr/share/docker-llng/updateConf set globalStorageOptions '{"server":"'"$REDIS_SERVER"'","Index":"'"$REDIS_INDEXES"'"}'
+    /usr/share/docker-llng/updateConf set forceGlobalStorageIssuerOTT 1
+    /usr/share/docker-llng/updateConf set tokenUseGlobalStorage 1
+    /usr/share/docker-llng/updateConf set forceGlobalStorageUpgradeOTT 1
+fi
+
+# Drop any cache
+rm -rf /var/lib/lemonldap-ng/cache/*/*
+
+KEY=`/usr/share/docker-llng/updateConf get key`
+
+if test "$KEY" = "" -o "$FORCE_KEY_REGENERATION" = "yes"; then
+    echo "Update configuration key"
+    /usr/share/docker-llng/updateConf set key `cat /proc/sys/kernel/random/uuid | sed 's/[-]//g'` 2>&1 | perl -pe 's/\w{32}/<hidden for security>/'
+fi
+
+KEYS=`(env | grep OVERRIDE || true) | sed -e 's/=.*$//'`
+for key in `(env | grep OVERRIDE || true) | sed -e 's/=.*$//'`; do
+    KEYNAME=${key#OVERRIDE_}
+    VAL=$(eval "echo \$$key")
+    echo "Set $KEYNAME to $VAL"
+    /usr/share/docker-llng/updateConf set `echo $KEYNAME|perl -pe 's/_/\n/g'` "$VAL"
+done
