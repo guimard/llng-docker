@@ -25,9 +25,10 @@ RUN echo "# Install nginx and portal libs" && \
 
 COPY *.patch /
 
-RUN patch -p1 < appgrid.patch && \
-    patch -p1 < jwt-type.patch && \
-    patch -p1 < little-security-fixes.patch && \
+RUN echo patch appgrid.patch && patch -p1 < appgrid.patch && \
+    echo patch jwt-type.patch && patch -p1 < jwt-type.patch && \
+    echo patch little-security-fixes.patch && patch -p1 < little-security-fixes.patch && \
+    echo patch choice-oidc.patch && patch -p1 < choice-oidc.patch && \
     rm -f *.patch
 
 RUN echo "# Install nginx configuration files" && \

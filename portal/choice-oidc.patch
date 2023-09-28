@@ -1,0 +1,23 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
+@@ -1836,6 +1836,7 @@ sub _handleRefreshTokenGrant {
+ 
+         # Lookup attributes and macros for user
+         $req->user( $refreshSession->data->{_session_uid} );
++        $req->data->{$_} = $refreshSession->data->{$_} foreach (qw(_choice));
+         $req->steps( [
+                 'getUser',        @{ $self->p->betweenAuthAndData },
+                 'setSessionInfo', $self->p->groupsAndMacros,
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/Choice.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/Choice.pm
+@@ -121,6 +121,10 @@ sub checkChoice {
+         $name = $req->pdata->{_choice};
+         $self->logger->debug("Choice $name selected from pdata");
+     }
++    elsif ( (defined $req->data->{_authChoice}) or (defined $req->data->{_choice}) ) {
++        $name = $req->data->{_authChoice} || $req->data->{_choice};
++        $self->logger->debug("Choice $name selected from req->data");
++    }
+ 
+     unless ($name) {
+ 
