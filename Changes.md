@@ -1,5 +1,6 @@
 # Changes
 
+* 2023-10-10: rebuild to have security updates
 * 2023-09-28: add patch to fix offline/choice (#3018)
 * 2023-09-18: add YAML support
 * 2023-09-18: Build alternative "no-s6" and add related tags
