@@ -1,5 +1,6 @@
 # Changes
 
+* 2023-10-17: clean reloadUrls list
 * 2023-10-10: add libdbd-cassandra-perl
 * 2023-09-28: add patch to fix offline/choice (#3018)
 * 2023-09-18: add YAML support

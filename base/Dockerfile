@@ -80,7 +80,8 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/* && \
     mkdir -p /var/lib/lemonldap-ng/cache && \
     chown www-data:www-data /var/lib/lemonldap-ng/cache && \
-    chmod 750 /var/lib/lemonldap-ng/cache
+    chmod 750 /var/lib/lemonldap-ng/cache && \
+    perl -000 -MJSON -i -ne '$_=JSON::from_json($_);$_->{reloadUrls}={};print JSON->new->pretty->canonical->encode($_)' /var/lib/lemonldap-ng/conf/lmConf-1.json
 
 #COPY syslogopt.patch .
 #
