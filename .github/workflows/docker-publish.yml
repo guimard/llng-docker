@@ -1,8 +1,7 @@
 name: Build and Publish Docker Images
 
 env:
-  VERSION: 2.17.0
-  DEBIANVERSION: 2.17.0+ds-1~bpo12+1
+  VERSION: 2.17.2
   PGVERSION: 15
   DEBIANRELEASE: bookworm
 
