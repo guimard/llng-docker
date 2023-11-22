@@ -92,6 +92,8 @@ services:
 
 ## Copyright and license
 
-Copyright: Xavier (Yadd) Guimard <yadd@debian.org>.
+Copyright:
+ * 2018-2023, Xavier Guimard <yadd@debian.org>
+ * 2023, LINAGORA <https://linagora.com>
 
 License: [GNU General Public License v2.0](https://github.com/guimard/llng-docker/blob/master/LICENSE)
