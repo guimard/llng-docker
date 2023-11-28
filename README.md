@@ -74,6 +74,7 @@ services:
 
 In this example, manager is available on port 81, portal on port 80.
 Configuration is stored in a PostgerSQL database, sessions in a Redis server.
+A crowdsec server is added to filter bad IP addresses.
 
 ```yaml
 version: "3.4"
@@ -96,9 +97,12 @@ services:
       - REDIS_SERVER=redis:6379
       - LOGGER=stderr
       - USERLOGGER=stderr
+      - CROWDSEC_SERVER=http://crowdsec:8080
+      - CROWDSEC_KEY=myrandomstring
+      - CROWDSEC_ACTION=reject
     port: 80:80
 
-  auth:
+  manager:
     image: yadd/lemonldap-ng-manager
     environment:
       - PG_SERVER=db
@@ -106,6 +110,11 @@ services:
       - LOGGER=stderr
       - USERLOGGER=stderr
     port: 81:80
+
+  crowdsec:
+    image: crowdsecurity/crowdsec
+    environment:
+      - BOUNCER_KEY_llng=myrandomstring
 ```
 
 ### 4. Scalability
@@ -137,6 +146,9 @@ services:
       - PG_SERVER=db
       - REDIS_SERVER=redis:6379
       - PORTAL_CRON=no
+      - CROWDSEC_SERVER=http://crowdsec:8080
+      - CROWDSEC_KEY=myrandomstring
+      - CROWDSEC_ACTION=reject
     depends_on:
       db:
         condition: service_healthy
@@ -170,6 +182,11 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+
+  crowdsec:
+    image: crowdsecurity/crowdsec
+    environment:
+      - BOUNCER_KEY_llng=myrandomstring
 
   haproxy:
     image: haproxy:2.6-bullseye

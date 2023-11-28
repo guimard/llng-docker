@@ -1,5 +1,6 @@
 # Changes
 
+* 2023-11-28: add crowdesc in docs
 * 2023-11-20: 2.17.2
 * 2023-10-23: able to redirect on unauthenticated logout
 * 2023-10-17: clean reloadUrls list

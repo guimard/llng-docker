@@ -86,6 +86,8 @@ Note that the container key _(here ldapExportedVars)_ must exist.
 
 ## Docker-compose example
 
+Example with yadd/lemonldap-ng-portal and crowdesc enabled
+
 ```yaml
 version: "3.4"
 
@@ -99,18 +101,25 @@ services:
   redis:
     image: redis
   base:
-    image: yadd/lemonldap-ng-base
+    image: yadd/lemonldap-ng-portal
     environment:
       - PG_SERVER=pgdb
       - REDIS_SERVER=redis:6379
       - LOGGER=stderr
       - USERLOGGER=stderr
       - OVERRIDE_exportedVars={"cn":"cn","mail":"mail","uid":"uid"}
+      - CROWDSEC_SERVER=http://crowdsec:8080
+      - CROWDSEC_KEY=myrandomstring
+      - CROWDSEC_ACTION=reject
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_started
+  crowdsec:
+    image: crowdsecurity/crowdsec
+    environment:
+      - BOUNCER_KEY_llng=myrandomstring
 ```
 
 ## Repository and bug reports

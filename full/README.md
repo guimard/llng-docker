@@ -30,6 +30,8 @@ See [yadd/lemonldap-ng-base](https://github.com/guimard/llng-docker/blob/master/
 
 ## Docker-compose example
 
+Example with Crowdsec enabled, Postgres database and Redis to share sessions.
+
 ```yaml
 version: "3.4"
 
@@ -51,11 +53,18 @@ services:
       - REDIS_SERVER=redis:6379
       - LOGGER=stderr
       - USERLOGGER=stderr
+      - CROWDSEC_SERVER=http://crowdsec:8080
+      - CROWDSEC_KEY=myrandomstring
+      - CROWDSEC_ACTION=reject
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_started
+  crowdsec:
+    image: crowdsecurity/crowdsec
+    environment:
+      - BOUNCER_KEY_llng=myrandomstring
 ```
 
 ## Repository and bug reports
