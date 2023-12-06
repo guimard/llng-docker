@@ -1,0 +1,24 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/SAML.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/SAML.pm
+@@ -1544,11 +1544,16 @@ sub getAttributeValue {
+         my @attr_values = $_->AttributeValue();
+ 
+         foreach (@attr_values) {
+-            my $xs      = XML::Simple->new();
+-            my $data    = $xs->XMLin( $_->dump() );
+-            my $content = $data->{content};
+-            $value .= $content . $self->conf->{multiValuesSeparator}
+-              if $content;
++            my $xs   = XML::Simple->new();
++            my $data = eval { $xs->XMLin( $_->dump() ) };
++            if ($@) {
++                $self->logger->error("Unable to decode a SAML attribute: $@");
++            }
++            else {
++                my $content = $data->{content};
++                $value .= $content . $self->conf->{multiValuesSeparator}
++                  if $content;
++            }
+         }
+         $value =~ s/$self->{conf}->{multiValuesSeparator}$// if $value;
+ 
