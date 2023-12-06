@@ -29,6 +29,7 @@ RUN echo patch appgrid.patch && patch -p1 < appgrid.patch && \
     echo patch jwt-type.patch && patch -p1 < jwt-type.patch && \
     echo patch choice-oidc.patch && patch -p1 < choice-oidc.patch && \
     echo patch redirectOnLogout.patch && patch -p1 < redirectOnLogout.patch && \
+    echo patch saml.patch && patch -p1 < saml.patch && \
     rm -f *.patch
 
 RUN echo "# Install nginx configuration files" && \
