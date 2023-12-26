@@ -21,6 +21,7 @@ RUN echo "# Install nginx and portal libs" && \
         libgd-securityimage-perl libmime-tools-perl libnet-ldap-perl \
         libio-socket-timeout-perl libunicode-string-perl liblasso-perl \
         libio-string-perl libemail-sender-perl && \
+	libcrypt-jwt-perl libdigest-hmac-perl libdata-password-zxcvbn-perl && \
     apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/*
 
 COPY *.patch /
