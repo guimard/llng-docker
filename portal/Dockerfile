@@ -20,7 +20,7 @@ RUN echo "# Install nginx and portal libs" && \
         libconvert-base32-perl libio-string-perl libipc-run-perl \
         libgd-securityimage-perl libmime-tools-perl libnet-ldap-perl \
         libio-socket-timeout-perl libunicode-string-perl liblasso-perl \
-        libio-string-perl libemail-sender-perl && \
+        libio-string-perl libemail-sender-perl \
 	libcrypt-jwt-perl libdigest-hmac-perl libdata-password-zxcvbn-perl && \
     apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/*
 
@@ -29,6 +29,7 @@ COPY *.patch /
 RUN echo patch appgrid.patch && patch -p1 < appgrid.patch && \
     echo patch jwt-type.patch && patch -p1 < jwt-type.patch && \
     echo patch auth-to-authn-by-jwt-portal.patch && patch -p1 < auth-to-authn-by-jwt-portal.patch && \
+    echo patch anssi.patch && patch -p1 < anssi.patch && \
     rm -f *.patch
 
 RUN echo "# Install nginx configuration files" && \

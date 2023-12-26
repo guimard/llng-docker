@@ -26,6 +26,7 @@ RUN echo "# Install nginx and manager libs" && \
 COPY *.patch /
 
 RUN echo auth-to-authn-by-jwt-manager.patch && patch -p1 < auth-to-authn-by-jwt-manager.patch && \
+    echo patch anssi.patch && patch -p1 < anssi.patch && \
     rm -f *.patch && \
     perl -MLemonldap::NG::Manager::Build -e 'Lemonldap::NG::Manager::Build->run( \
       structFile   => "/usr/share/lemonldap-ng/manager/htdocs/static/struct.json", \

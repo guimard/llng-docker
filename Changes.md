@@ -1,6 +1,6 @@
 # Changes
 
-* 2023-12-26: Add patches to authenticate via JWT on authn endpoint
+* 2023-12-26: Add patches to authenticate via JWT on authn endpoint + ANSSI patch
 * 2023-12-26: 2.18.1
 * 2023-12-06: add SAML patch to workaround Forgerock bug
 * 2023-11-28: add crowdesc in docs
