@@ -32,6 +32,7 @@ RUN echo patch appgrid.patch && patch -p1 < appgrid.patch && \
     echo patch anssi.patch && patch -p1 < anssi.patch && \
     echo patch fix-dropcsp.patch && patch -p1 < fix-dropcsp.patch && \
     echo patch oidc-logout.patch && patch -p1 < oidc-logout.patch && \
+    echo patch app-scope.patch && patch -p1 < app-scope.patch && \
     rm -f *.patch
 
 RUN echo "# Install nginx configuration files" && \
