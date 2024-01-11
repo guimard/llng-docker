@@ -1,5 +1,6 @@
 # Changes
 
+* 2024-01-11: Add patch to fix OIDC logout when any relyong party failed
 * 2024-01-08: Add fix-dropcsp.patch
 * 2023-12-26: Add patches to authenticate via JWT on authn endpoint + ANSSI patch
 * 2023-12-26: 2.18.1
