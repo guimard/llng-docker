@@ -1,5 +1,6 @@
 # Changes
 
+* 2024-01-31: Add SERVERNAME
 * 2024-01-11: Add patch to provide applications scope
 * 2024-01-11: Add patch to fix OIDC logout when any relyong party failed
 * 2024-01-08: Add fix-dropcsp.patch
