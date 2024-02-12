@@ -32,8 +32,6 @@ RUN echo patch appgrid.patch && patch -p1 < appgrid.patch && \
     echo patch jwt-type.patch && patch -p1 < jwt-type.patch && \
     echo patch auth-to-authn-by-jwt-portal.patch && patch -p1 < auth-to-authn-by-jwt-portal.patch && \
     echo patch anssi.patch && patch -p1 < anssi.patch && \
-    echo patch fix-dropcsp.patch && patch -p1 < fix-dropcsp.patch && \
-    echo patch oidc-logout.patch && patch -p1 < oidc-logout.patch && \
     echo patch app-scope.patch && patch -p1 < app-scope.patch && \
     rm -f *.patch
 
