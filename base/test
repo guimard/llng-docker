@@ -2,11 +2,11 @@
 
 set -e
 
-docker-compose run base cat /etc/lemonldap-ng/lemonldap-ng.ini 2>&1 | grep 'dbiChain=DBI:Pg:database=lemonldapng;host=db'
-docker-compose run base /usr/share/docker-llng/updateConf get persistentStorage 2>&1 |grep Apache::Session::Browseable::PgJSON
-docker-compose run base /usr/share/docker-llng/updateConf get globalStorage 2>&1 |grep Apache::Session::Browseable::Redis
-docker-compose run base /usr/share/docker-llng/updateConf get domain 2>&1 |grep debian.org
-docker-compose run base /usr/share/docker-llng/updateConf get authChoiceModules 2>&1 |grep 1_LDAP
-docker-compose run base /usr/share/docker-llng/updateConf get applicationList 1sample catname 2>&1 |grep "applications"
-docker-compose run base /usr/share/docker-llng/updateConf get exportedVars aa 2>&1 |grep bb
+docker-compose run base cat /etc/lemonldap-ng/lemonldap-ng.ini | grep 'dbiChain=DBI:Pg:database=lemonldapng;host=db'
+docker-compose run base /usr/share/docker-llng/updateConf get persistentStorage|grep Apache::Session::Browseable::PgJSON
+docker-compose run base /usr/share/docker-llng/updateConf get globalStorage|grep Apache::Session::Browseable::Redis
+docker-compose run base /usr/share/docker-llng/updateConf get domain|grep debian.org
+docker-compose run base /usr/share/docker-llng/updateConf get authChoiceModules|grep 1_LDAP
+docker-compose run base /usr/share/docker-llng/updateConf get applicationList 1sample catname|grep "applications"
+docker-compose run base /usr/share/docker-llng/updateConf get exportedVars aa|grep bb
 docker-compose down
