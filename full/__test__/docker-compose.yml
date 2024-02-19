@@ -6,6 +6,7 @@ services:
     environment:
       - LOGGER=stderr
       - USERLOGGER=stderr
+      - LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini
   test:
     image: yadd/lemonldap-ng-portal-test
     build:
