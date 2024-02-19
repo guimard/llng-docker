@@ -33,6 +33,7 @@ RUN echo patch appgrid.patch && patch -p1 < appgrid.patch && \
     echo patch auth-to-authn-by-jwt-portal.patch && patch -p1 < auth-to-authn-by-jwt-portal.patch && \
     echo patch anssi.patch && patch -p1 < anssi.patch && \
     echo patch app-scope.patch && patch -p1 < app-scope.patch && \
+    echo patch oidc-auth-pkce.patch && patch -p1 < oidc-auth-pkce.patch && \
     rm -f *.patch
 
 RUN echo "# Install nginx configuration files" && \

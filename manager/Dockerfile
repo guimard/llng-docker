@@ -27,6 +27,7 @@ COPY *.patch /
 
 RUN echo auth-to-authn-by-jwt-manager.patch && patch -p1 < auth-to-authn-by-jwt-manager.patch && \
     echo patch anssi.patch && patch -p1 < anssi.patch && \
+    echo patch oidc-auth-pkce.patch && patch -p1 < oidc-auth-pkce.patch && \
     rm -f *.patch && \
     perl -MLemonldap::NG::Manager::Build -e 'Lemonldap::NG::Manager::Build->run( \
       structFile   => "/usr/share/lemonldap-ng/manager/htdocs/static/struct.json", \
@@ -40,7 +41,9 @@ RUN echo auth-to-authn-by-jwt-manager.patch && patch -p1 < auth-to-authn-by-jwt-
       handlerStatusConstantsFile => "/usr/share/perl5/Lemonldap/NG/Handler/Lib/StatusConstants.pm", \
       portalConstantsFile => "/dev/null", \
       docConstantsFile => "/dev/null", \
-      )'
+      )' && \
+    rm -f /usr/share/lemonldap-ng/manager/htdocs/static/js/conftree.min.js && \
+    ln -s conftree.js /usr/share/lemonldap-ng/manager/htdocs/static/js/conftree.min.js
 
 RUN echo "# Install nginx configuration files" && \
     cd /etc/nginx/sites-enabled/ && \

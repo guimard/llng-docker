@@ -1,5 +1,6 @@
 # Changes
 
+* 2024-02-19: OIDC Auth PKCE
 * 2024-02-12: 2.18.2
 * 2024-01-31: Add SERVERNAME
 * 2024-01-11: Add patch to provide applications scope

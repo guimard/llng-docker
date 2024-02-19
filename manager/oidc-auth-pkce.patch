@@ -1,0 +1,195 @@
+diff --git a/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm b/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
+index 6a0413ce9..a8272fc9f 100644
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
+@@ -4887,6 +4887,10 @@ m{^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
+             type    => 'longtext',
+             default => '',
+         },
++        oidcOPMetaDataOptionsRequirePkce => {
++            type => 'bool',
++            documentation => 'Use PKCE with this OP',
++        },
+ 
+         # OpenID Connect relying parties
+         oidcRPMetaDataExportedVars => {
+diff --git a/usr/share/perl5/Lemonldap/NG/Manager/Build/CTrees.pm b/usr/share/perl5/Lemonldap/NG/Manager/Build/CTrees.pm
+index 155ffcb98..fb691e044 100644
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/CTrees.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/CTrees.pm
+@@ -183,6 +183,7 @@ sub cTrees {
+                             'oidcOPMetaDataOptionsClientSecret',
+                             'oidcOPMetaDataOptionsStoreIDToken',
+                             'oidcOPMetaDataOptionsUserAttribute',
++                            'oidcOPMetaDataOptionsRequirePkce',
+                         ]
+                     },
+                     {
+diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json
+index 052373255..eba6ec568 100644
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json
+@@ -694,6 +694,7 @@
+ "oidcOPMetaDataOptionsMaxAge":"الحد الأقصى للعمر",
+ "oidcOPMetaDataOptionsPrompt":"عاجل",
+ "oidcOPMetaDataOptionsProtocol":"بروتوكول",
++"oidcOPMetaDataOptionsRequirePkce":"PKCE required",
+ "oidcOPMetaDataOptionsResolutionRule":"حل القاعدة",
+ "oidcOPMetaDataOptionsScope":"نطاق",
+ "oidcOPMetaDataOptionsSortNumber":"Order",
+diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json
+index 54adf0238..559708c63 100644
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json
+@@ -694,6 +694,7 @@
+ "oidcOPMetaDataOptionsMaxAge":"Max age",
+ "oidcOPMetaDataOptionsPrompt":"Prompt",
+ "oidcOPMetaDataOptionsProtocol":"Protocol",
++"oidcOPMetaDataOptionsRequirePkce":"PKCE required",
+ "oidcOPMetaDataOptionsResolutionRule":"Resolution rule",
+ "oidcOPMetaDataOptionsScope":"Scope",
+ "oidcOPMetaDataOptionsSortNumber":"Order",
+diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json
+index 367fc6e64..9ca372081 100644
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json
+@@ -694,6 +694,7 @@
+ "oidcOPMetaDataOptionsMaxAge":"Max age",
+ "oidcOPMetaDataOptionsPrompt":"Prompt",
+ "oidcOPMetaDataOptionsProtocol":"Protocolo",
++"oidcOPMetaDataOptionsRequirePkce":"PKCE required",
+ "oidcOPMetaDataOptionsResolutionRule":"Resolution rule",
+ "oidcOPMetaDataOptionsScope":"Ámbito",
+ "oidcOPMetaDataOptionsSortNumber":"Orden",
+diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json
+index 2bd6a851d..d7c72b3a1 100644
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json
+@@ -694,6 +694,7 @@
+ "oidcOPMetaDataOptionsMaxAge":"Age maximum",
+ "oidcOPMetaDataOptionsPrompt":"Interaction",
+ "oidcOPMetaDataOptionsProtocol":"Protocole",
++"oidcOPMetaDataOptionsRequirePkce":"PKCE exigé",
+ "oidcOPMetaDataOptionsResolutionRule":"Règle de résolution",
+ "oidcOPMetaDataOptionsScope":"Scope",
+ "oidcOPMetaDataOptionsSortNumber":"Ordre",
+diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json
+index 1a2ff515c..b91e1ed19 100644
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json
+@@ -694,6 +694,7 @@
+ "oidcOPMetaDataOptionsMaxAge":"גיל מרבי",
+ "oidcOPMetaDataOptionsPrompt":"Prompt",
+ "oidcOPMetaDataOptionsProtocol":"פרוטוקול",
++"oidcOPMetaDataOptionsRequirePkce":"PKCE required",
+ "oidcOPMetaDataOptionsResolutionRule":"Resolution rule",
+ "oidcOPMetaDataOptionsScope":"היקף",
+ "oidcOPMetaDataOptionsSortNumber":"סדר",
+diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json
+index 474026a58..b6cfa7b0c 100644
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json
+@@ -694,6 +694,7 @@
+ "oidcOPMetaDataOptionsMaxAge":"Età massima",
+ "oidcOPMetaDataOptionsPrompt":"Richiesta",
+ "oidcOPMetaDataOptionsProtocol":"Protocollo",
++"oidcOPMetaDataOptionsRequirePkce":"PKCE required",
+ "oidcOPMetaDataOptionsResolutionRule":"Regola di risoluzione",
+ "oidcOPMetaDataOptionsScope":"Scopo",
+ "oidcOPMetaDataOptionsSortNumber":"Ordine",
+diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json
+index 1057072dd..3b4b110b3 100644
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json
+@@ -694,6 +694,7 @@
+ "oidcOPMetaDataOptionsMaxAge":"Maksymalny czas ważności",
+ "oidcOPMetaDataOptionsPrompt":"Prompt",
+ "oidcOPMetaDataOptionsProtocol":"Protokół",
++"oidcOPMetaDataOptionsRequirePkce":"PKCE required",
+ "oidcOPMetaDataOptionsResolutionRule":"Reguła rozstrzygania",
+ "oidcOPMetaDataOptionsScope":"Zakres",
+ "oidcOPMetaDataOptionsSortNumber":"Kolejność",
+diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json
+index 6e773b193..cacc0db5b 100644
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json
+@@ -694,6 +694,7 @@
+ "oidcOPMetaDataOptionsMaxAge":"Idade máxima",
+ "oidcOPMetaDataOptionsPrompt":"Prompt",
+ "oidcOPMetaDataOptionsProtocol":"Protocolo",
++"oidcOPMetaDataOptionsRequirePkce":"PKCE required",
+ "oidcOPMetaDataOptionsResolutionRule":"Regra de resolução",
+ "oidcOPMetaDataOptionsScope":"Escopo",
+ "oidcOPMetaDataOptionsSortNumber":"Ordem",
+diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json
+index 05dfa1632..0a41c5151 100644
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json
+@@ -694,6 +694,7 @@
+ "oidcOPMetaDataOptionsMaxAge":"Idade máxima",
+ "oidcOPMetaDataOptionsPrompt":"Solicitar",
+ "oidcOPMetaDataOptionsProtocol":"Protocolo",
++"oidcOPMetaDataOptionsRequirePkce":"PKCE required",
+ "oidcOPMetaDataOptionsResolutionRule":"Regra de resolução",
+ "oidcOPMetaDataOptionsScope":"Escopo",
+ "oidcOPMetaDataOptionsSortNumber":"Ordem",
+diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json
+index 54a66eb1f..6ab40b27d 100644
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json
+@@ -694,6 +694,7 @@
+ "oidcOPMetaDataOptionsMaxAge":"Максимальный возраст",
+ "oidcOPMetaDataOptionsPrompt":"Вызвать",
+ "oidcOPMetaDataOptionsProtocol":"Протокол",
++"oidcOPMetaDataOptionsRequirePkce":"PKCE required",
+ "oidcOPMetaDataOptionsResolutionRule":"Правило разрешения",
+ "oidcOPMetaDataOptionsScope":"Объем",
+ "oidcOPMetaDataOptionsSortNumber":"Порядок",
+diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json
+index ba69cca43..ea8b873b6 100644
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json
+@@ -694,6 +694,7 @@
+ "oidcOPMetaDataOptionsMaxAge":"Maksimum ömür",
+ "oidcOPMetaDataOptionsPrompt":"İstem",
+ "oidcOPMetaDataOptionsProtocol":"Protokol",
++"oidcOPMetaDataOptionsRequirePkce":"PKCE required",
+ "oidcOPMetaDataOptionsResolutionRule":"Çözünürlük kuralı",
+ "oidcOPMetaDataOptionsScope":"Kapsam",
+ "oidcOPMetaDataOptionsSortNumber":"Sıra",
+diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json
+index 88e2636f0..a22f0091d 100644
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json
+@@ -694,6 +694,7 @@
+ "oidcOPMetaDataOptionsMaxAge":"Thời hạn tối đa",
+ "oidcOPMetaDataOptionsPrompt":"Nhắc nhở",
+ "oidcOPMetaDataOptionsProtocol":"Giao thức",
++"oidcOPMetaDataOptionsRequirePkce":"PKCE required",
+ "oidcOPMetaDataOptionsResolutionRule":"Quy tắc phân giải ",
+ "oidcOPMetaDataOptionsScope":"Phạm vi",
+ "oidcOPMetaDataOptionsSortNumber":"Order",
+diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json
+index 0dfc487ee..417c6240e 100644
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json
+@@ -694,6 +694,7 @@
+ "oidcOPMetaDataOptionsMaxAge":"最大時間",
+ "oidcOPMetaDataOptionsPrompt":"提示",
+ "oidcOPMetaDataOptionsProtocol":"協定",
++"oidcOPMetaDataOptionsRequirePkce":"PKCE required",
+ "oidcOPMetaDataOptionsResolutionRule":"解析規則",
+ "oidcOPMetaDataOptionsScope":"範圍",
+ "oidcOPMetaDataOptionsSortNumber":"順序",
+diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json
+index 787628f3f..7e97702c8 100644
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json
+@@ -694,6 +694,7 @@
+ "oidcOPMetaDataOptionsMaxAge":"最大時間",
+ "oidcOPMetaDataOptionsPrompt":"提示",
+ "oidcOPMetaDataOptionsProtocol":"協定",
++"oidcOPMetaDataOptionsRequirePkce":"PKCE required",
+ "oidcOPMetaDataOptionsResolutionRule":"解析規則",
+ "oidcOPMetaDataOptionsScope":"範圍",
+ "oidcOPMetaDataOptionsSortNumber":"順序",

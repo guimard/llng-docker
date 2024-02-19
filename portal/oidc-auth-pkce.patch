@@ -1,0 +1,145 @@
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
+index b1fabaab8..813f44104 100644
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
+@@ -464,10 +464,8 @@ sub buildAuthorizationCodeAuthnRequest {
+     };
+ 
+     # Call oidcGenerateAuthenticationRequest
+-    my $h = $self->p->processHook(
+-        $req, 'oidcGenerateAuthenticationRequest',
+-        $op,  $authorize_request_params
+-    );
++    my $h = $self->p->processHook( $req, 'oidcGenerateAuthenticationRequest',
++        $op, $authorize_request_params, $state, );
+     return if ( $h != PE_OK );
+ 
+     if ( $authMode and $authMode =~ /^jw(?:s|e)$/ ) {
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm b/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm
+index 6d4f8eb25..d622f0218 100644
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm
+@@ -45,6 +45,8 @@ our @pList = (
+     locationDetect      => '::Plugins::LocationDetect',
+     globalLogoutRule    => '::Plugins::GlobalLogout',
+     samlFederationFiles => '::Plugins::SamlFederation',
++    'or::oidcOPMetaDataOptions/*/oidcOPMetaDataOptionsRequirePkce' =>
++      '::Plugins::AuthOidcPkce',
+ );
+ 
+ ##@method list enabledPlugins
+@@ -72,15 +74,12 @@ sub enabledPlugins {
+ 
+     # Load static plugin list
+     for ( my $i = 0 ; $i < @pList ; $i += 2 ) {
+-        my $pluginConf = $conf->{ $pList[$i] };
+-        if ( ref($pluginConf) eq "HASH" ) {
+-
+-            # Do not load plugin if config is an empty hash
+-            push @res, $pList[ $i + 1 ] if %{$pluginConf};
+-        }
+-        else {
+-            push @res, $pList[ $i + 1 ] if $pluginConf;
++        my $pluginConf;
++        if ( $pList[$i] =~ /^(.*?)::(.*)$/ ) {
++            $pluginConf = checkConf( $conf, $2, $1 );
+         }
++        else { $pluginConf = $conf->{ $pList[$i] } }
++        push @res, $pList[ $i + 1 ] if $pluginConf;
+     }
+ 
+     # Check if SOAP is enabled
+@@ -116,4 +115,29 @@ sub enabledPlugins {
+     return @res;
+ }
+ 
++sub checkConf {
++    my ( $conf, $path, $type ) = @_;
++    if ( $path =~ s#^(.*?)/## ) {
++        my $w = $1;
++        if ( $w eq '*' ) {
++            my @res;
++            foreach my $k ( keys %{ $conf || {} } ) {
++                push @res, checkConf( $conf->{$k}, $path, $type );
++            }
++            if ( $type eq 'or' ) {
++                my $res = 0;
++                map { $res ||= $_ } @res;
++                return $res;
++            }
++            else { die "Unkown type $type"; }
++        }
++        else {
++            return checkConf( $conf->{$w}, $path, $type );
++        }
++    }
++    else {
++        return $conf->{$path};
++    }
++}
++
+ 1;
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/AuthOidcPkce.pm b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/AuthOidcPkce.pm
+new file mode 100644
+index 000000000..395f50e9a
+--- /dev/null
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/AuthOidcPkce.pm
+@@ -0,0 +1,58 @@
++package Lemonldap::NG::Portal::Plugins::AuthOidcPkce;
++
++use strict;
++use Digest::SHA qw(sha256);
++use Lemonldap::NG::Portal::Main::Constants qw(PE_OK PE_ERROR);
++use MIME::Base64 'encode_base64url';
++use Mouse;
++use String::Random 'random_string';
++
++extends 'Lemonldap::NG::Portal::Main::Plugin';
++
++has oidc => (
++    is      => 'ro',
++    lazy    => 1,
++    default => sub {
++        $_[0]->p->loadedModules->{'Lemonldap::NG::Portal::Auth::OpenIDConnect'};
++    }
++);
++
++use constant hook => {
++    oidcGenerateAuthenticationRequest => 'setChallenge',
++    oidcGenerateTokenRequest          => 'setPkce'
++};
++
++use constant RS_MSK => 's' x 16;
++
++sub init { 1 }
++
++sub setChallenge {
++    my ( $self, $req, $op, $token_request_params, $state ) = @_;
++    unless ( $self->oidc ) {
++        $self->logger->error('Authentication is not OIDC, aborting');
++        return PE_ERROR;
++    }
++    if (    $self->oidc->opOptions->{$op}
++        and $self->oidc->opOptions->{$op}->{oidcOPMetaDataOptionsRequirePkce} )
++    {
++        my $code      = random_string(RS_MSK);
++        my $realState = $self->oidc->state_ott->getToken( $state, 1 );
++        $realState->{state}->{data__auth_pkce} = $code;
++        $self->oidc->state_ott->updateToken( $state,
++            state => $realState->{state} );
++        my $challenge = encode_base64url( sha256($code) );
++        $token_request_params->{code_challenge}        = $challenge;
++        $token_request_params->{code_challenge_method} = 'S256';
++    }
++    return PE_OK;
++}
++
++sub setPkce {
++    my ( $self, $req, $op, $authorize_request_params ) = @_;
++    if ( $req->data->{_auth_pkce} ) {
++        $authorize_request_params->{code_verifier} = $req->data->{_auth_pkce};
++    }
++    return PE_OK;
++}
++
++1;
