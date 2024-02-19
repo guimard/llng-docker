@@ -21,6 +21,7 @@ RUN echo auth-to-authn-by-jwt-manager.patch && patch -p1 < auth-to-authn-by-jwt-
     echo patch anssi.patch && patch -p1 < anssi.patch && \
     echo patch oidc-auth-pkce.patch && patch -p1 < oidc-auth-pkce.patch && \
     rm -f *.patch && \
+    LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng \
     perl -MLemonldap::NG::Manager::Build -e 'Lemonldap::NG::Manager::Build->run( \
       structFile   => "/usr/share/lemonldap-ng/manager/htdocs/static/struct.json", \
       confTreeFile => "/usr/share/lemonldap-ng/manager/htdocs/static/js/conftree.js", \
@@ -34,6 +35,8 @@ RUN echo auth-to-authn-by-jwt-manager.patch && patch -p1 < auth-to-authn-by-jwt-
       portalConstantsFile => "/dev/null", \
       docConstantsFile => "/dev/null", \
       )' && \
+    perl -i -pe 's#^(use constant DEFAULTCONFFILE).*$#$1 => "/etc/lemonldap-ng/lemonldap-ng.ini";# && print STDERR "OK\n"' \
+    	/usr/share/perl5/Lemonldap/NG/Common/Conf/Constants.pm && \
     rm -f /usr/share/lemonldap-ng/manager/htdocs/static/js/conftree.min.js && \
     ln -s conftree.js /usr/share/lemonldap-ng/manager/htdocs/static/js/conftree.min.js
 
