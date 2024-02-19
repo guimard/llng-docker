@@ -18,8 +18,8 @@ services:
       - FORCE_KEY_REGENERATION=yes
       - OVERRIDE_domain=debian.org
       - OVERRIDE_authChoiceModules={"1_LDAP":"Demo;Demo;Null;;;{}","2_SAML":"SAML;SAML;Null;;;{}"}
-      - OVERRIDE_applicationList\.1sample\.catname="Some applications"
-      - OVERRIDE_exportedVars\.aa=bb
+      - OVERRIDE_applicationList_1sample_catname="Some applications"
+      - OVERRIDE_exportedVars_aa=bb
     depends_on:
       db:
         condition: service_healthy
