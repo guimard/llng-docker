@@ -1,6 +1,0 @@
-#!/bin/sh
-
-set -e
-cd __test__
-docker-compose run --rm test
-docker-compose down
