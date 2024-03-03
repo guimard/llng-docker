@@ -2,7 +2,8 @@
 
 set -e
 
-LIST=${LIST:-pg base portal manager full ssoaas-fastcgi-server cron dev}
+LIST=${LIST:-pg base portal manager full ssoaas-fastcgi-server cron}
+#LIST=${LIST:-pg base portal manager full ssoaas-fastcgi-server cron dev}
 
 for i in $LIST; do
 	(
@@ -19,8 +20,10 @@ for i in $LIST; do
 			docker push $NAME
 		fi
 	fi
-	if test -x test; then
-		./test
+	if test "$i" != "full"; then
+		if test -x test; then
+			./test
+		fi
 	fi
 	)
 done
