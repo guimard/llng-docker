@@ -28,6 +28,7 @@ COPY *.patch /
 RUN echo auth-to-authn-by-jwt-manager.patch && patch -p1 < auth-to-authn-by-jwt-manager.patch && \
     echo patch anssi.patch && patch -p1 < anssi.patch && \
     echo patch oidc-auth-pkce.patch && patch -p1 < oidc-auth-pkce.patch && \
+    echo patch jitsi.patch && patch -p1 < jitsi.patch && \
     rm -f *.patch && \
     perl -MLemonldap::NG::Manager::Build -e 'Lemonldap::NG::Manager::Build->run( \
       structFile   => "/usr/share/lemonldap-ng/manager/htdocs/static/struct.json", \
