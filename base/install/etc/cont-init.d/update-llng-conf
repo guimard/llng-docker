@@ -21,6 +21,9 @@ fi
 if [ "$PG_SERVER" != "" ]; then
    PG_DATABASE=${PG_DATABASE:-lemonldap-ng}
    DEFAULT_DBI_CHAIN="DBI:Pg:database=$PG_DATABASE;host=$PG_SERVER"
+   if [ "$PG_OPTIONS" != "" ]; then
+      DEFAULT_DBI_CHAIN="$DEFAULT_DBI_CHAIN;$PG_OPTIONS"
+   fi
    DBI_CHAIN=${DBI_CHAIN:-$DEFAULT_DBI_CHAIN}
    export DBI_CHAIN
 fi

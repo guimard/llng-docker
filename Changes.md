@@ -1,5 +1,6 @@
 # Changes
 
+* 2024-03-05: add `PG_OPTIONS` env var
 * 2024-03-03: Add Jitsi support
 * 2024-02-19: OIDC Auth PKCE
 * 2024-02-12: 2.18.2

@@ -41,8 +41,9 @@ LemonLDAP::NG.
   * `PG_USER` = `lemonldap`
   * `PG_PASSWORD` = `lemonldap`
   * `PG_TABLE` = `lmConfig`
+  * `PG_OPTIONS` =
   * Advanced _(see DBI(3pm) for more)_
-    * `DBI_CHAIN` = **if** `$PG_SERVER` **then** `DBI:Pg:database=$PG_DATABASE;host=$PG_SERVER` **else** `""`
+    * `DBI_CHAIN` = **if** `$PG_SERVER` **then** `DBI:Pg:database=$PG_DATABASE;host=$PG_SERVER;$PG_OPTIONS` **else** `""`
     * `DBI_USER` = `$PG_USER`
     * `DBI_PASSWORD` = `$PG_PASSWORD`
 * Session storage:
@@ -58,7 +59,23 @@ LemonLDAP::NG.
   * `HANDLER_CRON` = `yes`
   * `PORTAL_CRON` = `yes`
 
-**LemonLDAP::NG logs**: when using default values _(syslog)_, logs are stored in `/var/log/syslogd/` _(default S6 behavior)_
+**LemonLDAP::NG logs**: when using default values _(syslog)_, logs are stored in `/var/log/`
+
+### Advanced PostgreSQL configuration
+
+Use `PG_OPTIONS` to set additional parameters. Examples:
+
+ * Change default port: `PG_OPTIONS=port=23456`
+ * Change SSL mode: `PG_OPTIONS=sslmode=require`
+ * Both: `PG_OPTIONS=port=23456;PG_OPTIONS=sslmode=require`
+
+Or use `DBI_CHAIN` directly _(and then `DBI_USER` and `DBI_PASSWORD`)_:
+
+```
+DBI_CHAIN=dbi:Pg:dbname=lemonldapng;host=postgresql.host.tld;port=23456;sslmode=require
+DBI_USER=pguser
+DBI_PASSWORD=pgpassword
+```
 
 ### Override Lemonldap::NG configuration parameters
 
@@ -86,11 +103,13 @@ Note that the container key _(here ldapExportedVars)_ must exist.
 
 ## Docker-compose example
 
+Example with yadd/lemonldap-ng-portal and crowdesc enabled
+
 ```yaml
 version: "3.4"
 
 services:
-  db:
+  pgdb:
     image: yadd/lemonldap-ng-pg-database
     environment:
       - POSTGRES_PASSWORD=zz
@@ -99,18 +118,25 @@ services:
   redis:
     image: redis
   base:
-    image: yadd/lemonldap-ng-base
+    image: yadd/lemonldap-ng-portal
     environment:
       - PG_SERVER=pgdb
       - REDIS_SERVER=redis:6379
       - LOGGER=stderr
       - USERLOGGER=stderr
       - OVERRIDE_exportedVars={"cn":"cn","mail":"mail","uid":"uid"}
+      - CROWDSEC_SERVER=http://crowdsec:8080
+      - CROWDSEC_KEY=myrandomstring
+      - CROWDSEC_ACTION=reject
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_started
+  crowdsec:
+    image: crowdsecurity/crowdsec
+    environment:
+      - BOUNCER_KEY_llng=myrandomstring
 ```
 
 ## Repository and bug reports

@@ -41,6 +41,7 @@ ENV SSODOMAIN=example.com \
     PG_SAML_TABLE=samlsessions \
     PG_OIDC_TABLE=oidcsessions \
     PG_CAS_TABLE=cassessions \
+    PG_OPTIONS="" \
     LDAP_URL="" \
     LDAP_CONF_BASE="" \
     LDAP_CONF_DN="" \
@@ -63,11 +64,13 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     libdbi-perl libdbd-pg-perl libnet-cidr-perl \
     libhttp-parser-xs-perl liblwp-protocol-https-perl libstring-random-perl \
     libconvert-base32-perl libnet-ldap-perl libxml-libxml-perl libxml-simple-perl \
+    libdbd-cassandra-perl \
     libredis-fast-perl libredis-perl libyaml-perl libencode-perl patch && \
     apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/* && \
     mkdir -p /var/lib/lemonldap-ng/cache && \
     chown www-data:www-data /var/lib/lemonldap-ng/cache && \
-    chmod 750 /var/lib/lemonldap-ng/cache
+    chmod 750 /var/lib/lemonldap-ng/cache && \
+    perl -000 -MJSON -i -ne '$_=JSON::from_json($_);$_->{reloadUrls}={};print JSON->new->pretty->canonical->encode($_)' /var/lib/lemonldap-ng/conf/lmConf-1.json
 
 #COPY syslogopt.patch .
 #
@@ -80,5 +83,7 @@ VOLUME ["/etc/lemonldap-ng","/var/lib/lemonldap-ng/conf", "/var/lib/lemonldap-ng
 COPY install /
 
 COPY start /
+
+CMD ["echo", "This is a base image, not usable directly"]
 
 ENTRYPOINT ["./start"]
