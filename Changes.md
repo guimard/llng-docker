@@ -1,5 +1,6 @@
 # Changes
 
+* 2024-03-27: add missing Jitsi/logout method
 * 2024-03-20: add PGSSLCERT=/tmp/postgres.crt
 * 2024-03-13: add patch to workaround local cache failures
 * 2024-03-05: add `PG_OPTIONS` env var

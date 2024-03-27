@@ -1,6 +1,6 @@
 --- /dev/null
 +++ b/usr/share/perl5/Lemonldap/NG/Portal/Issuer/JitsiMeetTokens.pm
-@@ -0,0 +1,259 @@
+@@ -0,0 +1,261 @@
 +package Lemonldap::NG::Portal::Issuer::JitsiMeetTokens;
 +
 +use strict;
@@ -170,6 +170,8 @@
 +    }
 +    return PE_OK;
 +}
++
++sub logout { return PE_OK; }
 +
 +sub jitsi {
 +    my ( $self, $req ) = @_;

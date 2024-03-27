@@ -35,6 +35,7 @@ RUN echo patch appgrid.patch && patch -p1 < appgrid.patch && \
     echo patch app-scope.patch && patch -p1 < app-scope.patch && \
     echo patch oidc-auth-pkce.patch && patch -p1 < oidc-auth-pkce.patch && \
     echo patch jitsi.patch && patch -p1 < jitsi.patch && \
+    test -e tmp.patch && patch -p1 < tmp.patch && \
     rm -f *.patch
 
 RUN echo "# Install nginx configuration files" && \
