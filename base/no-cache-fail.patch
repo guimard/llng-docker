@@ -79,7 +79,7 @@
      }
  
      unless ($session->{args}->{updateCache}
-@@ -120,4 +127,16 @@ sub cache {
+@@ -120,4 +127,17 @@ sub cache {
      return $self->{cache};
  }
  
@@ -91,8 +91,9 @@
 +
 +sub _cache_call {
 +    my ( $sub, $self, @args ) = @_;
-+    eval { $self->cache->$sub(@args); };
++    my $res = eval { $self->cache->$sub(@args); };
 +    print STDERR "Unable to use cache: $@\n" if $@;
++    return $res;
 +}
 +
  1;
