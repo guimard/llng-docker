@@ -28,6 +28,12 @@ docker-compose example to see how to do this using redis and
 
 See [yadd/lemonldap-ng-base](https://github.com/guimard/llng-docker/blob/master/base/README.md#readme)
 
+* Other:
+  * `DEFAULT_WEBSITE` = `no`, if set to `yes` the default Nginx website is
+    deleted
+  * `PROTECTION` = `manager`, set it to `none` if you don't want to protect
+    the manager by LemonLDAP-NG itself
+
 ## Docker-compose example
 
 Example with Crowdsec enabled, Postgres database and Redis to share sessions.

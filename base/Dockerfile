@@ -65,6 +65,7 @@ ENV SSODOMAIN=example.com \
     PORTAL_CRON=yes \
     FORCE_KEY_REGENERATION=no \
     DEBIAN_FRONTEND=noninteractive \
+    DEFAULT_WEBSITE=no \
     PGSSLCERT=/tmp/postgres.crt
 
 COPY *.patch /

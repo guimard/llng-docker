@@ -4,6 +4,8 @@ LABEL maintainer="Yadd yadd@debian.org>" \
       name="yadd/lemonldap-ng-full" \
       version="v1.0"
 
+ENV PROTECTION=manager
+
 RUN echo "# Install nginx and portal and manager libs" && \
     apt -y update && \
     apt -y dist-upgrade && \

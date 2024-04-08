@@ -7,3 +7,8 @@ s#__MANAGERSITEDIR__#/usr/share/lemonldap-ng/manager/htdocs/#g;
 s#__MANAGERSTATICDIR__#/usr/share/lemonldap-ng/manager/htdocs/static/#g;
 s#__DEFDOCDIR__#/usr/share/doc/lemonldap-ng/#g;
 ' /etc/lemonldap-ng/manager-nginx.conf
+
+if test "$PROTECTION" != ""; then
+  echo "Set manager protection to $PROTECTION"
+  perl -i -pe 's/^protection\s*=.*$/protection='$PROTECTION'/' /etc/lemonldap-ng/lemonldap-ng.ini
+fi

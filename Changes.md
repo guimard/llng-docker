@@ -1,5 +1,6 @@
 # Changes
 
+* 2024-04-08: add `DEFAULT_WEBSITE` and `PROTECTION` env var
 * 2024-04-04: add docker revision in version string
 * 2024-04-03: fix cache patch
 * 2024-03-27: add missing Jitsi/logout method
@@ -9,7 +10,7 @@
 * 2024-03-03: Add Jitsi support
 * 2024-02-19: OIDC Auth PKCE
 * 2024-02-12: 2.18.2
-* 2024-01-31: Add SERVERNAME
+* 2024-01-31: Add `SERVERNAME`
 * 2024-01-11: Add patch to provide applications scope
 * 2024-01-11: Add patch to fix OIDC logout when any relyong party failed
 * 2024-01-08: Add fix-dropcsp.patch

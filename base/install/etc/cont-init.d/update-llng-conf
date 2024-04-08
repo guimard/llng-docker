@@ -15,6 +15,11 @@ if test "$USERLOGGER" = "stderr"; then
     perl -i -ne 'print unless /^userLogger\s*=/;print "userLogger = Lemonldap::NG::Common::Logger::Std\n" if/^\[\s*all\s*\]/;' /etc/lemonldap-ng/lemonldap-ng.ini;
 fi
 
+if test "$DEFAULT_WEBSITE" = "yes"; then
+    echo "Drop Nginx default website"
+    rm -f /etc/nginx/sites-enabled/default
+fi
+
 # OPTIONAL DATABASE FOR CONFIGURATION
 #
 # 1 - Check for PostgreSQL server
@@ -83,8 +88,10 @@ elif [ "$LDAP_URL" != "" ]; then
    fi
 fi
 
+PORTALURL=`portalUrl "$PORTAL"`
+
 /usr/share/docker-llng/updateConf "setDomain" "$SSODOMAIN"
-/usr/share/docker-llng/updateConf "set" portal "$PORTAL"
+/usr/share/docker-llng/updateConf "set" portal "$PORTALURL"
 
 if test "$CROWDSEC_SERVER" != ""; then
     echo "Configure LLNG to use $CROWDSEC_SERVER as Crowdsec server"

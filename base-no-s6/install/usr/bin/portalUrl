@@ -1,0 +1,14 @@
+#!/usr/bin/perl
+
+use strict;
+
+my $arg = $ARGV[0] or die 'Missing arg';
+my $wantUrl = ($0 =~ /url/i);
+my $prefix = 'https://';
+
+$prefix = $1 if $arg =~ s#^(https?://)##;
+
+$arg =~ s#/.*$##;
+warn 'Maybe bas PORTAL value' unless $arg =~ /^\w[\w\.-]*\w$/;
+
+print $wantUrl ? "$prefix$arg/" : $arg;
