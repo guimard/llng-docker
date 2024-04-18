@@ -1,0 +1,225 @@
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
+@@ -1408,6 +1408,22 @@ sub attributes {
+             documentation => 'CrowdSec API key',
+         },
+ 
++        # IgnorePollers plugin
++        ignorePollers => {
++            type          => 'bool',
++            documentation => 'Enable IgnorePollers plugin',
++        },
++        ignorePollersLimit => {
++            type          => 'int',
++            default       => 10,
++            documentation => 'IgnorePollers max same request',
++        },
++        ignorePollersDelay => {
++            type          => 'int',
++            default       => 300,
++            documentation => 'Delay to reconsider pollers',
++        },
++
+         # History
+         failedLoginNumber => {
+             default       => 5,
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Tree.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Tree.pm
+@@ -947,6 +947,15 @@ sub tree {
+                                 'initializePasswordResetSecret',
+                             ],
+                         },
++                        {
++                            title => 'ignorePollersLabel',
++                            help  => 'ignorepollers.html',
++                            form  => 'simpleInputContainer',
++                            nodes => [
++                                'ignorePollers', 'ignorePollersLimit',
++                                'ignorePollersDelay',
++                            ],
++                        },
+                         {
+                             title => 'customPluginsNode',
+                             help  => 'plugincustom.html',
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json
+@@ -427,6 +427,10 @@
+ "httpOnly":"الحماية بواسطة جافا سكريبت",
+ "https":"إتش تي تي بي س",
+ "ignore":"Ignore",
++"ignorePollers":"Activation",
++"ignorePollersDelay":"Delay",
++"ignorePollersLabel":"Ignore pollers",
++"ignorePollersLimit":"Max requests",
+ "impersonation":"Impersonation",
+ "impersonationHiddenAttributes":"السمات المخفية",
+ "impersonationIdRule":"Identities use rule",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json
+@@ -427,6 +427,10 @@
+ "httpOnly":"Javascript protection",
+ "https":"HTTPS",
+ "ignore":"Ignore",
++"ignorePollers":"Activation",
++"ignorePollersDelay":"Delay",
++"ignorePollersLabel":"Ignore pollers",
++"ignorePollersLimit":"Max requests",
+ "impersonation":"Impersonation",
+ "impersonationHiddenAttributes":"Hidden attributes",
+ "impersonationIdRule":"Identities use rule",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json
+@@ -427,6 +427,10 @@
+ "httpOnly":"Protección javascript",
+ "https":"HTTPS",
+ "ignore":"Ignore",
++"ignorePollers":"Activation",
++"ignorePollersDelay":"Delay",
++"ignorePollersLabel":"Ignore pollers",
++"ignorePollersLimit":"Max requests",
+ "impersonation":"Suplantación",
+ "impersonationHiddenAttributes":"Atributos ocultos",
+ "impersonationIdRule":"Regla de uso de identidades",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json
+@@ -427,6 +427,10 @@
+ "httpOnly":"Protection contre javascript",
+ "https":"HTTPS",
+ "ignore":"Ignorer",
++"ignorePollers":"Activation",
++"ignorePollersDelay":"Délai",
++"ignorePollersLabel":"Ignorer les testeurs",
++"ignorePollersLimit":"Nombre maximal de requêtes",
+ "impersonation":"Simulation d'identité",
+ "impersonationHiddenAttributes":"Attributs masqués",
+ "impersonationIdRule":"Règle d'utilisation des identités",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json
+@@ -427,6 +427,10 @@
+ "httpOnly":"הגנת Javascript",
+ "https":"HTTPS",
+ "ignore":"Ignore",
++"ignorePollers":"Activation",
++"ignorePollersDelay":"Delay",
++"ignorePollersLabel":"Ignore pollers",
++"ignorePollersLimit":"Max requests",
+ "impersonation":"התחזות",
+ "impersonationHiddenAttributes":"מאפיינים נסתרים",
+ "impersonationIdRule":"זהויות משתמשות בכלל",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json
+@@ -427,6 +427,10 @@
+ "httpOnly":"Protezione Javascript",
+ "https":"HTTPS",
+ "ignore":"Ignore",
++"ignorePollers":"Activation",
++"ignorePollersDelay":"Delay",
++"ignorePollersLabel":"Ignore pollers",
++"ignorePollersLimit":"Max requests",
+ "impersonation":"Imitazione",
+ "impersonationHiddenAttributes":"Attributi nascosti",
+ "impersonationIdRule":"Le identità usano la regola",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json
+@@ -427,6 +427,10 @@
+ "httpOnly":"Ochrona JavaScript",
+ "https":"HTTPS",
+ "ignore":"Ignorować",
++"ignorePollers":"Activation",
++"ignorePollersDelay":"Delay",
++"ignorePollersLabel":"Ignore pollers",
++"ignorePollersLimit":"Max requests",
+ "impersonation":"Personifikacja",
+ "impersonationHiddenAttributes":"Ukryte atrybuty",
+ "impersonationIdRule":"Reguła korzystania z tożsamości",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json
+@@ -427,6 +427,10 @@
+ "httpOnly":"Proteção Javascript",
+ "https":"HTTPS",
+ "ignore":"Ignorar",
++"ignorePollers":"Activation",
++"ignorePollersDelay":"Delay",
++"ignorePollersLabel":"Ignore pollers",
++"ignorePollersLimit":"Max requests",
+ "impersonation":"Personificação",
+ "impersonationHiddenAttributes":"Atributos escondidos",
+ "impersonationIdRule":"Regra de uso de identidades",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json
+@@ -427,6 +427,10 @@
+ "httpOnly":"Proteção Javascript",
+ "https":"HTTPS",
+ "ignore":"Ignorar",
++"ignorePollers":"Activation",
++"ignorePollersDelay":"Delay",
++"ignorePollersLabel":"Ignore pollers",
++"ignorePollersLimit":"Max requests",
+ "impersonation":"Personificação",
+ "impersonationHiddenAttributes":"Atributos escondidos",
+ "impersonationIdRule":"Regra de uso de identidades",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json
+@@ -427,6 +427,10 @@
+ "httpOnly":"Защита Javascript",
+ "https":"HTTPS",
+ "ignore":"Игнорировать",
++"ignorePollers":"Activation",
++"ignorePollersDelay":"Delay",
++"ignorePollersLabel":"Ignore pollers",
++"ignorePollersLimit":"Max requests",
+ "impersonation":"Исполнение роли",
+ "impersonationHiddenAttributes":"Скрытые атрибуты",
+ "impersonationIdRule":"Правило использования идентификаторов",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json
+@@ -427,6 +427,10 @@
+ "httpOnly":"Javascript koruması",
+ "https":"HTTPS",
+ "ignore":"Görmezden gel",
++"ignorePollers":"Activation",
++"ignorePollersDelay":"Delay",
++"ignorePollersLabel":"Ignore pollers",
++"ignorePollersLimit":"Max requests",
+ "impersonation":"Başka bir kullanıcı gibi davran",
+ "impersonationHiddenAttributes":"Gizli nitelikler",
+ "impersonationIdRule":"Kimlik kullanım kuralı",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json
+@@ -427,6 +427,10 @@
+ "httpOnly":"Bảo vệ Javascript",
+ "https":"HTTPS",
+ "ignore":"Phớt lờ",
++"ignorePollers":"Activation",
++"ignorePollersDelay":"Delay",
++"ignorePollersLabel":"Ignore pollers",
++"ignorePollersLimit":"Max requests",
+ "impersonation":"mạo danh",
+ "impersonationHiddenAttributes":"Thuộc tính ẩn",
+ "impersonationIdRule":"Quy tắc sử dụng danh tính",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json
+@@ -427,6 +427,10 @@
+ "httpOnly":"Javascript 保護",
+ "https":"HTTPS",
+ "ignore":"Ignore",
++"ignorePollers":"Activation",
++"ignorePollersDelay":"Delay",
++"ignorePollersLabel":"Ignore pollers",
++"ignorePollersLimit":"Max requests",
+ "impersonation":"模擬",
+ "impersonationHiddenAttributes":"隱藏屬性",
+ "impersonationIdRule":"身份使用規則",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json
+@@ -427,6 +427,10 @@
+ "httpOnly":"Javascript 保護",
+ "https":"HTTPS",
+ "ignore":"Ignore",
++"ignorePollers":"Activation",
++"ignorePollersDelay":"Delay",
++"ignorePollersLabel":"Ignore pollers",
++"ignorePollersLimit":"Max requests",
+ "impersonation":"模擬",
+ "impersonationHiddenAttributes":"隱藏屬性",
+ "impersonationIdRule":"身份使用規則",

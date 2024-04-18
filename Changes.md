@@ -1,5 +1,7 @@
 # Changes
 
+* 2024-04-18: add IgnorePollers plugin (v2.18.2-9)
+* 2024-04-17: add package libhttp-browserdetect-perl for Lemonldap::NG::Portal::Plugins::LocationDetect
 * 2024-04-08: add `DEFAULT_WEBSITE` and `PROTECTION` env var
 * 2024-04-04: add docker revision in version string
 * 2024-04-03: fix cache patch
