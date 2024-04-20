@@ -6,6 +6,7 @@ on:
 
 jobs:
   setenv:
+    runs-on: ubuntu-latest
     steps:
       - name: setvars
         run: |
