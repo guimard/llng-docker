@@ -1,20 +1,17 @@
 name: Build and Publish Docker Images
 
+env:
+  VERSION: 2.18.2
+  PGVERSION: 15
+  DEBIANRELEASE: bookworm
+  DOCKERREVISION: 9
+
 on:
   push:
     branches: [master]
 
 jobs:
-  setenv:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      - name: set_vars
-        run: |
-          cat ./env >> "$GITHUB_ENV"
   test:
-    needs: setenv
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -22,7 +19,7 @@ jobs:
       - name: build_and_test
         run: ./build-all
         env:
-          VERSION: ${{ github.env.VERSION }}-${{ github.env.DOCKERREVISION }}
+          VERSION: ${{ env.VERSION }}-${{ env.DOCKERREVISION }}
 
   build-and-push-pg:
     needs: test
@@ -57,8 +54,8 @@ jobs:
             yadd/lemonldap-ng-pg-database:latest
             yadd/lemonldap-ng-pg-database:stable
             yadd/lemonldap-ng-pg-database:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-pg-database:${{ github.env.PGVERSION }}
-            yadd/lemonldap-ng-pg-database:${{ github.env.PGVERSION }}-${{ github.env.DEBIANRELEASE }}
+            yadd/lemonldap-ng-pg-database:${{ env.PGVERSION }}
+            yadd/lemonldap-ng-pg-database:${{ env.PGVERSION }}-${{ env.DEBIANRELEASE }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
         env:
@@ -103,8 +100,8 @@ jobs:
             yadd/lemonldap-ng-base:latest
             yadd/lemonldap-ng-base:stable
             yadd/lemonldap-ng-base:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-base:${{ github.env.VERSION }}-${{ github.env.DOCKERREVISION }}
-            yadd/lemonldap-ng-base:${{ github.env.VERSION }}-${{ github.env.DOCKERREVISION }}-${{ github.env.DEBIANRELEASE }}
+            yadd/lemonldap-ng-base:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
+            yadd/lemonldap-ng-base:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
         env:
@@ -151,8 +148,8 @@ jobs:
             yadd/lemonldap-ng-portal:latest
             yadd/lemonldap-ng-portal:stable
             yadd/lemonldap-ng-portal:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-portal:${{ github.env.VERSION }}-${{ github.env.DOCKERREVISION }}
-            yadd/lemonldap-ng-portal:${{ github.env.VERSION }}-${{ github.env.DOCKERREVISION }}-${{ github.env.DEBIANRELEASE }}
+            yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
+            yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
         env:
@@ -199,8 +196,8 @@ jobs:
             yadd/lemonldap-ng-cron:latest
             yadd/lemonldap-ng-cron:stable
             yadd/lemonldap-ng-cron:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-cron:${{ github.env.VERSION }}-${{ github.env.DOCKERREVISION }}
-            yadd/lemonldap-ng-cron:${{ github.env.VERSION }}-${{ github.env.DOCKERREVISION }}-${{ github.env.DEBIANRELEASE }}
+            yadd/lemonldap-ng-cron:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
+            yadd/lemonldap-ng-cron:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
         env:
@@ -247,8 +244,8 @@ jobs:
             yadd/lemonldap-ng-manager:latest
             yadd/lemonldap-ng-manager:stable
             yadd/lemonldap-ng-manager:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-manager:${{ github.env.VERSION }}-${{ github.env.DOCKERREVISION }}
-            yadd/lemonldap-ng-manager:${{ github.env.VERSION }}-${{ github.env.DOCKERREVISION }}-${{ github.env.DEBIANRELEASE }}
+            yadd/lemonldap-ng-manager:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
+            yadd/lemonldap-ng-manager:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
         env:
@@ -295,8 +292,8 @@ jobs:
             yadd/lemonldap-ng-full:latest
             yadd/lemonldap-ng-full:stable
             yadd/lemonldap-ng-full:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-full:${{ github.env.VERSION }}-${{ github.env.DOCKERREVISION }}
-            yadd/lemonldap-ng-full:${{ github.env.VERSION }}-${{ github.env.DOCKERREVISION }}-${{ github.env.DEBIANRELEASE }}
+            yadd/lemonldap-ng-full:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
+            yadd/lemonldap-ng-full:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
         env:
@@ -343,8 +340,8 @@ jobs:
             yadd/lemonldap-ng-ssoaas-fastcgi-server:latest
             yadd/lemonldap-ng-ssoaas-fastcgi-server:stable
             yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ github.env.VERSION }}-${{ github.env.DOCKERREVISION }}
-            yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ github.env.VERSION }}-${{ github.env.DOCKERREVISION }}-${{ github.env.DEBIANRELEASE }}
+            yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
+            yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
         env:
@@ -368,8 +365,8 @@ jobs:
         env:
           TAG_NAME: |
             latest
-            ${{ github.env.VERSION }}-${{ github.env.DOCKERREVISION }}-${{ steps.date.outputs.date }}
-            ${{ github.env.VERSION }}-${{ github.env.DOCKERREVISION }}-${{ steps.date.outputs.date }}-${{ github.env.DEBIANRELEASE }}
+            ${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ steps.date.outputs.date }}
+            ${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ steps.date.outputs.date }}-${{ env.DEBIANRELEASE }}
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Set up QEMU
@@ -390,7 +387,7 @@ jobs:
           tags: |
             yadd/lemonldap-ng-dev:latest
             yadd/lemonldap-ng-dev:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-dev:${{ github.env.DEBIANRELEASE }}
+            yadd/lemonldap-ng-dev:${{ env.DEBIANRELEASE }}
 
   build-and-push-base-no-s6:
     runs-on: ubuntu-latest
@@ -425,8 +422,8 @@ jobs:
             yadd/lemonldap-ng-base:latest-no-s6
             yadd/lemonldap-ng-base:stable-no-s6
             yadd/lemonldap-ng-base:${{ steps.date.outputs.date }}-no-s6
-            yadd/lemonldap-ng-base:${{ github.env.VERSION }}-${{ github.env.DOCKERREVISION }}-no-s6
-            yadd/lemonldap-ng-base:${{ github.env.VERSION }}-${{ github.env.DOCKERREVISION }}-${{ github.env.DEBIANRELEASE }}-no-s6
+            yadd/lemonldap-ng-base:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
+            yadd/lemonldap-ng-base:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
 
   build-and-push-portal-no-s6:
     needs: build-and-push-base-no-s6
@@ -463,8 +460,8 @@ jobs:
             yadd/lemonldap-ng-portal:latest-no-s6
             yadd/lemonldap-ng-portal:stable-no-s6
             yadd/lemonldap-ng-portal:${{ steps.date.outputs.date }}-no-s6
-            yadd/lemonldap-ng-portal:${{ github.env.VERSION }}-${{ github.env.DOCKERREVISION }}-no-s6
-            yadd/lemonldap-ng-portal:${{ github.env.VERSION }}-${{ github.env.DOCKERREVISION }}-${{ github.env.DEBIANRELEASE }}-no-s6
+            yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
+            yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
 
   build-and-push-cron-no-s6:
     needs: build-and-push-base-no-s6
@@ -501,8 +498,8 @@ jobs:
             yadd/lemonldap-ng-cron:latest-no-s6
             yadd/lemonldap-ng-cron:stable-no-s6
             yadd/lemonldap-ng-cron:${{ steps.date.outputs.date }}-no-s6
-            yadd/lemonldap-ng-cron:${{ github.env.VERSION }}-${{ github.env.DOCKERREVISION }}-no-s6
-            yadd/lemonldap-ng-cron:${{ github.env.VERSION }}-${{ github.env.DOCKERREVISION }}-${{ github.env.DEBIANRELEASE }}-no-s6
+            yadd/lemonldap-ng-cron:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
+            yadd/lemonldap-ng-cron:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
 
   build-and-push-manager-no-s6:
     needs: build-and-push-base-no-s6
@@ -539,8 +536,8 @@ jobs:
             yadd/lemonldap-ng-manager:latest-no-s6
             yadd/lemonldap-ng-manager:stable-no-s6
             yadd/lemonldap-ng-manager:${{ steps.date.outputs.date }}-no-s6
-            yadd/lemonldap-ng-manager:${{ github.env.VERSION }}-${{ github.env.DOCKERREVISION }}-no-s6
-            yadd/lemonldap-ng-manager:${{ github.env.VERSION }}-${{ github.env.DOCKERREVISION }}-${{ github.env.DEBIANRELEASE }}-no-s6
+            yadd/lemonldap-ng-manager:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
+            yadd/lemonldap-ng-manager:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
 
   build-and-push-full-no-s6:
     needs: build-and-push-portal-no-s6
@@ -577,8 +574,8 @@ jobs:
             yadd/lemonldap-ng-full:latest-no-s6
             yadd/lemonldap-ng-full:stable-no-s6
             yadd/lemonldap-ng-full:${{ steps.date.outputs.date }}-no-s6
-            yadd/lemonldap-ng-full:${{ github.env.VERSION }}-${{ github.env.DOCKERREVISION }}-no-s6
-            yadd/lemonldap-ng-full:${{ github.env.VERSION }}-${{ github.env.DOCKERREVISION }}-${{ github.env.DEBIANRELEASE }}-no-s6
+            yadd/lemonldap-ng-full:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
+            yadd/lemonldap-ng-full:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
 
   build-and-push-ssoaas-fastcgi-server-no-s6:
     needs: build-and-push-base-no-s6
@@ -615,5 +612,5 @@ jobs:
             yadd/lemonldap-ng-ssoaas-fastcgi-server:latest-no-s6
             yadd/lemonldap-ng-ssoaas-fastcgi-server:stable-no-s6
             yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ steps.date.outputs.date }}-no-s6
-            yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ github.env.VERSION }}-${{ github.env.DOCKERREVISION }}-no-s6
-            yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ github.env.VERSION }}-${{ github.env.DOCKERREVISION }}-${{ github.env.DEBIANRELEASE }}-no-s6
+            yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
+            yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
