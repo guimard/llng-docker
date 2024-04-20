@@ -1,17 +1,17 @@
 name: Build and Publish Docker Images
 
-env:
-  VERSION: 2.18.2
-  PGVERSION: 15
-  DEBIANRELEASE: bookworm
-  DOCKERREVISION: 9
-
 on:
   push:
     branches: [master]
 
 jobs:
+  setenv:
+    steps:
+      - name: setvars
+        run: |
+          cat ./env >> "$GITHUB_ENV"
   test:
+    needs: setenv
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
