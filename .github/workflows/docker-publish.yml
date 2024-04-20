@@ -8,7 +8,9 @@ jobs:
   setenv:
     runs-on: ubuntu-latest
     steps:
-      - name: setvars
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: set_vars
         run: |
           cat ./env >> "$GITHUB_ENV"
   test:
