@@ -1,5 +1,6 @@
 # Changes
 
+* 2024-04-26: add llngUserAttributes tool
 * 2024-04-18: add IgnorePollers plugin (v2.18.2-9)
 * 2024-04-17: add package libhttp-browserdetect-perl for Lemonldap::NG::Portal::Plugins::LocationDetect
 * 2024-04-08: add `DEFAULT_WEBSITE` and `PROTECTION` env var

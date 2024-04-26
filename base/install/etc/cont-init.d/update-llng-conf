@@ -1,5 +1,11 @@
 #!/command/with-contenv sh
 
+# Install Lemon commands in usr/bin
+for i in `find /usr/share/lemonldap-ng/bin -type f -perm -g=x`; do
+	NAME=`basename $i`
+	ln -s $i /usr/bin/$NAME
+done
+
 # Fix logLevel
 echo "Set logLevel to $LOGLEVEL"
 perl -i -pe 's/^logLevel\s*=.*$/logLevel=$ENV{LOGLEVEL}/' /etc/lemonldap-ng/lemonldap-ng.ini
