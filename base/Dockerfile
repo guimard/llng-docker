@@ -63,6 +63,7 @@ ENV SSODOMAIN=example.com \
     DBI_PASSWORD="" \
     HANDLER_CRON=yes \
     PORTAL_CRON=yes \
+    FIXED_LOGOUT_REDIRECTION= \
     FORCE_KEY_REGENERATION=no \
     DEBIAN_FRONTEND=noninteractive \
     DEFAULT_WEBSITE=no \

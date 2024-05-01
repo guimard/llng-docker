@@ -100,9 +100,9 @@ PORTALURL=`portalUrl "$PORTAL"`
 /usr/share/docker-llng/updateConf "set" portal "$PORTALURL"
 
 # Fix logout redirection
-if test "$FIXED_LOGOUT" != ""; then
-    echo "Configure LLNG to redirect all logouts on $FIXED_LOGOUT"
-    /usr/share/docker-llng/updateConf set fixedLogoutRedirection "$FIXED_LOGOUT"
+if test "$FIXED_LOGOUT_REDIRECTION" != ""; then
+    echo "Configure LLNG to redirect all logouts on $FIXED_LOGOUT_REDIRECTION"
+    /usr/share/docker-llng/updateConf set fixedLogoutRedirection "$FIXED_LOGOUT_REDIRECTION"
 fi
 
 if test "$CROWDSEC_SERVER" != ""; then
