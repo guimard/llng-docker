@@ -38,6 +38,7 @@ RUN echo patch appgrid.patch && patch -p1 < appgrid.patch && \
     echo patch oidc-auth-pkce.patch && patch -p1 < oidc-auth-pkce.patch && \
     echo patch jitsi.patch && patch -p1 < jitsi.patch && \
     echo patch ignorepollers.patch && patch -p1 < ignorepollers.patch && \
+    echo patch fixedLogout.patch && patch -p1 < fixedLogout.patch && \
     rm -f *.patch
 
 RUN echo "# Install nginx configuration files" && \

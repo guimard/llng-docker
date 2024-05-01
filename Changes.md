@@ -1,6 +1,7 @@
 # Changes
 
-* 2024-04-26: add llngUserAttributes tool
+* 2024-05-01: add FixedRedirectOnLogout plugin (v2.18.2-11)
+* 2024-04-26: add llngUserAttributes tool (v2.18.2-10)
 * 2024-04-18: add IgnorePollers plugin (v2.18.2-9)
 * 2024-04-17: add package libhttp-browserdetect-perl for Lemonldap::NG::Portal::Plugins::LocationDetect
 * 2024-04-08: add `DEFAULT_WEBSITE` and `PROTECTION` env var
