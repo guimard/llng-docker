@@ -31,6 +31,7 @@ RUN echo auth-to-authn-by-jwt-manager.patch && patch -p1 < auth-to-authn-by-jwt-
     echo patch oidc-auth-pkce.patch && patch -p1 < oidc-auth-pkce.patch && \
     echo patch jitsi.patch && patch -p1 < jitsi.patch && \
     echo patch ignorepollers.patch && patch -p1 < ignorepollers.patch && \
+    echo patch fixedLogout.patch && patch -p1 < fixedLogout.patch && \
     rm -f *.patch && \
     LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini \
     perl -MLemonldap::NG::Manager::Build -e 'Lemonldap::NG::Manager::Build->run( \
