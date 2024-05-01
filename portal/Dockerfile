@@ -24,7 +24,7 @@ RUN echo "# Install nginx and portal libs" && \
         libio-socket-timeout-perl libunicode-string-perl liblasso-perl \
         libio-string-perl libemail-sender-perl \
 	libcrypt-jwt-perl libdigest-hmac-perl libdata-password-zxcvbn-perl \
-	libhttp-browserdetect-perl \
+	libhttp-browserdetect-perl libnet-dns-perl \
 	&& \
     apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/*
 
