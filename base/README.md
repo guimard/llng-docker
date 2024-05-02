@@ -3,6 +3,8 @@
 Base image for `yadd/lemonldap-ng-*` dockers. Does nothing except configuring
 LemonLDAP::NG.
 
+Maybe you prefer official images
+
 ## Tags
 
 * `stable`: latest lemonldap-ng\* packages from Debian backports
