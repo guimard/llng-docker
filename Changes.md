@@ -1,5 +1,6 @@
 # Changes
 
+* 2024-05-02: drop libredis-fast-perl (v2.18.2-12)
 * 2024-05-01: add FixedRedirectOnLogout plugin (v2.18.2-11)
 * 2024-04-26: add llngUserAttributes tool (v2.18.2-10)
 * 2024-04-18: add IgnorePollers plugin (v2.18.2-9)
