@@ -12,15 +12,19 @@ LemonLDAP::NG.
 
 ## Features
 
+* Always use "Overlay" configuration backend.
+  See [Override configuration parameters](#override-configuration-parameters)
 * Update current configuration using given variables :
   * set domain (`SSODOMAIN`)
   * set portal (`PORTAL`)
   * set log level (`LOGLEVEL`)
-  * if `REDIS_SERVER` is set, change `globalStorage` to `Apache::Session::Browseable::Redis` and configure it _(indexes given by `REDIS_INDEXES`, default: "uid mail")_
+  * if `REDIS_SERVER` is set, change `globalStorage` to `Apache::Session::Browseable::Redis`
+    and configure it _(indexes given by `REDIS_INDEXES`, default: "uid mail")_
 * Upload local configuration into PostgreSQL database if:
   * `PG_SERVER` is given AND
   * PostgreSQL table is empty
-* Initialize LLNG configuration key to a random value if not already initialized or if `FORCE_KEY_REGENERATION` is set to `yes`
+* Initialize LLNG configuration key to a random value if not already initialized or if
+  `FORCE_KEY_REGENERATION` is set to `yes`
 
 > It is generaly a good idea to set this value to `yes`
 
@@ -77,7 +81,13 @@ DBI_USER=pguser
 DBI_PASSWORD=pgpassword
 ```
 
-### Override Lemonldap::NG configuration parameters
+### Override configuration parameters
+
+You can easily override any Lemonldap::NG configuration parameter using the
+overlay system _(starting from 2.19.0-1 tag)_. Simply push files into `/over`
+directory:
+  * filename is the configuration parameter name
+  * content is the raw content or a JSON content
 
 You can easily override any Lemonldap::NG configuration parameter using a
 environment variable set to `OVERRIDE_<parameter name>`. For example, to set

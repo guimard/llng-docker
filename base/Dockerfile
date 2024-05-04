@@ -70,6 +70,7 @@ ENV SSODOMAIN=example.com \
     PGSSLCERT=/tmp/postgres.crt
 
 RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
+    mkdir /over && \
     apt-get -y --no-install-recommends install procps cron \
     liblemonldap-ng-common-perl${LLNGDIST} \
     liblemonldap-ng-handler-perl${LLNGDIST} \

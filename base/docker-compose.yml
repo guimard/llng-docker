@@ -20,6 +20,8 @@ services:
       - OVERRIDE_authChoiceModules={"1_LDAP":"Demo;Demo;Null;;;{}","2_SAML":"SAML;SAML;Null;;;{}"}
       - OVERRIDE_applicationList_1sample_catname="Some applications"
       - OVERRIDE_exportedVars_aa=bb
+    volumes:
+      - ./test-over:/over
     depends_on:
       db:
         condition: service_healthy
