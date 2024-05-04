@@ -51,11 +51,11 @@ ENV SSODOMAIN=example.com \
     DBI_PASSWORD="" \
     HANDLER_CRON=yes \
     PORTAL_CRON=yes \
+    FIXED_LOGOUT_REDIRECTION= \
     FORCE_KEY_REGENERATION=no \
     DEBIAN_FRONTEND=noninteractive \
+    DEFAULT_WEBSITE=no \
     PGSSLCERT=/tmp/postgres.crt
-
-COPY *.patch /
 
 RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     apt-get -y --no-install-recommends install procps cron \
@@ -74,7 +74,6 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     chown www-data:www-data /var/lib/lemonldap-ng/cache && \
     chmod 750 /var/lib/lemonldap-ng/cache && \
     perl -000 -MJSON -i -ne '$_=JSON::from_json($_);$_->{reloadUrls}={};print JSON->new->pretty->canonical->encode($_)' /var/lib/lemonldap-ng/conf/lmConf-1.json && \
-    patch -p1 < no-cache-fail.patch && \
     rm -f *.patch
 
 #COPY syslogopt.patch .

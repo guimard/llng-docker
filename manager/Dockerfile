@@ -26,10 +26,7 @@ RUN echo "# Install nginx and manager libs" && \
 
 COPY *.patch /
 
-RUN echo auth-to-authn-by-jwt-manager.patch && patch -p1 < auth-to-authn-by-jwt-manager.patch && \
-    echo patch anssi.patch && patch -p1 < anssi.patch && \
-    echo patch oidc-auth-pkce.patch && patch -p1 < oidc-auth-pkce.patch && \
-    echo patch jitsi.patch && patch -p1 < jitsi.patch && \
+RUN \
     echo patch ignorepollers.patch && patch -p1 < ignorepollers.patch && \
     echo patch fixedLogout.patch && patch -p1 < fixedLogout.patch && \
     rm -f *.patch && \

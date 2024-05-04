@@ -1,20 +1,20 @@
 diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm b/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
-index f357afcbe..3d167eae2 100644
+index 96aea34..1c9a752 100644
 --- a/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
-@@ -800,6 +800,7 @@ sub run {
-                             address        => 'yourAddress',
-                             phone          => 'yourPhone',
-                             offline_access => 'yourOffline',
-+                            applications   => 'yourApps',
-                         };
-                         my @list;
-                         foreach my $requested_scope ( split( /\s+/, $scope ) ) {
+@@ -798,6 +798,7 @@ sub _authorizeEndpoint {
+                     address        => 'yourAddress',
+                     phone          => 'yourPhone',
+                     offline_access => 'yourOffline',
++                    applications   => 'yourApps',
+                 };
+                 my @list;
+                 foreach my $requested_scope ( split( /\s+/, $scope ) ) {
 diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
-index c5cd704e0..bd2395248 100644
+index 964c85b..1ea1096 100644
 --- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
-@@ -191,6 +191,9 @@ sub load_rp {
+@@ -148,6 +148,9 @@ sub load_rp {
      # Handle scopes
      # this HAS to be a deep copy of the DEFAULT_SCOPES hashref!
      my $scope_values = { %{ DEFAULT_SCOPES() } };
@@ -24,7 +24,7 @@ index c5cd704e0..bd2395248 100644
  
      # Additional claims
      my $extraClaims = $config{extraClaims};
-@@ -2134,10 +2137,34 @@ sub buildUserInfoResponseFromData {
+@@ -2117,10 +2120,34 @@ sub buildUserInfoResponseFromData {
          # Else, iterate through scopes to find allowed attributes
      }
      else {

@@ -22,7 +22,7 @@ index 129ea713c..5c9f18253 100644
      }
  
      # Get access token session
-@@ -125,6 +127,8 @@ sub fetchId {
+@@ -126,6 +128,8 @@ sub fetchId {
          return "O-$_session_id";
      }
  
@@ -81,10 +81,10 @@ index 000000000..bb2f280a8
 +
 +1;
 diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/RESTServer.pm b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/RESTServer.pm
-index 71997891f..e8ddfad81 100644
+index 3938378..8fc0294 100644
 --- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/RESTServer.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/RESTServer.pm
-@@ -256,6 +256,22 @@ sub init {
+@@ -265,6 +265,22 @@ sub init {
      return 1;
  }
  
