@@ -11,6 +11,11 @@ sessions.
 
 ## Variables with default values:
 
+* POSTGRES\_HOST: localhost
+* POSTGRES\_PORT: 5432
+* POSTGRES\_USER: postgres
+* POSTGRES\_DB: postgres
+
 * PG\_DATABASE: lemonldapng
 * PG\_USER: lemonldap
 * PG\_PASSWORD: lemonldap
@@ -26,6 +31,15 @@ and all variables from postgres:bookworm. Note that you should set
 
 ## Initialize configuration
 
+If you want to initialize the database in a remote Postgres Database, modify the `POSTGRES_*` variables. Example:
+```shell
+POSTGRES_HOST: postgresql.namespace.default.svc.cluster.local # For Kubernetes
+POSTGRES_HOST: postgresql.us-west-2.rds.amazonaws.com # For AWS Cloud Provider
+POSTGRES_HOST: postgresql.database.cloud.ovh.net # For OVH Provider
+POSTGRES_PORT: 20814
+POSTGRES_USER: your-admin-account
+POSTGRES_DB: your-admin-db
+```
 If `/llng-conf/conf.json` exists, the database will be initialized with this
 configuration. You can use docker "volumes" for this:
 

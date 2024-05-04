@@ -1,6 +1,11 @@
 #!/bin/sh
 set -e
 
+POSTGRES_HOST=${POSTGRES_HOST:-localhost}
+POSTGRES_PORT=${POSTGRES_PORT:-5432}
+POSTGRES_USER=${POSTGRES_USER:-postgres}
+POSTGRES_DB=${POSTGRES_DB:-postgres}
+
 DATABASE=${PG_DATABASE:-lemonldapng}
 USER=${PG_USER:-lemonldap}
 PASSWORD=${PG_PASSWORD:-lemonldap}
@@ -11,11 +16,12 @@ SAMLTABLE=${PG_SAML_TABLE:-samlsessions}
 OIDCTABLE=${PG_OIDC_TABLE:-oidcsessions}
 CASTABLE=${PG_CAS_TABLE:-cassessions}
 
-psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
+psql -v ON_ERROR_STOP=1 -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
 	CREATE USER $USER PASSWORD '$PASSWORD';
 	CREATE DATABASE $DATABASE;
 EOSQL
-psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$DATABASE" <<-EOSQL
+
+psql -v ON_ERROR_STOP=1 -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" --username "$POSTGRES_USER" --dbname "$DATABASE" <<-EOSQL
 	CREATE TABLE $TABLE (
 		cfgNum integer not null primary key,
 		data text
@@ -87,7 +93,7 @@ if test -e /llng-conf/conf.json; then
 		$a =~ s/\\\\/\\\\\\\\/g;
 		print $a;'`
 	echo "set val '$SERIALIZED'" >&2
-	psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$DATABASE" <<-EOSQL
+	psql -v ON_ERROR_STOP=1 -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" --username "$USER" --dbname "$DATABASE" <<-EOSQL
 	\\set val '$SERIALIZED'
 	INSERT INTO $TABLE (cfgNum, data) VALUES (1, :'val');
 	SELECT * FROM $TABLE;
