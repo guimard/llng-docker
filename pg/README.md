@@ -33,6 +33,20 @@ configuration. You can use docker "volumes" for this:
 $ docker run -v /path/to/conf.json:/llng-conf/conf.json yadd/lemonldap-ng-pg-database
 ```
 
+## Initialize configuration - Remote Postgres
+If you want to initialize the database in a remote Postgres Database, modify the `POSTGRES_*` variables and override the container Entrypoint. Example:
+```shell
+POSTGRES_HOST: postgresql.namespace.default.svc.cluster.local # Kubernetes
+# POSTGRES_HOST: postgresql.us-west-2.rds.amazonaws.com # AWS RDS
+# POSTGRES_HOST: postgresql.database.cloud.ovh.net # OVH Cloud
+POSTGRES_PORT: 20814
+POSTGRES_USER: your-admin-account
+POSTGRES_DB: your-admin-db
+PGPASSWORD: your-admin-password
+
+$ docker run /docker-entrypoint-initdb.d/init-user-db.sh ---env-file=env yadd/lemonldap-ng-pg-database 
+```
+>Note: `PGPASSWORD` env is used by the psql client at runtime.
 ## Repository and bug reports
 
 * Repository: [github.com/guimard/llng-docker](https://github.com/guimard/llng-docker/tree/master/pg)
