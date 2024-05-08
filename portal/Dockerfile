@@ -35,6 +35,7 @@ RUN echo patch appgrid.patch && patch -p1 < appgrid.patch && \
     echo patch app-scope.patch && patch -p1 < app-scope.patch && \
     echo patch ignorepollers.patch && patch -p1 < ignorepollers.patch && \
     echo patch fixedLogout.patch && patch -p1 < fixedLogout.patch && \
+    echo patch more-logs.patch && patch -p1 < more-logs.patch && \
     rm -f *.patch
 
 RUN echo "# Install nginx configuration files" && \

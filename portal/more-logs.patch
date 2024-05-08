@@ -1,0 +1,11 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
+@@ -1777,6 +1777,7 @@ sub checkEndPointAuthenticationCredentials {
+             unless ( $client_secret eq
+                 $self->rpOptions->{$rp}->{oidcRPMetaDataOptionsClientSecret} )
+             {
++                $self->logger->debug("OIDC SECRETS MISMATCH: '$client_secret' != '$self->{rpOptions}->{$rp}->{oidcRPMetaDataOptionsClientSecret}'\n");
+                 $self->logger->error("Wrong credentials for $rp");
+                 return undef;
+             }
+
