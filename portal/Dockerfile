@@ -22,7 +22,7 @@ RUN echo "# Install nginx and portal libs" && \
         libconvert-base32-perl libio-string-perl libipc-run-perl \
         libgd-securityimage-perl libmime-tools-perl libnet-ldap-perl \
         libio-socket-timeout-perl libunicode-string-perl liblasso-perl \
-        libio-string-perl libemail-sender-perl \
+        libio-string-perl libemail-sender-perl libregexp-common-perl \
 	libcrypt-jwt-perl libdigest-hmac-perl libdata-password-zxcvbn-perl \
 	libhttp-browserdetect-perl libnet-dns-perl \
 	&& \
@@ -30,21 +30,16 @@ RUN echo "# Install nginx and portal libs" && \
 
 COPY *.patch /
 
-RUN echo patch appgrid.patch && patch -p1 < appgrid.patch && \
-    echo patch jwt-type.patch && patch -p1 < jwt-type.patch && \
-    echo patch app-scope.patch && patch -p1 < app-scope.patch && \
-    echo patch ignorepollers.patch && patch -p1 < ignorepollers.patch && \
-    echo patch fixedLogout.patch && patch -p1 < fixedLogout.patch && \
-    echo patch more-logs.patch && patch -p1 < more-logs.patch && \
-    rm -f *.patch
-
-RUN echo "# Install nginx configuration files" && \
+RUN for p in appgrid.patch jwt-type.patch app-scope.patch ignorepollers.patch \
+    fixedLogout.patch more-logs.patch introspec-for-public-clients.patch \
+    token-exchange.patch \
+    ; do echo patch $p && patch -p1 < $p; done && \
+    rm -f *.patch && \
+    echo "# Install nginx configuration files" && \
     cd /etc/nginx/sites-enabled/ && \
-    ln -s ../../lemonldap-ng/portal-nginx.conf
-
-RUN (echo ""; echo "daemon off;") >> /etc/nginx/nginx.conf
-
-RUN perl -i -pe 's#access_log .*;#access_log /dev/stdout;#; s#error_log .*;#error_log /dev/stdout info;#' /etc/nginx/nginx.conf
+    ln -s ../../lemonldap-ng/portal-nginx.conf && \
+    (echo ""; echo "daemon off;") >> /etc/nginx/nginx.conf && \
+    perl -i -pe 's#access_log .*;#access_log /dev/stdout;#; s#error_log .*;#error_log /dev/stdout info;#' /etc/nginx/nginx.conf
 
 COPY install /
 

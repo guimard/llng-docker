@@ -29,6 +29,7 @@ COPY *.patch /
 RUN \
     echo patch ignorepollers.patch && patch -p1 < ignorepollers.patch && \
     echo patch fixedLogout.patch && patch -p1 < fixedLogout.patch && \
+    echo patch token-exchange.patch && patch -p1 < token-exchange.patch && \
     rm -f *.patch && \
     LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini \
     perl -MLemonldap::NG::Manager::Build -e 'Lemonldap::NG::Manager::Build->run( \

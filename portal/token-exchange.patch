@@ -1,0 +1,786 @@
+--- /dev/null
++++ b/usr/share/perl5/Lemonldap/NG/Common/Matrix.pm
+@@ -0,0 +1,279 @@
++package Lemonldap::NG::Common::Matrix;
++
++use strict;
++use JSON;
++use Lemonldap::NG::Common::FormEncode;
++use Lemonldap::NG::Common::UserAgent;
++use Mouse::Role;
++use Net::DNS;
++use Regexp::Common 'net';
++use Regexp::Common::URI::RFC2396 '$hostname';
++
++# Check IP:port or IP. Captures IP and port
++my $isIpLiteral = qr/^($RE{net}{IPv6}|$RE{net}{IPv4})(?:(?<!:):(\d+))?$/;
++
++# Check hostname:port or hostname. Cpatures hostname and port
++my $isHostname = qr/^($hostname)(?:(?<!:):(\d+))?$/;
++
++has ua => (
++    is      => 'rw',
++    lazy    => 1,
++    builder => sub {
++
++        # TODO : LWP options to use a proxy for example
++        my $ua = Lemonldap::NG::Common::UserAgent->new( $_[0]->{conf} );
++        $ua->env_proxy();
++        return $ua;
++    }
++);
++
++has dnsResolver => (
++    is      => 'rw',
++    lazy    => 1,
++    builder => sub {
++        return Net::DNS::Resolver->new;
++    }
++);
++
++# MATRIX SERVER RESOLUTION
++#
++# main method: serverResolve
++
++sub serverResolve {
++    my ( $self, $name ) = @_;
++
++    # From Matrix spec 1.9
++    #
++    # If the hostname is an IP literal, then that IP address should be used,
++    # together with the given port number, or 8448 if no port is given.
++    return "https://$1:" . ( $2 || '8448' ) . '/'
++      if $name =~ $isIpLiteral;
++
++    unless ( $name =~ $isHostname ) {
++        $self->logger->error("Bad hostname $name");
++        return;
++    }
++
++    # If the hostname is not an IP literal, and the server name includes an
++    # explicit port, resolve the hostname to an IP address using CNAME, AAAA
++    # or A records
++    return "https://$1:$2/" if $2;
++
++    # If the hostname is not an IP literal, a regular HTTPS request is made
++    # to https://<hostname>/.well-known/matrix/server
++    my $resp = $self->ua->get("https://$name/.well-known/matrix/server");
++    if ( $resp->is_success ) {
++        my $content = eval { JSON::from_json( $resp->decoded_content ) };
++        unless ($@) {
++            if (    ref($content)
++                and ref($content) eq 'HASH'
++                and my $delegated = $content->{'m.server'} )
++            {
++                # If <delegated_hostname> is an IP literal, then that IP
++                # address should be used together with the <delegated_port>
++                # or 8448 if no port is provided
++                return "https://$1:" . ( $2 || '8448' ) . '/'
++                  if $delegated =~ $isIpLiteral;
++
++                unless ( $delegated =~ $isHostname ) {
++                    $self->logger->error("Bad hostname $name");
++                    return;
++                }
++
++                # If <delegated_hostname> is not an IP literal, and
++                # <delegated_port> is present, an IP address is discovered by
++                # looking up CNAME, AAAA or A records for <delegated_hostname>
++                return "https://$1:$2/" if $2;
++
++                # ALL NEXT CASES ARE EXACTLY THE SAME DNS SEARCH THAN IF NO
++                # .well-known IS VALID BUT USING ${delegated} INSTEAD OF
++                # ${name}
++
++                # If <delegated_hostname> is not an IP literal and no
++                # <delegated_port> is present, an SRV record is looked up for
++                # _matrix-fed._tcp.<delegated_hostname>. This may result in
++                # another hostname (to be resolved using AAAA or A records) and
++                # port.
++                #
++                # [Deprecated] If <delegated_hostname> is not an IP literal, no
++                # <delegated_port> is present, and a
++                # _matrix-fed._tcp.<delegated_hostname> SRV record was not
++                # found, an SRV record is looked up for
++                # _matrix._tcp.<delegated_hostname>. This may result in another
++                # hostname # (to be resolved using AAAA or A records) and port.
++                #
++                # If no SRV record is found, an IP address is resolved using
++                # CNAME, # AAAA or A records. Requests are then made to the
++                # resolve IP address # and a port of 8448, using a Host header
++                # of <delegated_hostname>
++                return $self->_dnsResolve($delegated);
++            }
++        }
++    }
++    return $self->_dnsResolve($name);
++}
++
++sub _dnsResolve {
++    my ( $self, $name ) = @_;
++    my @res;
++
++    # If the /.well-known request resulted in an error response, a server is
++    # found by resolving an SRV record for _matrix-fed._tcp.<hostname>. This
++    # may result in a hostname (to be resolved using AAAA or A records) and
++    # port
++    @res = $self->dnsSrvResolve("_matrix-fed._tcp.$name");
++
++    # [Deprecated] If the /.well-known request resulted in an error response,
++    # and a _matrix-fed._tcp.<hostname> SRV record was not found, a server is
++    # found by resolving an SRV record for _matrix._tcp.<hostname>
++    @res = $self->dnsSrvResolve("_matrix._tcp.$name") unless @res;
++
++    return ( wantarray ? @res : shift(@res) ) if @res;
++
++    # If the /.well-known request returned an error response, and the
++    # SRV record was not found, an IP address is resolved using CNAME,
++    # AAAA and A records. Requests are made to the resolved IP address
++    # using port 8448 and a Host header containing the <hostname>
++    if ( rr($name) ) {
++        return "https://$name:8448/";
++    }
++    else {
++        $self->logger->error("Unable to resolve Matrix name $name");
++        return;
++    }
++}
++
++sub dnsSrvResolve {
++    my ( $self, $name ) = @_;
++    my $reply = $self->dnsResolver->query( $name, 'SRV' );
++    return unless $reply;
++    return map { 'https://' . $_->target . ':' . $_->port . '/' }
++      sort { $b->priority <=> $a->priority } $reply->answer;
++}
++
++# MATRIX TOKEN VALIDATION
++#
++# main method: validateMatrixToken
++
++sub validateMatrixToken {
++    my ( $self, $matrixBaseUrl, $accessToken ) = @_;
++    $matrixBaseUrl =~ s#/+$##;
++    my $resp =
++      $self->ua->get( "$matrixBaseUrl/_matrix/federation/v1/openid/userinfo?"
++          . build_urlencoded( access_token => $accessToken ) );
++    if ( $resp->is_success ) {
++        my $content = eval { JSON::from_json( $resp->decoded_content ) };
++        if ($@) {
++            $self->logger->error("Bad response from $matrixBaseUrl: $@");
++            return;
++        }
++        if ( ref $content eq 'HASH' and my $sub = $content->{sub} ) {
++            unless ( $sub =~ /^\@(.*):(.*)$/ ) {
++                $self->logger->error(
++                    "Bad 'sub' received from $matrixBaseUrl: $sub");
++                return;
++            }
++            return wantarray ? ( $sub, $1, $2 ) : $sub;
++        }
++        else {
++            $self->logger->error(
++                "Bad response from $matrixBaseUrl: " . $resp->decoded_content );
++            return;
++        }
++    }
++    else {
++        $self->userLogger->error(
++            "Token $accessToken refused by $matrixBaseUrl: "
++              . $resp->status_line );
++        return;
++    }
++}
++
++1;
++__END__
++
++=head1 NAME
++
++=encoding utf8
++
++Lemonldap::NG::Common::Matrix - Library to interact with Matrix servers
++
++=head1 SYNOPSIS
++
++    use Mouse;
++    with 'Lemonldap::NG::Common::Matrix';
++    #
++    # Server resolution
++    #
++    my $baseUrl = $self->serverResolve('matrix.org');
++    # Gives: https://matrix-federation.matrix.org.cdn.cloudflare.net:8443/
++    #
++    # Token validation
++    #
++    my $subject = $self->validateMatrixToken( $baseUrl, 'federationToken' );
++    # or
++    my ( $subject, $username, $domain) =
++        $self->validateMatrixToken( $baseUrl, 'federationToken' );
++    # Gives the Matrix address of this user
++
++
++=head1 DESCRIPTION
++
++Lemonldap::NG::Common::Matrix is a L<Mouse::Role> that provides additional
++methods to interact with Matrix servers.
++
++=head1 METHODS
++
++=head2 serverResolve
++
++Return the base URL corresponding to the given Matrix "Servername", following
++L<Matrix specifications|https://spec.matrix.org/v1.9/server-server-api/#server-discovery>
++
++=head2 validateMatrixToken
++
++Verify the given "federation token" and return the matrix address.
++
++The "federation token" isn't the Matrix C<access_token> but a token that user
++can get by calling C</_matrix/client/v3/user/$USER_ID/openid/request_token>
++on its Matrix server.
++
++=head1 SEE ALSO
++
++L<Lemonldap::NG::Manager>, L<Lemonldap::NG::Portal>, L<Lemonldap::NG::Handler>
++
++=head1 AUTHORS
++
++=over
++
++=item LemonLDAP::NG team L<http://lemonldap-ng.org/team>
++
++=back
++
++=head1 BUG REPORT
++
++Use OW2 system to report bug or ask for features:
++L<https://gitlab.ow2.org/lemonldap-ng/lemonldap-ng/issues>
++
++=head1 DOWNLOAD
++
++Lemonldap::NG is available at
++L<https://lemonldap-ng.org/download>
++
++=head1 COPYRIGHT AND LICENSE
++
++See COPYING file for details.
++
++This library is free software; you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation; either version 2, or (at your option)
++any later version.
++
++This program is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with this program.  If not, see L<http://www.gnu.org/licenses/>.
++
++=cut
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm b/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm
+index bc2b8e867..9e51457c1 100644
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm
+@@ -47,6 +47,10 @@ our @pList = (
+     samlFederationFiles => '::Plugins::SamlFederation',
+     'or::oidcOPMetaDataOptions/*/oidcOPMetaDataOptionsRequirePkce' =>
+       '::Plugins::AuthOidcPkce',
++    'or::oidcRPMetaDataOptions/*/oidcRPMetaDataOptionsTokenXAuthorizedRP' =>
++      '::Plugins::OIDCInternalTokenExchange',
++    'or::oidcRPMetaDataOptions/*/oidcRPMetaDataOptionsTokenXAuthorizedMatrix'
++      => '::Plugins::MatrixTokenExchange',
+ );
+ 
+ ##@method list enabledPlugins
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Lib/OIDCTokenExchange.pm b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OIDCTokenExchange.pm
+new file mode 100644
+index 000000000..64761f0e9
+--- /dev/null
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OIDCTokenExchange.pm
+@@ -0,0 +1,330 @@
++package Lemonldap::NG::Portal::Lib::OIDCTokenExchange;
++
++use strict;
++use Lemonldap::NG::Portal::Main::Constants qw(
++  PE_SENDRESPONSE
++  PE_OK
++);
++use Mouse;
++
++extends 'Lemonldap::NG::Portal::Main::Plugin';
++
++our $VERSION = '2.20.0';
++
++# INTERFACE
++use constant hook => { oidcGotTokenExchange => 'tokenExchange' };
++
++has oidc => (
++    is      => 'ro',
++    lazy    => 1,
++    default => sub {
++        $_[0]
++          ->p->loadedModules->{'Lemonldap::NG::Portal::Issuer::OpenIDConnect'};
++    }
++);
++
++sub init { 1 }
++
++# MAIN METHOD
++#
++# Important note: only PE_OK and PE_RESPONSE are used here because:
++#  - oidcGotTokenExchange only accept PE_SENDRESPONSE has positive response
++#  - PE_OK permits to continue to check other plugins
++sub tokenExchange {
++    my ( $self, $req, $rp ) = @_;
++
++    unless ( $self->oidc ) {
++        $self->logger->error('Authentication is not OIDC, aborting');
++        return PE_OK;
++    }
++
++    $self->logger->debug("Matrix Refresh Token exchange for $rp");
++
++    # 1. Validate request
++    #
++    # Note that client_id and grant_type value are verified by
++    # ::/lib::OpenIDConnect
++
++    my $clientId     = $req->param('client_id');       # already validated
++    my $subjectToken = $req->param('subject_token');
++    unless ($subjectToken) {
++        $self->userLogger->error('Token exchange called without subject_token');
++        return PE_OK;
++    }
++
++    # Even if these fields are required in Oauth2, it seems that it is not
++    # required by Keycloak..
++
++    my @types;
++    foreach my $name (qw(subject_token_type requested_token_type)) {
++        my $val = $req->param($name);
++        if ($val) {
++            unless ($val =~ s/^urn:ietf:params:oauth:token-type://
++                and $val =~ /^(?:(?:refresh|access|id)_token|saml[12])$/ )
++            {
++                $self->logger->info(
++                    "Malformed $name: " . $req->param('subject_token_type') );
++                return PE_OK;
++            }
++        }
++        push @types, $val;
++    }
++
++    # 2. Check for audience and authorization
++    my $targetClientId = $req->param('audience');
++    my $target         = { audience => $req->param('audience'), };
++    if ( $target->{audience} ) {
++        if ( $target->{audience} eq $clientId ) {
++            $target->{rp} = $rp;
++        }
++        else {
++            my ($res) = grep {
++                $self->oidc->rpOptions->{$_}->{oidcRPMetaDataOptionsClientID}
++                  eq $targetClientId
++            } keys %{ $self->oidc->rpOptions };
++            $target->{rp} = $res;
++        }
++    }
++    else {
++        $target->{rp} = $rp;
++    }
++
++    unless ( $self->validateAudience( $req, $rp, $target, $types[1] ) ) {
++        $self->logger->debug( ref($self) . " refused to validate audience" );
++        return PE_OK;
++    }
++
++    # 3. Use subclass getUid() to get user ID
++    my $uid = $self->getUid( $req, $rp, $subjectToken, $types[0] );
++    return PE_OK unless $uid;
++
++    # 4. Create refresh_token
++
++    my $opts = { $self->oidc->_storeOpts() };
++
++    # 3.1. Create a new refresh_token if missing
++    $req->user($uid);
++    $req->steps( [
++            'getUser',        'setAuthSessionInfo',
++            'setSessionInfo', $self->p->groupsAndMacros,
++            'setLocalGroups'
++        ]
++    );
++    if ( my $error = $self->p->process($req) ) {
++        if ( $error == PE_OK ) {
++            $self->userLogger->warn(
++                    'Token exchange requested for an invalid user ('
++                  . $req->{user}
++                  . ")" );
++        }
++        $self->logger->error("Unable to find user $uid");
++        return PE_OK;
++    }
++
++    my $refreshToken = $self->oidc->newRefreshToken(
++        $rp,
++        {
++            %{ $req->sessionInfo },
++            scope        => $req->param('scope') || 'openid',
++            client_id    => $target->{audience},
++            _session_uid => $uid,
++            grant_type   => $req->param('grant_type'),
++        },
++    );
++    unless ($refreshToken) {
++        return PE_OK;
++    }
++
++    # 5. Use normal method to create new access_token from refresh_token
++    #
++    # TODO: remote may want a refresh_token
++
++    my $res = $self->oidc->_handleRefreshTokenGrant( $req, $target->{rp} || $rp,
++        $refreshToken->id, $targetClientId );
++
++    # Insert refresh_token in response
++    my $tmp = JSON::from_json( $res->[2]->[0] );
++    $tmp->{refresh_token} = $refreshToken->id;
++    $res->[2]->[0] = JSON::to_json($tmp);
++
++    $req->response($res);
++
++    return PE_SENDRESPONSE;
++}
++
++1;
++__END__
++
++=pod
++
++=encoding utf8
++
++=head1 NAME
++
++Lemonldap::NG::Portal::Lib::OIDCTokenExchange - Base class for building OpenID
++Connect token exchange systems.
++
++=head1 SYNOPSIS
++
++  use Mouse
++  extends 'Lemonldap::NG::Portal::Lib::OIDCTokenExchange';
++  
++  sub validateAudience {
++    my ( $self, $req, $rp, $target, $requestedTokenType ) = @_;
++    #
++    # verify and update if needed:
++    # * $target->{audience}
++    # * $target->{rp}
++    #
++    return 1;
++  }
++  
++  sub getUid {
++    my ( $self, $req, $rp, $subjectToken, $subjectTokenType ) = @_;
++    #
++    # verify subjectToken
++    #
++    return 1;
++  }
++
++=head1 DESCRIPTION
++
++When L<Lemonldap::NG|https://lemonldap-ng.org> detects a
++L<Oauth2 token exchange|https://datatracker.ietf.org/doc/html/rfc8693> request,
++it searches for a plugin able to respond. If no one returns a valid response,
++it rejects the requests.
++
++B<Lemonldap::NG::Portal::Lib::OIDCTokenExchange> permits one to build such
++plugin by just writing two methods. Of course you need then to load the module
++for example using L<Enabling custom plugin|https://lemonldap-ng.org/documentation/latest/plugincustom.html#enabling-your-plugin>.
++
++=head2 Methods to write
++
++=head3 validateAudience
++
++The goal of C<validateAudience()> is to validate the requested B<audience>.
++
++If a non-null value is returned, then the request is accepted and Lemonldap::NG
++will build new C<access_token>, C<id_token> and C<refresh_token> using the
++values included into C<$target> hash.
++
++If a null value is returned, Lemonldap::NG will try the next plugin.
++
++Parameters:
++
++=over
++
++=item * B<$req>, the L<Lemonldap::NG::Portal::Main::Request> object
++
++=item * B<$rp>, the internal LLNG name of the Relying Party which pushed the request
++
++=item * B<$target>, a hash value with 2 keys:
++
++=over
++
++=item * B<audience>, the requested audience
++
++=item * B<rp>: if B<Lemonldap::NG> found a known Relying Party which Client-ID
++matches with requested audience, its name is put here, else this value is
++undefined.
++
++=back
++
++This value can be modified inside C<validateAudience> and will be used to generate
++the new C<access_token>.
++
++=item * B<$requestedTokenType>, the type of the requested token. This value is always
++one of:
++
++=over
++
++=item * B<access_token>
++
++=item * B<refresh_token>
++
++=item * B<id_token>
++
++=item * B<saml1>
++
++=item * B<saml2>
++
++=item * I<undef>
++
++=back
++
++=back
++
++=head3 getUid
++
++C<getUid()> is a boolean method to validate the token given in the request.
++
++If a non-null value is returned, then the request is accepted. Else Lemonldap::NG
++will try the next plugin.
++
++Parameters:
++
++=over
++
++=item * B<$req>, the L<Lemonldap::NG::Portal::Main::Request> object
++
++=item * B<$rp>, the internal LLNG name of the Relying Party which pushed the request
++
++=item * B<$subjectToken>, the token given in the request
++
++=item * B<$subjectTokenType>, the type of the given token. This value is always
++one of:
++
++=over
++
++=item * B<access_token>
++
++=item * B<refresh_token>
++
++=item * B<id_token>
++
++=item * B<saml1>
++
++=item * B<saml2>
++
++=item * I<undef>
++
++=back
++
++=back
++
++=head1 AUTHORS
++
++=over
++
++=item * LemonLDAP::NG team L<http://lemonldap-ng.org/team>
++
++=back
++
++=head1 BUG REPORT
++
++Use OW2 system to report bug or ask for features:
++L<https://gitlab.ow2.org/lemonldap-ng/lemonldap-ng/issues>
++
++=head1 DOWNLOAD
++
++Lemonldap::NG is available at
++L<https://lemonldap-ng.org/download>
++
++=head1 COPYRIGHT AND LICENSE
++
++See COPYING file for details.
++
++This library is free software; you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation; either version 2, or (at your option)
++any later version.
++
++This program is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with this program.  If not, see L<http://www.gnu.org/licenses/>.
++
++=cut
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/MatrixTokenExchange.pm b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/MatrixTokenExchange.pm
+new file mode 100644
+index 000000000..cf2072cfe
+--- /dev/null
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/MatrixTokenExchange.pm
+@@ -0,0 +1,74 @@
++package Lemonldap::NG::Portal::Plugins::MatrixTokenExchange;
++
++use strict;
++use Mouse;
++
++extends 'Lemonldap::NG::Portal::Lib::OIDCTokenExchange';
++
++with 'Lemonldap::NG::Common::Matrix';
++
++sub validateAudience {
++    my ( $self, $req, $rp, $target, $requestedTokenType ) = @_;
++
++    if ( $requestedTokenType and $requestedTokenType ne 'access_token' ) {
++        $self->logger->debug("Requested token isn't declared as access_token");
++        return 0;
++    }
++
++    unless ( $target->{audience} ) {
++        $target->{rp} = $rp;
++        return 1;
++    }
++
++    unless ( $target->{rp} ) {
++        $self->logger->debug(
++            "Token exchange request for an unexistent RP $target->{audience}");
++        return 0;
++    }
++
++    return 1 if $target->{rp} eq $rp;
++
++    my $list = $self->oidc->rpOptions->{ $target->{rp} }
++      ->{oidcRPMetaDataOptionsTokenXAuthorizedMatrix};
++    my $subject_issuer = $req->param('subject_issuer');
++    unless ($subject_issuer) {
++        $self->logger->debug('Request without subject_issuer');
++        return 0;
++    }
++    unless ( $list and grep { $_ eq $subject_issuer } split /[,;\s]+/, $list ) {
++        $self->logger->debug(
++"Token exchange for an unauthorized Matrix server ($subject_issuer => $target->{rp})"
++        );
++        return 0;
++    }
++    return 1;
++}
++
++sub getUid {
++    my ( $self, $req, $rp, $subjectToken, $subjectTokenType ) = @_;
++
++    if ( $subjectTokenType and $subjectTokenType ne 'access_token' ) {
++        $self->logger->debug(
++            "Matrix given token isn't declared as access_token");
++        return 0;
++    }
++
++    my $subject_issuer = $req->param('subject_issuer');
++    $subject_issuer = $self->serverResolve($subject_issuer);
++
++    # 2. Validate Matrix token against given Matrix server
++    $self->logger->debug(
++        "Token exchange asked for Matrix token $subjectToken on $subject_issuer"
++    );
++
++    my ( $matrixSub, $uid, $domain ) =
++      $self->validateMatrixToken( $subject_issuer, $subjectToken );
++
++    unless ($matrixSub) {
++        $self->logger->debug("Matrix token rejected by $subject_issuer");
++        return 0;
++    }
++    return $uid;
++}
++
++1;
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/OIDCInternalTokenExchange.pm b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/OIDCInternalTokenExchange.pm
+new file mode 100644
+index 000000000..27641eb12
+--- /dev/null
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/OIDCInternalTokenExchange.pm
+@@ -0,0 +1,67 @@
++package Lemonldap::NG::Portal::Plugins::OIDCInternalTokenExchange;
++
++use strict;
++use Mouse;
++
++extends 'Lemonldap::NG::Portal::Lib::OIDCTokenExchange';
++
++our $VERSION = '2.20.0';
++
++sub validateAudience {
++    my ( $self, $req, $rp, $target, $requestedTokenType ) = @_;
++
++    if ( $requestedTokenType and $requestedTokenType ne 'access_token' ) {
++        $self->logger->debug("Requested token isn't declared as access_token");
++        return 0;
++    }
++
++    unless ( $target->{audience} ) {
++        $target->{rp} = $rp;
++        return 1;
++    }
++
++    unless ( $target->{rp} ) {
++        $self->logger->debug(
++            "Token exchange request for an unexistent RP $target->{audience}");
++        return 0;
++    }
++
++    return 1 if $target->{rp} eq $rp;
++
++    my $list = $self->oidc->rpOptions->{ $target->{rp} }
++      ->{oidcRPMetaDataOptionsTokenXAuthorizedRP};
++    unless ( $list and grep { $_ eq $rp } split /[,;\s]+/, $list ) {
++        $self->logger->debug(
++            "Token exchange for an unauthorized RP ($rp => $target->{rp})");
++        return 0;
++    }
++    return 1;
++}
++
++sub getUid {
++    my ( $self, $req, $rp, $subjectToken, $subjectTokenType ) = @_;
++
++    if ( $subjectTokenType and $subjectTokenType ne 'access_token' ) {
++        $self->logger->error("Given token isn't declared as access_token");
++        return 0;
++    }
++
++    my $accessTokenSession = $self->oidc->getAccessToken($subjectToken);
++    unless ($accessTokenSession) {
++        $self->logger->debug("Unable to validate subject_token $subjectToken");
++        return 0;
++    }
++
++    unless ( $rp eq $accessTokenSession->data->{rp} ) {
++        $self->logger->debug( "subject_token rp isn't $rp ("
++              . $accessTokenSession->data->{rp}
++              . ')s' );
++        return 0;
++    }
++
++    my $id      = $accessTokenSession->data->{user_session_id};
++    my $session = $self->p->getApacheSession($id);
++    return $session->data->{ $self->conf->{whatToTrace} };
++}
++
++1;

@@ -1,5 +1,8 @@
 # Changes
 
+* 2024-05-14 (v2.19.0-3):
+  * Add introspection patch to allow authenticated public client
+  * Add OIDC token exchange (internal and Matrix), not enabled by default
 * 2024-05-09: Update lemonldap-ng-pg to support external DB init (ducnm0711) (v2.19.0-2)
 * 2024-05-09: More logs
 * 2024-05-04: Update to 2.19.0 (v2.19.0-1), use "Overlay" configuration backend

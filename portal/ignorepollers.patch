@@ -90,7 +90,7 @@
 +        $self->lastCall->{$ip} = {};
 +    }
 +    my $url = $self->_fingerprint($req);
-+    if ( $url ne $self->lastCall->{$ip}->{url} ) {
++    if ( $url and $self->lastCall->{$ip}->{url} and $url ne $self->lastCall->{$ip}->{url} ) {
 +        $self->lastCall->{$ip}->{url} = $url;
 +        $self->lastCall->{$ip}->{nb}  = 1;
 +    }
