@@ -35,6 +35,7 @@ LemonLDAP::NG.
 * `CROWDSEC_POLICY` = `reject` _(possible values: warn, reject)_
 * `CROWDSEC_KEY` = _(required, given by `cscli bouncers add mylemon`)_
 * `PORTAL` = `http://auth.example.com/` _(full URL needed here)_
+* `LISTEN` = _(set `:PORTNUMBER` here if you want to access directly to FastCGI server)_
 * `LOGLEVEL` = `info` _(possible values: debug, info, notice, warn, error)_
 * `LOGGER` = `syslog` _(possible values: stderr, syslog)_
 * `USERLOGGER` = `syslog` _(possible values: stderr, syslog)_

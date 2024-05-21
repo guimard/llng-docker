@@ -30,7 +30,11 @@ This image is then scalable _(see docker-compose example)_:
 cron tasks only on one portal: Set environment variable `PORTAL_CRON` to `no`
 in all portal containers except one.
 
-See [yadd/lemonldap-ng-base](https://github.com/guimard/llng-docker/blob/master/base/README.md#readme)
+* `NPROC`: the minimal number of FastCGI server to start _(default: 7)_
+* `ENGINE`: the FastCGI server engine. _(default: [FCGI](https://metacpan.org/pod/FCGI))_.
+  You can try [FCGI::Engine::ProcManager](https://metacpan.org/pod/FCGI::Engine::ProcManager).
+
+See also [yadd/lemonldap-ng-base](https://github.com/guimard/llng-docker/blob/master/base/README.md#readme)
 
 ## Docker-compose example
 

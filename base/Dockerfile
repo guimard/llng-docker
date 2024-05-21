@@ -43,6 +43,7 @@ ENV SSODOMAIN=example.com \
     USERLOGGER=stderr \
     REDIS_SERVER="" \
     REDIS_INDEXES="_whatToTrace _session_kind _utime ipAddr _httpSessionType _user" \
+    LISTEN= \
     PG_SERVER="" \
     PG_DATABASE="lemonldapng" \
     PG_USER=lemonldap \

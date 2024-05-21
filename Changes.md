@@ -1,5 +1,6 @@
 # Changes
 
+* 2024-05-21: add libfcgi-engine-perl (v2.19.0-4)
 * 2024-05-14 (v2.19.0-3):
   * Add introspection patch to allow authenticated public client
   * Add OIDC token exchange (internal and Matrix), not enabled by default

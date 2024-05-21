@@ -4,7 +4,9 @@ LABEL maintainer="Yadd yadd@debian.org>" \
       name="yadd/lemonldap-ng-portal" \
       version="v1.0"
 
-ENV SERVERNAME=
+ENV SERVERNAME= \
+    NPROC= \
+    ENGINE=FCGI
 
 RUN echo "# Install nginx and portal libs" && \
     apt -y update && \
@@ -24,7 +26,7 @@ RUN echo "# Install nginx and portal libs" && \
         libio-socket-timeout-perl libunicode-string-perl liblasso-perl \
         libio-string-perl libemail-sender-perl libregexp-common-perl \
 	libcrypt-jwt-perl libdigest-hmac-perl libdata-password-zxcvbn-perl \
-	libhttp-browserdetect-perl libnet-dns-perl \
+	libhttp-browserdetect-perl libnet-dns-perl libfcgi-engine-perl \
 	&& \
     apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/*
 
@@ -32,7 +34,7 @@ COPY *.patch /
 
 RUN for p in appgrid.patch jwt-type.patch app-scope.patch ignorepollers.patch \
     fixedLogout.patch more-logs.patch introspec-for-public-clients.patch \
-    token-exchange.patch redirect-ajax.patch \
+    token-exchange.patch redirect-ajax.patch better-listen2.patch \
     ; do echo patch $p && patch -p1 < $p; done && \
     rm -f *.patch && \
     echo "# Install nginx configuration files" && \
