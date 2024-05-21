@@ -27,6 +27,7 @@ RUN echo "# Install nginx and portal libs" && \
         libio-string-perl libemail-sender-perl libregexp-common-perl \
 	libcrypt-jwt-perl libdigest-hmac-perl libdata-password-zxcvbn-perl \
 	libhttp-browserdetect-perl libnet-dns-perl libfcgi-engine-perl \
+	libfcgi-procmanager-maxrequests-perl \
 	&& \
     apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/*
 
