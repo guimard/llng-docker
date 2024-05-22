@@ -19,7 +19,7 @@ $ docker build -t my/test --build-arg=BRANCH=oidc-front-channel-logout .
 ## Copyright and license
 
 Copyright:
- * 2018-2023, Xavier Guimard <yadd@debian.org>
- * 2023, LINAGORA <https://linagora.com>
+ * 2018-2024, Xavier Guimard <yadd@debian.org>
+ * 2023-2024, LINAGORA <https://linagora.com>
 
 License: [GNU General Public License v2.0](https://github.com/guimard/llng-docker/blob/master/LICENSE)

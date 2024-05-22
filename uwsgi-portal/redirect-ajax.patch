@@ -1,0 +1,18 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm     2024-05-14 06:25:32.854365171 +0400
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm        2024-05-15 17:03:16.169166741 +0400
+@@ -392,6 +392,14 @@
+                 $res->{id_http} = $req->sessionInfo->{_httpSession}
+                   if $req->sessionInfo->{_httpSession};
+             }
++            if ( $err eq PE_REDIRECT and $req->{urldc} ) {
++                $res->{location} = URI->new( $req->{urldc} )->as_string;
++                return [
++                    302,
++                    [ Location => $res->{location}, $req->spliceHdrs ],
++                    [ JSON::to_json($res) ]
++                ];
++            }
+             return $self->sendJSONresponse( $req, $res );
+         }
+     }
+

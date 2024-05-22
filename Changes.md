@@ -1,5 +1,6 @@
 # Changes
 
+* 2024-05-22: add yadd/lemonldap-ng-portal-hiperf (v2.19.0-5)
 * 2024-05-21: add libfcgi-engine-perl, libfcgi-procmanager-maxrequests-perl, FCGI::ProcManager::Dynamic (v2.19.0-4)
 * 2024-05-14 (v2.19.0-3):
   * Add introspection patch to allow authenticated public client

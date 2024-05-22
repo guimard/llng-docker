@@ -6,6 +6,7 @@ PostgreSQL server to share configuration. See docker-compose example.
 
 List:
  - [yadd/lemonldap-ng-portal](./portal): the portal
+   * [yadd/lemonldap-ng-portal-hiperf](./uwsgi-portal): portal with better performances
  - [yadd/lemonldap-ng-manager](./manager): the manager
  - [yadd/lemonldap-ng-full](./full): the portal and the manager in the same image
  - [yadd/lemonldap-ng-ssoaas-fastcgi-server](./ssoaas-fastcgi-server): a FastCGI
@@ -204,7 +205,7 @@ services:
 ## Copyright and license
 
 Copyright:
- * 2018-2023, Xavier Guimard <yadd@debian.org>
- * 2023, LINAGORA <https://linagora.com>
+ * 2018-2024, Xavier Guimard <yadd@debian.org>
+ * 2023-2024, LINAGORA <https://linagora.com>
 
 License: [GNU General Public License v2.0](./LICENSE)

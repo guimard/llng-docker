@@ -2,8 +2,8 @@
 
 set -e
 
-LIST=${LIST:-pg base portal manager full ssoaas-fastcgi-server cron}
-#LIST=${LIST:-pg base portal manager full ssoaas-fastcgi-server cron dev}
+LIST=${LIST:-pg base portal uwsgi-portal manager full ssoaas-fastcgi-server cron}
+#LIST=${LIST:-pg base portal uwsgi-portal manager full ssoaas-fastcgi-server cron dev}
 
 for i in $LIST; do
 	(

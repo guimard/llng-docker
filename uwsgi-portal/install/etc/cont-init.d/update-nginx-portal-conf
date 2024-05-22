@@ -1,0 +1,16 @@
+#!/command/with-contenv sh
+
+PORTAL=${PORTAL:-auth.example.com}
+PORTALHOST=`portalHost "$PORTAL"`
+SSODOMAIN=${SSODOMAIN:-example.com}
+SERVERNAME=${SERVERNAME:-${PORTALHOST}}
+SERVERNAME=${SERVERNAME%/*}
+export SERVERNAME
+
+perl -i -pe 's#__FASTCGISOCKDIR__#/run/llng-fastcgi-server#g;
+s#__PORT__#80#g;
+s#__SERVERNAME__#$ENV{SERVERNAME}#g;
+s#__DNSDOMAIN__#$ENV{SSODOMAIN}#g;
+s#__PORTALSITEDIR__#/usr/share/lemonldap-ng/portal/htdocs/#g;
+s#__PORTALSTATICDIR__#/usr/share/lemonldap-ng/portal/htdocs/static/#g;
+' /etc/lemonldap-ng/portal-nginx.conf

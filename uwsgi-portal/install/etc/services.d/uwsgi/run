@@ -1,0 +1,5 @@
+#!/command/with-contenv sh
+
+set -e
+
+/usr/bin/uwsgi --yaml /etc/uwsgi/apps-available/llng-server.yaml ${UWSGI_ARGS}
