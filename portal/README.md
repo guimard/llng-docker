@@ -13,6 +13,9 @@ This image is then scalable _(see docker-compose example)_:
 * `2.x.x`: versioned lemonldap-ng\* packages from Debian backports
 * `2.x.x-no-s6`: the same without [S6-overlay](https://github.com/just-containers/s6-overlay)
 
+You can also use the same tags with suffix "-hiperf" to use the portal with
+a better _(but more resource intensive)_ engine.
+
 ## Features _(inherited from [yadd/lemonldap-ng-base](https://github.com/guimard/llng-docker/blob/master/base/README.md#readme))_
 
 * Update current configuration using given variables :

@@ -527,7 +527,7 @@ jobs:
       - name: Build and push Docker image for portal uWSGI
         uses: docker/build-push-action@v4
         with:
-          context: ./uswgi-portal
+          context: ./uwsgi-portal
           build-args: |
             "BASE=yadd/lemonldap-ng-base:latest-no-s6"
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
