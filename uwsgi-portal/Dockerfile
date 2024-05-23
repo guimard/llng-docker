@@ -5,7 +5,7 @@ LABEL maintainer="Yadd yadd@debian.org>" \
       version="v1.0"
 
 ENV SERVERNAME= \
-    UWSGI_ARGS="--log-date --log-slow 1000 -b 65535 -l 1024 --disable-logging --perl-no-die-catch"
+    UWSGI_ARGS="--log-date --log-slow 1000 --log-5xx --disable-logging --master --enable-threads --vacuum --single-interpreter --perl-no-die-catch -b 65535 -l 1024"
 
 RUN echo "# Install nginx and portal libs" && \
     apt -y update && \
