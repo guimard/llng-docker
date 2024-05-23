@@ -8,7 +8,7 @@ except that variables related to [Plack](https://metacpan.org/pod/Plack) engine
 are replaced by:
 
  * `UWSGI_ARGS`: the arguments to give to **uWSGI** daemon. Default:
-   `--log-date --log-slow 1000 --log-5xx --disable-logging --master --enable-threads --vacuum --single-interpreter --perl-no-die-catch -b 65535 -l 1024`
+   `--log-date --log-slow 1000 --log-5xx --disable-logging --master --enable-threads --vacuum --single-interpreter --perl-no-die-catch -b 65535 -l 1024 --processes=100 --cheaper=8`
 
 ## Repository and bug reports
 
