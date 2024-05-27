@@ -37,7 +37,7 @@
 +sub run {
 +    my ( $self, $req ) = @_;
 +    if ( $self->conf->{fixedLogoutRedirection} ) {
-+        $req->logger->debug("Force logout redirection");
++        $self->logger->debug("Force logout redirection");
 +        $req->mustRedirect(1);
 +        $req->urldc( $self->conf->{fixedLogoutRedirection} );
 +    }
