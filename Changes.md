@@ -1,5 +1,6 @@
 # Changes
 
+* 2024-05-29: add more debug in Back-Channel-Logout
 * 2024-05-27: fix fixedLogout.patch (v2.19.0-6)
 * 2024-05-22: add yadd/lemonldap-ng-portal-hiperf (v2.19.0-5)
 * 2024-05-21: add libfcgi-engine-perl, libfcgi-procmanager-maxrequests-perl, FCGI::ProcManager::Dynamic (v2.19.0-4)
