@@ -31,7 +31,8 @@ a better _(but more resource intensive)_ engine.
 
 > When running multiple portals using the same database, you should keep portal
 cron tasks only on one portal: Set environment variable `PORTAL_CRON` to `no`
-in all portal containers except one.
+in all portal containers except one _(or use one of yadd/lemonldap-ng-cron or
+yadd/lemonldap-ng-cron-task)_.
 
 * `NPROC`: the minimal number of FastCGI server to start _(default: 7)_
 * `ENGINE`: the FastCGI server engine. _(default: [FCGI](https://metacpan.org/pod/FCGI))_.

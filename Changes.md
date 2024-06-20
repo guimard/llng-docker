@@ -1,5 +1,7 @@
 # Changes
 
+* 2024-06-20: add yadd/lemonldap-ng-cron-task
+* 2024-06-19: custom cron string
 * 2024-05-29: add more debug in Back-Channel-Logout
 * 2024-05-27: fix fixedLogout.patch (v2.19.0-6)
 * 2024-05-22: add yadd/lemonldap-ng-portal-hiperf (v2.19.0-5)
