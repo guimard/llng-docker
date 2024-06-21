@@ -35,6 +35,7 @@ LemonLDAP::NG.
 * `CROWDSEC_POLICY` = `reject` _(possible values: warn, reject)_
 * `CROWDSEC_KEY` = _(required, given by `cscli bouncers add mylemon`)_
 * `PORTAL` = `http://auth.example.com/` _(full URL needed here)_
+* `LISTEN` = _(set `:PORTNUMBER` here if you want to access directly to FastCGI server)_
 * `LOGLEVEL` = `info` _(possible values: debug, info, notice, warn, error)_
 * `LOGGER` = `syslog` _(possible values: stderr, syslog)_
 * `USERLOGGER` = `syslog` _(possible values: stderr, syslog)_
@@ -84,12 +85,12 @@ DBI_PASSWORD=pgpassword
 ### Override configuration parameters
 
 You can easily override any Lemonldap::NG configuration parameter using the
-overlay system _(starting from 2.19.0-1 tag)_. Simply push files into `/over`
-directory:
+[overlay system](https://lemonldap-ng.org/documentation/latest/overlayconfbackend.html)
+_(starting from 2.19.0-1 tag)_. Simply push files into `/over` directory:
   * filename is the configuration parameter name
   * content is the raw content or a JSON content
 
-You can easily override any Lemonldap::NG configuration parameter using a
+You can also easily override any Lemonldap::NG configuration parameter using a
 environment variable set to `OVERRIDE_<parameter name>`. For example, to set
 `checkXSS`to 0 and `exportedVars` to `{"Name":"cn"}` in a docker-compose.yml
 file, use:

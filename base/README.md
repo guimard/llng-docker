@@ -85,12 +85,12 @@ DBI_PASSWORD=pgpassword
 ### Override configuration parameters
 
 You can easily override any Lemonldap::NG configuration parameter using the
-overlay system _(starting from 2.19.0-1 tag)_. Simply push files into `/over`
-directory:
+[overlay system](https://lemonldap-ng.org/documentation/latest/overlayconfbackend.html)
+_(starting from 2.19.0-1 tag)_. Simply push files into `/over` directory:
   * filename is the configuration parameter name
   * content is the raw content or a JSON content
 
-You can easily override any Lemonldap::NG configuration parameter using a
+You can also easily override any Lemonldap::NG configuration parameter using a
 environment variable set to `OVERRIDE_<parameter name>`. For example, to set
 `checkXSS`to 0 and `exportedVars` to `{"Name":"cn"}` in a docker-compose.yml
 file, use:
