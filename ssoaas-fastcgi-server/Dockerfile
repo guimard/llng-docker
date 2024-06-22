@@ -5,12 +5,12 @@ LABEL maintainer="Yadd yadd@debian.org>" \
       version="v1.0"
 
 RUN echo "# Install libs" && \
-    apt -y update && \
-    apt -y dist-upgrade && \
-    apt install -y --no-install-recommends \
+    apt-get -y update && \
+    apt-get -y dist-upgrade && \
+    apt-get install -y --no-install-recommends \
         lemonldap-ng-fastcgi-server${LLNGDIST} \
         libfcgi-engine-perl && \
-    apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/*
+    apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 CMD ["/usr/sbin/llng-fastcgi-server", "--foreground", "-u", "www-data", "-g", "www-data", "-s", "/tmp/llng-fastcgi.sock", "--listen", ":9001", "-e", "FCGI::Engine"]
 

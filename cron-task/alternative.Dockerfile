@@ -23,8 +23,8 @@ LABEL maintainer="Yadd yadd@debian.org>" \
 WORKDIR /mnt
 
 #RUN echo "deb-src http://deb.debian.org/debian" ${DEBIAN_VERSION}"-backports main" > /etc/apt/sources.list.d/bsrc.list && \
-RUN apt update && \
-    apt install -y xz-utils \
+RUN apt-get update && \
+    apt-get install -y xz-utils \
     libapache-session-browseable-perl \
     libdbi-perl libdbd-pg-perl \
     libredis-fast-perl libredis-perl \
@@ -50,6 +50,6 @@ RUN apt update && \
     dpkg -x liblemonldap-ng-common-perl*.deb common && \
     mv common/usr/share/perl5/Lemonldap /usr/share/perl5/ && \
     rm -rf * /etc/services.d/cron && \
-    apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/*
+    apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 CMD ["cron", "-f"]

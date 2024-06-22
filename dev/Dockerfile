@@ -4,14 +4,14 @@ FROM debian:${DEBIAN_VERSION}-slim
 
 ARG BRANCH=v2.0
 
-RUN apt -y update && \
-    apt -y dist-upgrade && \
-    apt --no-install-recommends install -y git debhelper dpkg-dev libio-string-perl libjson-perl \
+RUN apt-get -y update && \
+    apt-get -y dist-upgrade && \
+    apt-get --no-install-recommends install -y git debhelper dpkg-dev libio-string-perl libjson-perl \
         liblwp-protocol-psgi-perl libmouse-perl libregexp-assemble-perl \
         libregexp-common-perl python3-sphinx \
         python3-sphinx-bootstrap-theme \
         uglifyjs yui-compressor && \
-    apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/*
+    apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /mnt
 
@@ -32,8 +32,8 @@ LABEL maintainer="Yadd yadd@debian.org>" \
 
 COPY --from=0 /mnt/*.deb /tmp/
 
-RUN apt -y update && \
-    apt -y dist-upgrade && \
+RUN apt-get -y update && \
+    apt-get -y dist-upgrade && \
     dpkg --force-overwrite --force-confold -i /tmp/*.deb
 
 RUN echo "Install doc" && \
@@ -43,7 +43,7 @@ RUN echo "Install doc" && \
     mv /tmp/dpkg.cfg.d /etc/dpkg/
 
 RUN rm -rf /mnt/*.deb && \
-    apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/*
+    apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /var/lib/lemonldap-ng/cache && chown www-data:www-data /var/lib/lemonldap-ng/cache
 

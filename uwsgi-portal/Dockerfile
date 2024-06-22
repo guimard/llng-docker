@@ -8,11 +8,11 @@ ENV SERVERNAME= \
     UWSGI_ARGS="--log-date --log-slow 1000 --log-5xx --disable-logging --master --enable-threads --vacuum --single-interpreter --perl-no-die-catch -b 65535 -l 1024 --processes=100 --cheaper=8 --auto-procname --procname-prefix-spaced=llng"
 
 RUN echo "# Install nginx and portal libs" && \
-    apt -y update && \
-    apt -y dist-upgrade && \
-    apt -y --no-install-recommends install nginx \
-        lemonldap-ng-uwsgi-app${LLNGDIST} \
-        liblemonldap-ng-portal-perl${LLNGDIST} \
+    apt-get -y update && \
+    apt-get -y dist-upgrade && \
+    apt-get -y --no-install-recommends install nginx \
+        lemonldap-ng-uwsgi-app"${LLNGDIST}" \
+        liblemonldap-ng-portal-perl"${LLNGDIST}" \
         gsfonts patch uwsgi uwsgi-plugin-psgi \
         libcrypt-u2f-server-perl libgeoip2-perl \
         libglib-perl libgssapi-perl libhttp-browserdetect-perl \
@@ -27,7 +27,7 @@ RUN echo "# Install nginx and portal libs" && \
 	libcrypt-jwt-perl libdigest-hmac-perl libdata-password-zxcvbn-perl \
 	libhttp-browserdetect-perl libnet-dns-perl \
 	&& \
-    apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/*
+    apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY *.patch /
 
@@ -37,8 +37,8 @@ RUN for p in appgrid.patch jwt-type.patch app-scope.patch ignorepollers.patch \
     ; do echo patch $p && patch -p1 < $p; done && \
     rm -f *.patch && \
     echo "# Install nginx configuration files" && \
-    cd /etc/nginx/sites-enabled/ && \
-    ln -s ../../lemonldap-ng/portal-nginx.conf && \
+    rm -f /etc/nginx/sites-enabled/* && \
+    ln -s ../../lemonldap-ng/portal-nginx.conf /etc/nginx/sites-enabled/ && \
     (echo ""; echo "daemon off;") >> /etc/nginx/nginx.conf && \
     perl -i -pe 's#access_log .*;#access_log /dev/stdout;#; s#error_log .*;#error_log /dev/stdout info;#' /etc/nginx/nginx.conf
 

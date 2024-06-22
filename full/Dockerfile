@@ -7,15 +7,15 @@ LABEL maintainer="Yadd yadd@debian.org>" \
 ENV PROTECTION=manager
 
 RUN echo "# Install nginx and portal and manager libs" && \
-    apt -y update && \
-    apt -y dist-upgrade && \
-    apt -y --no-install-recommends install nginx \
+    apt-get -y update && \
+    apt-get -y dist-upgrade && \
+    apt-get -y --no-install-recommends install nginx \
           liblemonldap-ng-manager-perl${LLNGDIST} && \
     mv /etc/dpkg/dpkg.cfg.d /tmp/ && \
-    apt -y --no-install-recommends install \
+    apt-get -y --no-install-recommends install \
       lemonldap-ng-doc${LLNGDIST} && \
     mv /tmp/dpkg.cfg.d /etc/dpkg/ && \
-    apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/*
+    apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY *.patch /
 
@@ -44,8 +44,7 @@ RUN \
     ln -s conftree.js /usr/share/lemonldap-ng/manager/htdocs/static/js/conftree.min.js
 
 RUN echo "# Install nginx configuration files" && \
-    cd /etc/nginx/sites-enabled/ && \
-    ln -s ../../lemonldap-ng/manager-nginx.conf
+    ln -s ../../lemonldap-ng/manager-nginx.conf /etc/nginx/sites-enabled/z_manager-nginx.conf
 
 COPY install /
 
