@@ -6,7 +6,7 @@ LABEL maintainer="Yadd yadd@debian.org>" \
 
 RUN echo "# Install libs" && \
     apt-get -y update && \
-    apt-get -y dist-upgrade && \
+    apt-get -y upgrade && \
     apt-get install -y --no-install-recommends \
         lemonldap-ng-fastcgi-server${LLNGDIST} \
         libfcgi-engine-perl && \

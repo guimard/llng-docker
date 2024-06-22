@@ -5,7 +5,7 @@ FROM debian:${DEBIAN_VERSION}-slim
 ARG BRANCH=v2.0
 
 RUN apt-get -y update && \
-    apt-get -y dist-upgrade && \
+    apt-get -y upgrade && \
     apt-get --no-install-recommends install -y git debhelper dpkg-dev libio-string-perl libjson-perl \
         liblwp-protocol-psgi-perl libmouse-perl libregexp-assemble-perl \
         libregexp-common-perl python3-sphinx \
@@ -33,7 +33,7 @@ LABEL maintainer="Yadd yadd@debian.org>" \
 COPY --from=0 /mnt/*.deb /tmp/
 
 RUN apt-get -y update && \
-    apt-get -y dist-upgrade && \
+    apt-get -y upgrade && \
     dpkg --force-overwrite --force-confold -i /tmp/*.deb
 
 RUN echo "Install doc" && \

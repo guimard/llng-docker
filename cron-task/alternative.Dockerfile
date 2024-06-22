@@ -6,7 +6,7 @@ ENV DEBIAN_VERSION=bookworm
 
 RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
     apt-get -y update && \
-    apt-get -y dist-upgrade && \
+    apt-get -y upgrade && \
     echo "deb http://deb.debian.org/debian" ${DEBIAN_VERSION}"-backports main" > /etc/apt/sources.list.d/backports.list && \
     apt-get -y update
 

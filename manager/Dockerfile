@@ -8,7 +8,7 @@ ENV PROTECTION=manager
 
 RUN echo "# Install nginx and manager libs" && \
     apt-get -y update && \
-    apt-get -y dist-upgrade && \
+    apt-get -y upgrade && \
     apt-get -y --no-install-recommends install nginx \
       lemonldap-ng-fastcgi-server${LLNGDIST} \
       liblemonldap-ng-manager-perl${LLNGDIST} \

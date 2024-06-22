@@ -8,7 +8,7 @@ ENV PROTECTION=manager
 
 RUN echo "# Install nginx and portal and manager libs" && \
     apt-get -y update && \
-    apt-get -y dist-upgrade && \
+    apt-get -y upgrade && \
     apt-get -y --no-install-recommends install nginx \
           liblemonldap-ng-manager-perl${LLNGDIST} && \
     mv /etc/dpkg/dpkg.cfg.d /tmp/ && \
