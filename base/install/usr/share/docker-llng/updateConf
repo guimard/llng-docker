@@ -60,7 +60,10 @@ sub follow {
     my $offset = '';
     while ( @keys > 1 ) {
         my $key = shift @keys;
-        die "Unable to find $offset$key" unless exists $conf->{$key};
+        unless (exists $conf->{$key}) {
+            warn "Unable to find $offset$key, creating";
+            $conf->{$key} = {};
+        }
         $offset .= "$key/";
         $conf = $conf->{$key};
     }
