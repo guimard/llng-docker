@@ -37,6 +37,7 @@ ENV SSODOMAIN=example.com \
     CROWDSEC_SERVER= \
     CROWDSEC_POLICY=reject \
     CROWDSEC_KEY= \
+    CROWDSEC_IGNORE_FAILURES= \
     PORTAL=http://auth.example.com/ \
     LOGLEVEL=info \
     LOGGER=stderr \

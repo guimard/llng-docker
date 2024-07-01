@@ -4,15 +4,15 @@ INI=/etc/lemonldap-ng/lemonldap-ng.ini
 
 # Use overlay for config
 if grep -E '^type *= *Overlay$' $INI 2>&1; then
-	echo "Overlay is already in use, skipping"
+    echo "Overlay is already in use, skipping"
 else
-	perl -i -pe 's/^type\s*=\s*(\w+)/type = Overlay\noverlayRealtype = $1\noverlayDirectory = \/over\n/' $INI
+    perl -i -pe 's/^type\s*=\s*(\w+)/type = Overlay\noverlayRealtype = $1\noverlayDirectory = \/over\n/' $INI
 fi
 
 # Install Lemon commands in usr/bin
 for i in `find /usr/share/lemonldap-ng/bin -type f -perm -g=x`; do
-	NAME=`basename $i`
-	ln -s $i /usr/bin/$NAME
+    NAME=`basename $i`
+    ln -s $i /usr/bin/$NAME
 done
 
 # Fix logLevel
@@ -126,6 +126,10 @@ if test "$CROWDSEC_SERVER" != ""; then
     fi
     /usr/share/docker-llng/updateConf set crowdsecAction "$POLICY"
     /usr/share/docker-llng/updateConf set crowdsecKey "$CROWDSEC_KEY"
+    if test "$CROWDSEC_IGNORE_FAILURES" != "1"; then
+        CROWDSEC_IGNORE_FAILURES=0
+    fi
+    /usr/share/docker-llng/updateConf set crowdsecIgnoreFailures "$CROWDSEC_IGNORE_FAILURES"
 fi
 
 # If Redis server is given, let's use it for sessions

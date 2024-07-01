@@ -34,6 +34,7 @@ LemonLDAP::NG.
 * `CROWDSEC_SERVER` = _(full base url, example: http://myserver:8080)_
 * `CROWDSEC_POLICY` = `reject` _(possible values: warn, reject)_
 * `CROWDSEC_KEY` = _(required, given by `cscli bouncers add mylemon`)_
+* `CROWDSEC_IGNORE_FAILURES` = _(possible values: <empty> 1)_
 * `PORTAL` = `http://auth.example.com/` _(full URL needed here)_
 * `LISTEN` = _(set `:PORTNUMBER` here if you want to access directly to FastCGI server)_
 * `LOGLEVEL` = `info` _(possible values: debug, info, notice, warn, error)_

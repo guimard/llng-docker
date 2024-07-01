@@ -1,5 +1,6 @@
 # Changes
 
+* 2024-07-01: add patch to ignore crowdsec errors
 * 2024-06-27: don't override other globalStorageOptions keys
 * 2024-06-22: drop default Nginx website
 * 2024-06-20: add yadd/lemonldap-ng-cron-task (v2.19.0-8)
