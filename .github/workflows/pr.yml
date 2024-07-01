@@ -1,0 +1,22 @@
+name: Build and Publish Docker Images
+
+env:
+  VERSION: 2.19.0
+  PGVERSION: 15
+  DEBIANRELEASE: bookworm
+  DOCKERREVISION: 9
+
+on:
+  push:
+    branches-ignore: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: build_and_test
+        run: ./build-all
+        env:
+          VERSION: ${{ env.VERSION }}-${{ env.DOCKERREVISION }}
