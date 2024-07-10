@@ -21,8 +21,8 @@
      }
      return 0;
  
---- a/lemonldap-ng-common/scripts/lemonldap-ng-sessions
-+++ b/lemonldap-ng-common/scripts/lemonldap-ng-sessions
+--- a/usr/share/lemonldap-ng/bin/lemonldap-ng-sessions
++++ b/usr/share/lemonldap-ng/bin/lemonldap-ng-sessions
 @@ -30,11 +30,13 @@ GetOptions(
      'id-only|i'     => \$opts->{idonly},
      'user|u=s'      => \$opt_user,
