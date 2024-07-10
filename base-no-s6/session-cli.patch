@@ -1,0 +1,80 @@
+--- a/usr/share/perl5/Lemonldap/NG/Common/CliSessions.pm
++++ b/usr/share/perl5/Lemonldap/NG/Common/CliSessions.pm
+@@ -100,11 +100,17 @@ sub search {
+     my ($self) = shift;
+     my $res    = $self->_search();
+     my $o      = $self->stdout;
+-    if ( $self->opts->{idonly} ) {
+-        print $o map { $res->{$_}->{_session_id} . "\n" } keys %{$res};
++    if ( $self->opts->{count} ) {
++        my @tmp = keys %$res;
++        print $o scalar(@tmp) . "\n";
+     }
+     else {
+-        print $o $self->_to_json( [ values %{$res} ] );
++        if ( $self->opts->{idonly} ) {
++            print $o map { $res->{$_}->{_session_id} . "\n" } keys %{$res};
++        }
++        else {
++            print $o $self->_to_json( [ values %{$res} ] );
++        }
+     }
+     return 0;
+ 
+--- a/lemonldap-ng-common/scripts/lemonldap-ng-sessions
++++ b/lemonldap-ng-common/scripts/lemonldap-ng-sessions
+@@ -30,11 +30,13 @@ GetOptions(
+     'id-only|i'     => \$opts->{idonly},
+     'user|u=s'      => \$opt_user,
+     'group|g=s'     => \$opt_group,
++    'count'         => \$opts->{count},
+ ) or pod2usage( -exitcode => 1, -verbose => 0 );
+ 
+ pod2usage( -exitcode => 0, -verbose => 2 ) if $help;
+ 
+ eval {
++    no warnings;
+     POSIX::setgid( scalar( getgrnam($opt_group) ) );
+     POSIX::setuid( scalar( getpwnam($opt_user) ) );
+ };
+@@ -45,6 +47,11 @@ unless ($action) {
+     pod2usage( -exitcode => 1, -verbose => 0 );
+ }
+ 
++if ( $action eq 'count' ) {
++    $action = 'search';
++    $opts->{count} = 1;
++}
++
+ if ( $action eq "get" ) {
+     unless ( @ARGV >= 1 ) {
+         pod2usage(
+@@ -126,6 +133,8 @@ B<Commands>:
+ 
+ =item B<L</search>>: search for sessions
+ 
++=item B<count>: alias for B<search --count>
++
+ =item B<L</delete>>: delete existing sessions
+ 
+ =item B<L</setKey>>: add/change key in existing session
+@@ -161,6 +170,9 @@ B<Options>:
+ =item B<--hash>: When "hashed session storage" is in use, indicates that the
+ given session ID is the original value (cookie value)
+ 
++=item B<--count> I<(only with B<L</search>>)>: display the number of matching
++sessions instead of their content
++
+ =back
+ 
+ =head2 COMMANDS
+@@ -210,6 +222,9 @@ Examples
+     lemonldap-ng-sessions search --where '_startTime>20240410063538'
+     lemonldap-ng-sessions search --where '_startTime<20240410063538'
+ 
++And you can just display the number of result using
++B<lemonldap-ng-sessions search --count>
++
+ =head3 delete
+ 
+     lemonldap-ng-sessions delete <id> [<id> ...]
