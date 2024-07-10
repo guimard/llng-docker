@@ -137,7 +137,7 @@ if test "$REDIS_SERVER" != ""; then
     echo "Change configuration to use Redis for sessions"
     TMP=`/usr/share/docker-llng/updateConf get globalStorageOptions Index`
     REDIS_INDEXES=${REDIS_INDEXES:-$TMP}
-    REDIS_INDEXES=${REDIS_INDEXES:-uid mail}
+    REDIS_INDEXES=${REDIS_INDEXES:-_whatToTrace _session_kind _utime ipAddr _httpSessionType user mail _session_uid _saml_id ProxyID _nameID _assert_id _art_id}
     /usr/share/docker-llng/updateConf set globalStorage 'Apache::Session::Browseable::Redis'
     /usr/share/docker-llng/updateConf set globalStorageOptions server "$REDIS_SERVER"
     /usr/share/docker-llng/updateConf set globalStorageOptions Index "$REDIS_INDEXES"
