@@ -8,7 +8,7 @@ env:
 
 on:
   push:
-    branches: [master]
+    branches: [master,stable]
 
 jobs:
   test:
@@ -52,7 +52,6 @@ jobs:
           push: true
           tags: |
             yadd/lemonldap-ng-pg-database:latest
-            yadd/lemonldap-ng-pg-database:stable
             yadd/lemonldap-ng-pg-database:${{ steps.date.outputs.date }}
             yadd/lemonldap-ng-pg-database:${{ env.PGVERSION }}
             yadd/lemonldap-ng-pg-database:${{ env.PGVERSION }}-${{ env.DEBIANRELEASE }}
@@ -98,7 +97,6 @@ jobs:
           push: true
           tags: |
             yadd/lemonldap-ng-base:latest
-            yadd/lemonldap-ng-base:stable
             yadd/lemonldap-ng-base:${{ steps.date.outputs.date }}
             yadd/lemonldap-ng-base:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
             yadd/lemonldap-ng-base:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
@@ -146,7 +144,6 @@ jobs:
           push: true
           tags: |
             yadd/lemonldap-ng-portal:latest
-            yadd/lemonldap-ng-portal:stable
             yadd/lemonldap-ng-portal:${{ steps.date.outputs.date }}
             yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
             yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
@@ -194,7 +191,6 @@ jobs:
           push: true
           tags: |
             yadd/lemonldap-ng-portal:latest-hiperf
-            yadd/lemonldap-ng-portal:stable-hiperf
             yadd/lemonldap-ng-portal:${{ steps.date.outputs.date }}-hiperf
             yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-hiperf
             yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-hiperf
@@ -232,7 +228,6 @@ jobs:
           push: true
           tags: |
             yadd/lemonldap-ng-cron:latest
-            yadd/lemonldap-ng-cron:stable
             yadd/lemonldap-ng-cron:${{ steps.date.outputs.date }}
             yadd/lemonldap-ng-cron:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
             yadd/lemonldap-ng-cron:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
@@ -280,7 +275,6 @@ jobs:
           push: true
           tags: |
             yadd/lemonldap-ng-cron-task:latest
-            yadd/lemonldap-ng-cron-task:stable
             yadd/lemonldap-ng-cron-task:${{ steps.date.outputs.date }}
             yadd/lemonldap-ng-cron-task:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
             yadd/lemonldap-ng-cron-task:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
@@ -328,7 +322,6 @@ jobs:
           push: true
           tags: |
             yadd/lemonldap-ng-manager:latest
-            yadd/lemonldap-ng-manager:stable
             yadd/lemonldap-ng-manager:${{ steps.date.outputs.date }}
             yadd/lemonldap-ng-manager:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
             yadd/lemonldap-ng-manager:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
@@ -376,7 +369,6 @@ jobs:
           push: true
           tags: |
             yadd/lemonldap-ng-full:latest
-            yadd/lemonldap-ng-full:stable
             yadd/lemonldap-ng-full:${{ steps.date.outputs.date }}
             yadd/lemonldap-ng-full:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
             yadd/lemonldap-ng-full:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
@@ -424,7 +416,6 @@ jobs:
           push: true
           tags: |
             yadd/lemonldap-ng-ssoaas-fastcgi-server:latest
-            yadd/lemonldap-ng-ssoaas-fastcgi-server:stable
             yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ steps.date.outputs.date }}
             yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
             yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
@@ -506,7 +497,6 @@ jobs:
           push: true
           tags: |
             yadd/lemonldap-ng-base:latest-no-s6
-            yadd/lemonldap-ng-base:stable-no-s6
             yadd/lemonldap-ng-base:${{ steps.date.outputs.date }}-no-s6
             yadd/lemonldap-ng-base:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
             yadd/lemonldap-ng-base:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
@@ -544,7 +534,6 @@ jobs:
           push: true
           tags: |
             yadd/lemonldap-ng-portal:latest-no-s6
-            yadd/lemonldap-ng-portal:stable-no-s6
             yadd/lemonldap-ng-portal:${{ steps.date.outputs.date }}-no-s6
             yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
             yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
@@ -582,7 +571,6 @@ jobs:
           push: true
           tags: |
             yadd/lemonldap-ng-portal:latest-no-s6-hiperf
-            yadd/lemonldap-ng-portal:stable-no-s6-hiperf
             yadd/lemonldap-ng-portal:${{ steps.date.outputs.date }}-no-s6-hiperf
             yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6-hiperf
             yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6-hiperf
@@ -620,7 +608,6 @@ jobs:
           push: true
           tags: |
             yadd/lemonldap-ng-cron:latest-no-s6
-            yadd/lemonldap-ng-cron:stable-no-s6
             yadd/lemonldap-ng-cron:${{ steps.date.outputs.date }}-no-s6
             yadd/lemonldap-ng-cron:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
             yadd/lemonldap-ng-cron:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
@@ -658,7 +645,6 @@ jobs:
           push: true
           tags: |
             yadd/lemonldap-ng-cron-task:latest-no-s6
-            yadd/lemonldap-ng-cron-task:stable-no-s6
             yadd/lemonldap-ng-cron-task:${{ steps.date.outputs.date }}-no-s6
             yadd/lemonldap-ng-cron-task:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
             yadd/lemonldap-ng-cron-task:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
@@ -696,7 +682,6 @@ jobs:
           push: true
           tags: |
             yadd/lemonldap-ng-manager:latest-no-s6
-            yadd/lemonldap-ng-manager:stable-no-s6
             yadd/lemonldap-ng-manager:${{ steps.date.outputs.date }}-no-s6
             yadd/lemonldap-ng-manager:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
             yadd/lemonldap-ng-manager:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
@@ -734,7 +719,6 @@ jobs:
           push: true
           tags: |
             yadd/lemonldap-ng-full:latest-no-s6
-            yadd/lemonldap-ng-full:stable-no-s6
             yadd/lemonldap-ng-full:${{ steps.date.outputs.date }}-no-s6
             yadd/lemonldap-ng-full:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
             yadd/lemonldap-ng-full:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
@@ -772,7 +756,6 @@ jobs:
           push: true
           tags: |
             yadd/lemonldap-ng-ssoaas-fastcgi-server:latest-no-s6
-            yadd/lemonldap-ng-ssoaas-fastcgi-server:stable-no-s6
             yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ steps.date.outputs.date }}-no-s6
             yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
             yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
