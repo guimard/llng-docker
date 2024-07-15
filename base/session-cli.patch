@@ -42,7 +42,7 @@
 +        $res->{$backend} = $_res;
 +    }
 +    my $o = $self->stdout;
-+    print $o to_json($res);
++    print $o to_json($res); return 0;
 +}
 +
 +sub restore {
@@ -65,7 +65,7 @@
 +    };
 +    if ($@) {
 +        print STDERR "Given backup file looks bad: $@\n";
-+        exit 1;
++        return 1;
 +    }
 +    foreach my $backend ( keys %$obj ) {
 +        unless ( grep { $backend eq $_ } BACKENDS ) {
@@ -76,7 +76,7 @@
 +        foreach my $_session_id ( keys %{ $obj->{$backend} } ) {
 +            $self->_insert( $_session_id, $obj->{$backend}->{$_session_id} );
 +        }
-+    }
++    } return 0;
 +}
 +
 +sub _insert {

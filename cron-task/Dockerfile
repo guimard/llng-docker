@@ -16,4 +16,6 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* /usr/share/perl5/Lemonldap/NG/Handler \
     /etc/services.d /tmp/liblemonldap-ng-portal-*
 
+USER www-data
+
 CMD ["/usr/share/lemonldap-ng/bin/purgeCentralCache", "-d"]
