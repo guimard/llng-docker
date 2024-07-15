@@ -1,15 +1,44 @@
 --- a/usr/share/perl5/Lemonldap/NG/Common/CliSessions.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Common/CliSessions.pm
-@@ -9,6 +9,8 @@ use Lemonldap::NG::Common::Apache::Session;
+@@ -9,6 +9,9 @@ use Lemonldap::NG::Common::Apache::Session;
  use Lemonldap::NG::Common::Session;
  use Lemonldap::NG::Common::Util qw/getPSessionID genId2F/;
  
-+use constant BACKENDS => qw(global persistent oidc saml cas);
++use constant BACKENDS       => qw(global persistent oidc saml cas);
++use constant ISREFRESHTOKEN => '_type=refresh_token';
 +
  our $VERSION = '2.19.0';
  
  has opts => ( is => 'rw' );
-@@ -100,16 +102,92 @@ sub search {
+@@ -55,6 +58,10 @@ sub _search {
+     if ( $self->opts->{persistent} ) {
+         $backendStorage = "persistentStorage";
+     }
++    elsif ( $self->opts->{refreshTokens} ) {
++        $backendStorage = "oidcStorage";
++        $self->opts->{where} ||= ISREFRESHTOKEN;
++    }
+ 
+     $backendStorage = "globalStorage" unless $self->conf->{$backendStorage};
+ 
+@@ -93,6 +100,16 @@ sub _search {
+             $args, ( @fields ? [@fields] : () ) );
+     }
+ 
++    if (    $self->opts->{refreshTokens}
++        and $self->opts->{where} ne ISREFRESHTOKEN )
++    {
++        foreach my $key (%$res) {
++            delete $res->{$key}
++              unless $res->{$key}->{_type}
++              and $res->{$key}->{_type} eq 'refresh_token';
++        }
++    }
++
+     return $res;
+ }
+ 
+@@ -100,14 +117,100 @@ sub search {
      my ($self) = shift;
      my $res    = $self->_search();
      my $o      = $self->stdout;
@@ -18,31 +47,40 @@
 +    if ( $self->opts->{count} ) {
 +        my @tmp = keys %$res;
 +        print $o scalar(@tmp) . "\n";
-     }
-     else {
--        print $o $self->_to_json( [ values %{$res} ] );
++    }
++    else {
 +        if ( $self->opts->{idonly} ) {
 +            print $o map { $res->{$_}->{_session_id} . "\n" } keys %{$res};
 +        }
 +        else {
 +            print $o $self->_to_json( [ values %{$res} ] );
 +        }
-     }
-     return 0;
- 
- }
- 
++    }
++    return 0;
++
++}
++
 +sub backup {
 +    my $self = shift;
 +    my $res  = {};
-+    foreach my $backend (BACKENDS) {
-+        next unless $self->conf->{"${backend}Storage"};
-+        $self->opts->{backend} = $backend;
-+        my $_res = $self->_search();
-+        $res->{$backend} = $_res;
++    if ( $self->opts->{persistent} ) {
++        $res->{persistent} = $self->_search();
++    }
++    elsif ( $self->opts->{refreshTokens} ) {
++        $res->{oidc} = $self->_search();
+     }
+     else {
+-        print $o $self->_to_json( [ values %{$res} ] );
++        foreach my $backend (BACKENDS) {
++            next unless $self->conf->{"${backend}Storage"};
++            $self->opts->{backend} = $backend;
++            my $_res = $self->_search();
++            $res->{$backend} = $_res;
++        }
 +    }
 +    my $o = $self->stdout;
-+    print $o to_json($res); return 0;
++    print $o to_json($res);
++    return 0;
 +}
 +
 +sub restore {
@@ -52,7 +90,7 @@
 +        local $/ = undef;
 +        my $i = *STDIN;
 +        if (@_) {
-+            open($i, '<', "$_[0]") or die $!;
++            open( $i, '<', "$_[0]" ) or die $!;
 +        }
 +        while (<$i>) {
 +            $obj .= $_;
@@ -76,13 +114,14 @@
 +        foreach my $_session_id ( keys %{ $obj->{$backend} } ) {
 +            $self->_insert( $_session_id, $obj->{$backend}->{$_session_id} );
 +        }
-+    } return 0;
+     }
+     return 0;
 +}
 +
 +sub _insert {
 +    my ( $self, $id, $content ) = @_;
 +    $id = id2storage($id) if $id and $self->opts->{hash};
-+
+ 
 +    # Lookup backend storage from CLI options
 +    my $backendStorage =
 +      ( lc( $self->opts->{backend} || 'global' ) ) . "Storage";
@@ -100,12 +139,20 @@
 +      . $self->opts->{backend} . "\n"
 +      unless $as;
 +    return $as;
-+}
-+
+ }
+ 
  # Returns the session object, so we can modify it
- sub _get_one_session {
-     my ( $self, $id, $backend ) = @_;
-@@ -507,7 +585,7 @@ sub run {
+@@ -130,6 +233,9 @@ sub _get_one_session {
+         $backendStorage = "persistentStorage";
+         $id             = getPSessionID($id);
+     }
++    elsif ( $self->opts->{refreshTokens} ) {
++        $backendStorage = "oidcStorage";
++    }
+ 
+     # In any case, fall back to global storage if we couldn't find the backend
+     $backendStorage = "globalStorage" unless $self->conf->{$backendStorage};
+@@ -507,7 +613,7 @@ sub run {
      $self->opts($opts);
  
      # Simple commands
@@ -116,20 +163,36 @@
  
 --- a/usr/share/lemonldap-ng/bin/lemonldap-ng-sessions
 +++ b/usr/share/lemonldap-ng/bin/lemonldap-ng-sessions
-@@ -18,6 +18,7 @@ my $opts = {};
+@@ -18,23 +18,28 @@ my $opts = {};
  my $help;
  my $opt_user  = 'www-data';
  my $opt_group = 'www-data';
 +my $out;
  
  GetOptions(
-     'help|h'        => \$help,
-@@ -30,11 +31,14 @@ GetOptions(
-     'id-only|i'     => \$opts->{idonly},
-     'user|u=s'      => \$opt_user,
-     'group|g=s'     => \$opt_group,
-+    'count'         => \$opts->{count},
-+    'out|o=s'       => \$out,
+-    'help|h'        => \$help,
+-    'select|s=s@'   => \$opts->{select},
+-    'where|w=s'     => \$opts->{where},
+-    'all|a'         => \$opts->{all},
+-    'backend|b=s'   => \$opts->{backend},
+-    'persistent|p'  => \$opts->{persistent},
+-    'hash|cookie|c' => \$opts->{hash},
+-    'id-only|i'     => \$opts->{idonly},
+-    'user|u=s'      => \$opt_user,
+-    'group|g=s'     => \$opt_group,
++    'help|h'         => \$help,
++    'select|s=s@'    => \$opts->{select},
++    'where|w=s'      => \$opts->{where},
++    'all|a'          => \$opts->{all},
++    'backend|b=s'    => \$opts->{backend},
++    'persistent|p'   => \$opts->{persistent},
++    'refresh-tokens' => \$opts->{refreshTokens},
++    'hash|cookie|c'  => \$opts->{hash},
++    'id-only|i'      => \$opts->{idonly},
++    'user|u=s'       => \$opt_user,
++    'group|g=s'      => \$opt_group,
++    'count'          => \$opts->{count},
++    'out|o=s'        => \$out,
  ) or pod2usage( -exitcode => 1, -verbose => 0 );
  
  pod2usage( -exitcode => 0, -verbose => 2 ) if $help;
@@ -139,7 +202,7 @@
      POSIX::setgid( scalar( getgrnam($opt_group) ) );
      POSIX::setuid( scalar( getpwnam($opt_user) ) );
  };
-@@ -45,6 +49,11 @@ unless ($action) {
+@@ -45,6 +50,11 @@ unless ($action) {
      pod2usage( -exitcode => 1, -verbose => 0 );
  }
  
@@ -151,7 +214,7 @@
  if ( $action eq "get" ) {
      unless ( @ARGV >= 1 ) {
          pod2usage(
-@@ -54,7 +63,7 @@ if ( $action eq "get" ) {
+@@ -54,7 +64,7 @@ if ( $action eq "get" ) {
          );
      }
  }
@@ -160,7 +223,7 @@
      unless ( @ARGV >= 1 or $opts->{where} ) {
          pod2usage(
              -exitval  => 1,
-@@ -63,7 +72,7 @@ if ( $action eq "delete" ) {
+@@ -63,7 +73,7 @@ if ( $action eq "delete" ) {
          );
      }
  }
@@ -169,7 +232,7 @@
      unless ( @ARGV >= 2 ) {
          pod2usage(
              -exitval  => 1,
-@@ -72,7 +81,7 @@ if ( $action eq "delKey" ) {
+@@ -72,7 +82,7 @@ if ( $action eq "delKey" ) {
          );
      }
  }
@@ -178,7 +241,7 @@
      unless ( @ARGV >= 3 ) {
          pod2usage(
              -exitval  => 1,
-@@ -82,7 +91,7 @@ if ( $action eq "setKey" ) {
+@@ -82,7 +92,7 @@ if ( $action eq "setKey" ) {
      }
  }
  
@@ -187,7 +250,7 @@
      unless ( @ARGV >= 1 ) {
          pod2usage(
              -exitval  => 1,
-@@ -92,7 +101,7 @@ if ( $action eq "secondfactors" ) {
+@@ -92,7 +102,7 @@ if ( $action eq "secondfactors" ) {
      }
  }
  
@@ -196,7 +259,7 @@
      unless ( @ARGV >= 2 ) {
          pod2usage(
              -exitval  => 1,
-@@ -102,7 +111,15 @@ if ( $action eq "consents" ) {
+@@ -102,7 +112,16 @@ if ( $action eq "consents" ) {
      }
  }
  
@@ -204,8 +267,9 @@
 +my $client;
 +if ( $out and $out ne '-' ) {
 +    open F, '>', $out or die "Unable to open file given by --out: $!";
-+    $client = Lemonldap::NG::Common::CliSessions->new({stdout => *F});
-+} else {
++    $client = Lemonldap::NG::Common::CliSessions->new( { stdout => *F } );
++}
++else {
 +    $client = Lemonldap::NG::Common::CliSessions->new;
 +}
 +
@@ -213,7 +277,7 @@
  
  __END__
  
-@@ -126,6 +143,8 @@ B<Commands>:
+@@ -126,6 +145,8 @@ B<Commands>:
  
  =item B<L</search>>: search for sessions
  
@@ -222,7 +286,7 @@
  =item B<L</delete>>: delete existing sessions
  
  =item B<L</setKey>>: add/change key in existing session
-@@ -136,6 +155,10 @@ B<Commands>:
+@@ -136,6 +157,10 @@ B<Commands>:
  
  =item B<L</consents>>: manage OIDC user consents
  
@@ -233,16 +297,18 @@
  =back
  
  B<Options>:
-@@ -148,7 +171,7 @@ B<Options>:
+@@ -148,7 +173,9 @@ B<Options>:
  
  =item B<--backend>: Specify session backend
  
 -=item B<--persistent>:Search in persistent sessions
 +=item B<--persistent>: Search in persistent sessions
++
++=item B<--refresh-tokens>: Search into refresh_tokens only
  
  =item B<--where>: Set search filter (search/delete only)
  
-@@ -161,6 +184,11 @@ B<Options>:
+@@ -161,6 +188,11 @@ B<Options>:
  =item B<--hash>: When "hashed session storage" is in use, indicates that the
  given session ID is the original value (cookie value)
  
@@ -254,7 +320,7 @@
  =back
  
  =head2 COMMANDS
-@@ -210,6 +238,9 @@ Examples
+@@ -210,6 +242,9 @@ Examples
      lemonldap-ng-sessions search --where '_startTime>20240410063538'
      lemonldap-ng-sessions search --where '_startTime<20240410063538'
  
@@ -264,7 +330,7 @@
  =head3 delete
  
      lemonldap-ng-sessions delete <id> [<id> ...]
-@@ -297,6 +328,22 @@ Commands:
+@@ -297,6 +332,26 @@ Commands:
      delete <user> <id> [<id> ...]
          delete OIDC consents for a user
  
@@ -273,8 +339,12 @@
 +    lemonldap-ng-sessions backup > file
 +    # or
 +    lemonldap-ng-sessions backup --out file
++    # or limited to persistent sessions
++    lemonldap-ng-sessions backup --persistent --out file
++    # or limited to OIDC refresh_tokens
++    lemonldap-ng-sessions backup --refresh-tokens --out file
 +
-+Simple commande to dump all sessions
++Simple command to dump all sessions or only persistent or refresh_tokens.
 +
 +=head3 restore
 +
@@ -287,7 +357,7 @@
  =head2 OPTIONS
  
  =over
-@@ -318,8 +365,8 @@ Examples:
+@@ -318,8 +373,8 @@ Examples:
  
  	--search uid=dwho
  	--search _sessionType=OIDC
