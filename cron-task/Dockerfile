@@ -2,7 +2,7 @@ ARG BASE=
 FROM ${BASE}
 
 LABEL maintainer="Yadd yadd@debian.org>" \
-      name="yadd/lemonldap-ng-cron" \
+      name="yadd/lemonldap-ng-cron-task" \
       version="v1.0"
 
 RUN apt-get update && \

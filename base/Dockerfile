@@ -71,6 +71,8 @@ ENV SSODOMAIN=example.com \
     DEFAULT_WEBSITE=no \
     PGSSLCERT=/tmp/postgres.crt
 
+COPY *.patch /
+
 RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     mkdir /over && \
     apt-get -y --no-install-recommends install procps cron \
