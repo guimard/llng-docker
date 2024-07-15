@@ -5,6 +5,9 @@ LABEL maintainer="Yadd yadd@debian.org>" \
       name="yadd/lemonldap-ng-cron-task" \
       version="v1.0"
 
+ENV HANDLER_CRON=no \
+    PORTAL_CRON=no
+
 RUN apt-get update && \
     cd /tmp/ && \
     apt-get download liblemonldap-ng-portal-perl${LLNGDIST} && \
