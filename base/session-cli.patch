@@ -1,6 +1,15 @@
 --- a/usr/share/perl5/Lemonldap/NG/Common/CliSessions.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Common/CliSessions.pm
-@@ -100,11 +100,17 @@ sub search {
+@@ -9,6 +9,8 @@ use Lemonldap::NG::Common::Apache::Session;
+ use Lemonldap::NG::Common::Session;
+ use Lemonldap::NG::Common::Util qw/getPSessionID genId2F/;
+ 
++use constant BACKENDS => qw(global persistent oidc saml cas);
++
+ our $VERSION = '2.19.0';
+ 
+ has opts => ( is => 'rw' );
+@@ -100,16 +102,92 @@ sub search {
      my ($self) = shift;
      my $res    = $self->_search();
      my $o      = $self->stdout;
@@ -21,13 +30,106 @@
      }
      return 0;
  
+ }
+ 
++sub backup {
++    my $self = shift;
++    my $res  = {};
++    foreach my $backend (BACKENDS) {
++        next unless $self->conf->{"${backend}Storage"};
++        $self->opts->{backend} = $backend;
++        my $_res = $self->_search();
++        $res->{$backend} = $_res;
++    }
++    my $o = $self->stdout;
++    print $o to_json($res);
++}
++
++sub restore {
++    my $self = shift;
++    my $obj;
++    {
++        local $/ = undef;
++        my $i = *STDIN;
++        if (@_) {
++            open($i, '<', "$_[0]") or die $!;
++        }
++        while (<$i>) {
++            $obj .= $_;
++        }
++    }
++    eval {
++        $obj = from_json($obj);
++        no warnings;
++        %$obj;
++    };
++    if ($@) {
++        print STDERR "Given backup file looks bad: $@\n";
++        exit 1;
++    }
++    foreach my $backend ( keys %$obj ) {
++        unless ( grep { $backend eq $_ } BACKENDS ) {
++            print STDERR
++              "Given backup file looks bad: unknpwn backend $backend\n";
++        }
++        $self->opts->{backend} = $backend;
++        foreach my $_session_id ( keys %{ $obj->{$backend} } ) {
++            $self->_insert( $_session_id, $obj->{$backend}->{$_session_id} );
++        }
++    }
++}
++
++sub _insert {
++    my ( $self, $id, $content ) = @_;
++    $id = id2storage($id) if $id and $self->opts->{hash};
++
++    # Lookup backend storage from CLI options
++    my $backendStorage =
++      ( lc( $self->opts->{backend} || 'global' ) ) . "Storage";
++
++    my $as = Lemonldap::NG::Common::Session->new( {
++            hashStore            => 0,
++            storageModule        => $self->conf->{$backendStorage},
++            storageModuleOptions => $self->conf->{"${backendStorage}Options"},
++            id                   => $id,
++            force                => 1,
++            info                 => $content,
++        }
++    );
++    print STDERR "Unable to restore session $id in backend "
++      . $self->opts->{backend} . "\n"
++      unless $as;
++    return $as;
++}
++
+ # Returns the session object, so we can modify it
+ sub _get_one_session {
+     my ( $self, $id, $backend ) = @_;
+@@ -507,7 +585,7 @@ sub run {
+     $self->opts($opts);
+ 
+     # Simple commands
+-    if ( $action =~ /^(?:get|search|delete|setKey|delKey)$/ ) {
++    if ( $action =~ /^(?:get|search|delete|setKey|delKey|backup|restore)$/ ) {
+         return $self->$action(@_);
+     }
+ 
 --- a/usr/share/lemonldap-ng/bin/lemonldap-ng-sessions
 +++ b/usr/share/lemonldap-ng/bin/lemonldap-ng-sessions
-@@ -30,11 +30,13 @@ GetOptions(
+@@ -18,6 +18,7 @@ my $opts = {};
+ my $help;
+ my $opt_user  = 'www-data';
+ my $opt_group = 'www-data';
++my $out;
+ 
+ GetOptions(
+     'help|h'        => \$help,
+@@ -30,11 +31,14 @@ GetOptions(
      'id-only|i'     => \$opts->{idonly},
      'user|u=s'      => \$opt_user,
      'group|g=s'     => \$opt_group,
 +    'count'         => \$opts->{count},
++    'out|o=s'       => \$out,
  ) or pod2usage( -exitcode => 1, -verbose => 0 );
  
  pod2usage( -exitcode => 0, -verbose => 2 ) if $help;
@@ -37,7 +139,7 @@
      POSIX::setgid( scalar( getgrnam($opt_group) ) );
      POSIX::setuid( scalar( getpwnam($opt_user) ) );
  };
-@@ -45,6 +47,11 @@ unless ($action) {
+@@ -45,6 +49,11 @@ unless ($action) {
      pod2usage( -exitcode => 1, -verbose => 0 );
  }
  
@@ -49,7 +151,69 @@
  if ( $action eq "get" ) {
      unless ( @ARGV >= 1 ) {
          pod2usage(
-@@ -126,6 +133,8 @@ B<Commands>:
+@@ -54,7 +63,7 @@ if ( $action eq "get" ) {
+         );
+     }
+ }
+-if ( $action eq "delete" ) {
++elsif ( $action eq "delete" ) {
+     unless ( @ARGV >= 1 or $opts->{where} ) {
+         pod2usage(
+             -exitval  => 1,
+@@ -63,7 +72,7 @@ if ( $action eq "delete" ) {
+         );
+     }
+ }
+-if ( $action eq "delKey" ) {
++elsif ( $action eq "delKey" ) {
+     unless ( @ARGV >= 2 ) {
+         pod2usage(
+             -exitval  => 1,
+@@ -72,7 +81,7 @@ if ( $action eq "delKey" ) {
+         );
+     }
+ }
+-if ( $action eq "setKey" ) {
++elsif ( $action eq "setKey" ) {
+     unless ( @ARGV >= 3 ) {
+         pod2usage(
+             -exitval  => 1,
+@@ -82,7 +91,7 @@ if ( $action eq "setKey" ) {
+     }
+ }
+ 
+-if ( $action eq "secondfactors" ) {
++elsif ( $action eq "secondfactors" ) {
+     unless ( @ARGV >= 1 ) {
+         pod2usage(
+             -exitval  => 1,
+@@ -92,7 +101,7 @@ if ( $action eq "secondfactors" ) {
+     }
+ }
+ 
+-if ( $action eq "consents" ) {
++elsif ( $action eq "consents" ) {
+     unless ( @ARGV >= 2 ) {
+         pod2usage(
+             -exitval  => 1,
+@@ -102,7 +111,15 @@ if ( $action eq "consents" ) {
+     }
+ }
+ 
+-exit Lemonldap::NG::Common::CliSessions->run( $action, $opts, @ARGV );
++my $client;
++if ( $out and $out ne '-' ) {
++    open F, '>', $out or die "Unable to open file given by --out: $!";
++    $client = Lemonldap::NG::Common::CliSessions->new({stdout => *F});
++} else {
++    $client = Lemonldap::NG::Common::CliSessions->new;
++}
++
++exit $client->run( $action, $opts, @ARGV );
+ 
+ __END__
+ 
+@@ -126,6 +143,8 @@ B<Commands>:
  
  =item B<L</search>>: search for sessions
  
@@ -58,17 +222,39 @@
  =item B<L</delete>>: delete existing sessions
  
  =item B<L</setKey>>: add/change key in existing session
-@@ -161,6 +170,9 @@ B<Options>:
+@@ -136,6 +155,10 @@ B<Commands>:
+ 
+ =item B<L</consents>>: manage OIDC user consents
+ 
++=item B<L</backup>>: dump all sessions
++
++=item B<L</restore>>: restore sessions from a dump file
++
+ =back
+ 
+ B<Options>:
+@@ -148,7 +171,7 @@ B<Options>:
+ 
+ =item B<--backend>: Specify session backend
+ 
+-=item B<--persistent>:Search in persistent sessions
++=item B<--persistent>: Search in persistent sessions
+ 
+ =item B<--where>: Set search filter (search/delete only)
+ 
+@@ -161,6 +184,11 @@ B<Options>:
  =item B<--hash>: When "hashed session storage" is in use, indicates that the
  given session ID is the original value (cookie value)
  
 +=item B<--count> I<(only with B<L</search>>)>: display the number of matching
 +sessions instead of their content
 +
++=item B<--out>: write result into given file
++
  =back
  
  =head2 COMMANDS
-@@ -210,6 +222,9 @@ Examples
+@@ -210,6 +238,9 @@ Examples
      lemonldap-ng-sessions search --where '_startTime>20240410063538'
      lemonldap-ng-sessions search --where '_startTime<20240410063538'
  
@@ -78,3 +264,37 @@
  =head3 delete
  
      lemonldap-ng-sessions delete <id> [<id> ...]
+@@ -297,6 +328,22 @@ Commands:
+     delete <user> <id> [<id> ...]
+         delete OIDC consents for a user
+ 
++=head3 backup
++
++    lemonldap-ng-sessions backup > file
++    # or
++    lemonldap-ng-sessions backup --out file
++
++Simple commande to dump all sessions
++
++=head3 restore
++
++    lemonldap-ng-sessions restore < file
++    # or
++    lemonldap-ng-sessions restore file
++
++Command to restore sessions using a file generated by L</backup> command
++
+ =head2 OPTIONS
+ 
+ =over
+@@ -318,8 +365,8 @@ Examples:
+ 
+ 	--search uid=dwho
+ 	--search _sessionType=OIDC
+-    --search '_startTime>20240410063538'
+-    --search '_startTime<20240410063538'
++	--search '_startTime>20240410063538'
++	--search '_startTime<20240410063538'
+ 
+ =item B<--backend>,B<-b>
+ 
