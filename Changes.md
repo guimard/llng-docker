@@ -1,6 +1,6 @@
 # Changes
 
-* 2024-07-15: add sessions-backup task docker
+* 2024-07-15: add sessions-backup task docker (v2.19.0-9)
 * 2024-07-15: add "backup/restore" commands into session cli
 * 2024-07-10: add "count" command into session cli
 * 2024-07-10: update default Redis indexes
