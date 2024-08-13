@@ -1,0 +1,299 @@
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Auth/_WebForm.pm b/usr/share/perl5/Lemonldap/NG/Portal/Auth/_WebForm.pm
+index a8ad13be3..a99c54442 100644
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Auth/_WebForm.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Auth/_WebForm.pm
+@@ -43,10 +43,15 @@ has ott     => ( is => 'rw' );
+ sub init {
+     my $self = shift;
+ 
+-    if ( $self->{conf}->{captcha_login_enabled} ) {
+-        $self->captcha(1);
+-    }
+-    else {
++    $self->captcha(
++        $self->p->buildRule(
++            $self->{conf}->{captcha_login_enabled},
++            'captchaLogin'
++        )
++    );
++
++    return 0 unless $self->captcha;
++    unless ( $self->{conf}->{captcha_login_enabled} ) {
+         $self->ott( $self->p->loadModule('::Lib::OneTimeToken') ) or return 0;
+         $self->ott->timeout( $self->conf->{formTimeout} );
+     }
+@@ -106,17 +111,18 @@ sub extractFormInfo {
+     }
+ 
+     # Security: check for captcha or token
++    my $needCaptcha = $self->captcha->( $req, {} );
+     if ( not $req->data->{'skipToken'}
+-        and ( $self->captcha or $self->ottRule->( $req, {} ) ) )
++        and ( $needCaptcha or $self->ottRule->( $req, {} ) ) )
+     {
+         my $token;
+-        unless ( $token = $req->param('token') or $self->captcha ) {
++        unless ( $token = $req->param('token') or $needCaptcha ) {
+             $self->userLogger->error('Authentication tried without token');
+             $self->ott->setToken($req);
+             return PE_NOTOKEN;
+         }
+ 
+-        if ( $self->captcha ) {
++        if ($needCaptcha) {
+             my $result = $self->p->getService('captcha')->check_captcha($req);
+             if ($result) {
+                 $self->logger->debug("Captcha code verified");
+@@ -179,7 +185,7 @@ sub setSecurity {
+     return if $req->data->{skipToken};
+ 
+     # If captcha is enable, prepare it
+-    if ( $self->captcha ) {
++    if ( $self->captcha->( $req, {} ) ) {
+         $self->p->getService('captcha')->init_captcha($req);
+     }
+ 
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Captcha/ReCaptcha.pm b/usr/share/perl5/Lemonldap/NG/Portal/Captcha/ReCaptcha.pm
+new file mode 100644
+index 000000000..a4a1a6d41
+--- /dev/null
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Captcha/ReCaptcha.pm
+@@ -0,0 +1,79 @@
++package Lemonldap::NG::Portal::Captcha::ReCaptcha;
++
++use strict;
++use Mouse;
++use Lemonldap::NG::Common::UserAgent;
++
++# Add constants used by this module
++
++our $VERSION = '2.20.0';
++
++extends 'Lemonldap::NG::Portal::Main::Plugin';
++
++has ua => (
++    is      => 'rw',
++    lazy    => 1,
++    builder => sub {
++        my $ua = Lemonldap::NG::Common::UserAgent->new( $_[0]->{conf} );
++        $ua->env_proxy();
++        return $ua;
++    }
++);
++
++sub init {
++    my ($self) = @_;
++    unless ($self->conf->{captchaOptions}->{dataSiteKey}
++        and $self->conf->{captchaOptions}->{secretKey} )
++    {
++        $self->logger->error('Missing required options for reCaptcha');
++        return 0;
++    }
++    return 1;
++}
++
++sub init_captcha {
++    my ( $self, $req ) = @_;
++
++    $req->data->{customScript} .=
++      '<script src="https://www.google.com/recaptcha/enterprise.js"></script>';
++
++    # Read option from the manager configuration
++    my $dataSiteKey = $self->conf->{captchaOptions}->{dataSiteKey};
++    my $html =
++qq'<div class="g-recaptcha" data-sitekey="$dataSiteKey" data-action="LOGIN"></div>';
++    $req->captchaHtml($html);
++}
++
++sub check_captcha {
++    my ( $self, $req ) = @_;
++
++    my $captcha_input = $req->param('g-recaptcha-response');
++    unless ($captcha_input) {
++        $self->logger->info('No captcha value submitted');
++        return 0;
++    }
++    my $response = $self->ua->post(
++        'https://www.google.com/recaptcha/api/siteverify',
++        {
++            secret   => $self->conf->{captchaOptions}->{secretKey},
++            response => $captcha_input,
++        }
++    );
++    if ( $response->is_success ) {
++        my $res = eval { JSON::from_json( $response->decoded_content ) };
++        if ($@) {
++            $self->logger->error("reCaptcha: $@");
++            return 0;
++        }
++        unless ( $res->{success} ) {
++            $self->logger->info(
++                'reCaptcha errors:' . $response->decoded_content );
++        }
++        return $res->{success};
++    }
++    $self->logger->error( 'reCaptcha error: ' . $response->status_line );
++    return 0;
++}
++
++1;
++
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CertificateResetByMail.pm b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CertificateResetByMail.pm
+index d74580f38..52375d00d 100644
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CertificateResetByMail.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CertificateResetByMail.pm
+@@ -85,9 +85,12 @@ sub init {
+     );
+ 
+     # Initialize Captcha if needed
+-    if ( $self->conf->{captcha_mail_enabled} ) {
+-        $self->captcha(1);
+-    }
++    $self->captcha(
++        $self->p->buildRule(
++            $self->conf->{captcha_mail_enabled},
++            'captchaMail'
++        )
++    );
+ 
+     # Load registered module
+     $self->registerModule(
+@@ -168,7 +171,7 @@ sub _certificateReset {
+         $req->{user} = $req->param('mail');
+ 
+         # Captcha for register form
+-        if ( $self->captcha ) {
++        if ( $self->captcha->( $req, {} ) ) {
+             my $result = $self->p->getService('captcha')->check_captcha($req);
+             if ($result) {
+                 $self->logger->debug("Captcha code verified");
+@@ -559,7 +562,7 @@ sub modifyCertificate {
+ sub setSecurity {
+     my ( $self, $req ) = @_;
+ 
+-    if ( $self->captcha ) {
++    if ( $self->captcha->( $req, {} ) ) {
+         $self->p->getService('captcha')->init_captcha($req);
+     }
+ 
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/Impersonation.pm b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/Impersonation.pm
+index e24d6b68a..29b0d86a8 100644
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/Impersonation.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/Impersonation.pm
+@@ -28,7 +28,8 @@ has unrestrictedUsersRule => ( is => 'rw', default => sub { 0 } );
+ has ott => ( is => 'rw' );
+ 
+ # Captcha generator
+-has captcha => ( is => 'rw' );
++has captcha     => ( is => 'rw' );
++has needCaptcha => ( is => 'rw' );
+ 
+ # Prefix used for renaming session attributes
+ has prefix => (
+@@ -68,6 +69,12 @@ sub init {
+     return 0 unless $self->unrestrictedUsersRule;
+ 
+     # Initialize Captcha if needed
++    $self->needCaptcha(
++        $self->p->buildRule(
++            $self->{conf}->{captcha_login_enabled},
++            'captchaLogin'
++        )
++    );
+     if ( $self->{conf}->{captcha_login_enabled} ) {
+         $self->captcha( $self->p->loadModule('::Lib::Captcha') ) or return 0;
+     }
+@@ -285,7 +292,7 @@ sub _userData {
+ 
+ sub setSecurity {
+     my ( $self, $req ) = @_;
+-    if ( $self->captcha ) {
++    if ( $self->needCaptcha->( $req, {} ) ) {
+         $self->captcha->setCaptcha($req);
+     }
+     elsif ( $self->ottRule->( $req, {} ) ) {
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/MailPasswordReset.pm b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/MailPasswordReset.pm
+index a62cbf04c..5ffe8731b 100644
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/MailPasswordReset.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/MailPasswordReset.pm
+@@ -72,9 +72,12 @@ sub init {
+     $self->addUnauthRoute( resetpwd => 'resetPwd', [ 'POST', 'GET' ] );
+ 
+     # Initialize Captcha if needed
+-    if ( $self->conf->{captcha_mail_enabled} ) {
+-        $self->captcha(1);
+-    }
++    $self->captcha(
++        $self->p->buildRule(
++            $self->conf->{captcha_mail_enabled},
++            'captchaMail'
++        )
++    );
+ 
+     # Parse password policy activation rule
+     $self->passwordPolicyActivationRule(
+@@ -239,7 +242,7 @@ sub _reset {
+         $req->{user} = $req->param('mail');
+ 
+         # Captcha for register form
+-        if ( $self->captcha ) {
++        if ( $self->captcha->( $req, {} ) ) {
+             my $result = $self->p->getService('captcha')->check_captcha($req);
+             if ($result) {
+                 $self->logger->debug("Captcha code verified");
+@@ -585,7 +588,7 @@ sub changePwd {
+ 
+ sub setSecurity {
+     my ( $self, $req ) = @_;
+-    if ( $self->captcha ) {
++    if ( $self->captcha->( $req, {} ) ) {
+         $self->p->getService('captcha')->init_captcha($req);
+     }
+     elsif ( $self->ottRule->( $req, {} ) ) {
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/Register.pm b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/Register.pm
+index 616d42859..fa310149f 100644
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/Register.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/Register.pm
+@@ -64,12 +64,15 @@ sub init {
+     $self->addUnauthRoute( register => 'register', [ 'POST', 'GET' ] );
+ 
+     # Initialize Captcha if needed
+-    if ( $self->conf->{captcha_register_enabled} ) {
+-        $self->captcha(1);
+-    }
++    $self->captcha(
++        $self->p->buildRule(
++            $self->conf->{captcha_register_enabled},
++            'captchaRegister'
++        )
++    );
+ 
+     # Initialize form token if needed (captcha provides also a token)
+-    else {
++    unless ( $self->conf->{captcha_register_enabled} ) {
+         $_[0]->ott(
+             $_[0]->p->loadModule('Lemonldap::NG::Portal::Lib::OneTimeToken') )
+           or return 0;
+@@ -158,8 +161,9 @@ sub _register {
+         {
+ 
+             # Captcha for register form
+-            if ( $self->captcha ) {
+-                my $result = $self->p->getService('captcha')->check_captcha($req);
++            if ( $self->captcha->( $req, {} ) ) {
++                my $result =
++                  $self->p->getService('captcha')->check_captcha($req);
+                 if ($result) {
+                     $self->logger->debug("Captcha code verified");
+                 }
+@@ -188,8 +192,8 @@ sub _register {
+ 
+     # Check mail
+     return PE_MALFORMEDUSER
+-      unless ( $req->data->{registerInfo}->{mail} =~
+-        m/$self->{conf}->{userControl}/ );
++      unless (
++        $req->data->{registerInfo}->{mail} =~ m/$self->{conf}->{userControl}/ );
+ 
+     # Search for user using UserDB module
+     # If the user already exists, register is forbidden
