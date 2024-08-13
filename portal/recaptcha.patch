@@ -22,7 +22,7 @@ index a8ad13be3..a99c54442 100644
          $self->ott( $self->p->loadModule('::Lib::OneTimeToken') ) or return 0;
          $self->ott->timeout( $self->conf->{formTimeout} );
      }
-@@ -106,17 +111,18 @@ sub extractFormInfo {
+@@ -106,23 +111,24 @@ sub extractFormInfo {
      }
  
      # Security: check for captcha or token
@@ -40,19 +40,29 @@ index a8ad13be3..a99c54442 100644
          }
  
 -        if ( $self->captcha ) {
+-            my $result = $self->p->_captcha->check_captcha($req);
 +        if ($needCaptcha) {
-             my $result = $self->p->getService('captcha')->check_captcha($req);
++            my $result = $self->p->getService('captcha')->check_captcha($req);
              if ($result) {
                  $self->logger->debug("Captcha code verified");
-@@ -179,7 +185,7 @@ sub setSecurity {
+             }
+             else {
+-                $self->p->_captcha->init_captcha($req);
++                $self->p->getService('captcha')->init_captcha($req);
+                 $self->userLogger->warn("Captcha failed");
+                 return PE_CAPTCHAERROR;
+             }
+@@ -179,8 +185,8 @@ sub setSecurity {
      return if $req->data->{skipToken};
  
      # If captcha is enable, prepare it
 -    if ( $self->captcha ) {
+-        $self->p->_captcha->init_captcha($req);
 +    if ( $self->captcha->( $req, {} ) ) {
-         $self->p->getService('captcha')->init_captcha($req);
++        $self->p->getService('captcha')->init_captcha($req);
      }
  
+     # Else get token
 diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Captcha/ReCaptcha.pm b/usr/share/perl5/Lemonldap/NG/Portal/Captcha/ReCaptcha.pm
 new file mode 100644
 index 000000000..a4a1a6d41
@@ -138,6 +148,240 @@ index 000000000..a4a1a6d41
 +
 +1;
 +
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Captcha/SecurityImage.pm b/usr/share/perl5/Lemonldap/NG/Portal/Captcha/SecurityImage.pm
+index 6878cdf1b..34656d735 100644
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Captcha/SecurityImage.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Captcha/SecurityImage.pm
+@@ -62,12 +62,7 @@ has ott => (
+ 
+ sub init {
+     my ($self) = @_;
+-    if (   $self->conf->{captcha_mail_enabled}
+-        || $self->conf->{captcha_login_enabled}
+-        || $self->conf->{captcha_register_enabled} )
+-    {
+-        $self->addUnauthRoute( renewcaptcha => '_sendCaptcha', ['GET'] );
+-    }
++    $self->addUnauthRoute( renewcaptcha => '_sendCaptcha', ['GET'] );
+     return 1;
+ }
+ 
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Main/Init.pm b/usr/share/perl5/Lemonldap/NG/Portal/Main/Init.pm
+index a1573bb0a..4cf723b37 100644
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Init.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Init.pm
+@@ -31,9 +31,14 @@ has _authentication => ( is => 'rw' );
+ has _userDB         => ( is => 'rw' );
+ has _passwordDB     => ( is => 'rw' );
+ has _sfEngine       => ( is => 'rw' );
+-has _captcha        => ( is => 'rw' );
+-has _trustedBrowser => ( is => 'rw' );
+-has _ppRules        => ( is => 'rw', default => sub { {} } );
++
++has _loadedServices => ( is => 'rw', default => sub { {} } );
++
++# Legacy
++sub _captcha        { $_[0]->getService('captcha') }
++sub _trustedBrowser { $_[0]->getService('trustedBrowser') }
++
++has _ppRules => ( is => 'rw', default => sub { {} } );
+ 
+ has loadedModules => ( is => 'rw' );
+ 
+@@ -104,6 +109,22 @@ has pluginSessionDataToRemember =>
+ 
+ # INITIALIZATION
+ 
++sub _resetPluginsAndServices {
++    my ($self) = @_;
++    $self->loadedModules( {} );
++    $self->_loadedServices( {} );
++    $self->afterSub( {} );
++    $self->aroundSub( {} );
++    $self->spRules( {} );
++    $self->hook( {} );
++    $self->pluginSessionDataToRemember( {} );
++
++    # Reinitialize arrays
++    foreach ( qw(_macros _groups), @entryPoints ) {
++        $self->{$_} = [];
++    }
++}
++
+ sub init {
+     my ( $self, $args ) = @_;
+     $args ||= {};
+@@ -134,10 +155,7 @@ sub init {
+     $self->trOver( JSON::to_json( $self->trOver ) );
+ 
+     # Purge loaded module list
+-    $self->loadedModules( {} );
+-    $self->afterSub( {} );
+-    $self->aroundSub( {} );
+-    $self->hook( {} );
++    $self->_resetPluginsAndServices;
+ 
+     # Insert `reloadConf` in handler reload stack
+     Lemonldap::NG::Handler::Main->onReload( $self, 'reloadConf' );
+@@ -231,17 +249,8 @@ sub reloadConf {
+     # Reinitialize $self->conf
+     %{ $self->{conf} } = %{ $self->localConfig };
+ 
+-    # Reinitialize arrays
+-    foreach ( qw(_macros _groups), @entryPoints ) {
+-        $self->{$_} = [];
+-    }
+-    $self->afterSub( {} );
+-    $self->aroundSub( {} );
+-    $self->spRules( {} );
+-    $self->hook( {} );
+-
+-    # Plugin history fields
+-    $self->pluginSessionDataToRemember( {} );
++    # Purge loaded module list
++    $self->_resetPluginsAndServices;
+ 
+     # Load conf in portal object
+     foreach my $key ( keys %$conf ) {
+@@ -325,23 +334,6 @@ sub reloadConf {
+       unless $self->{_sfEngine} =
+       $self->loadPlugin( $self->conf->{'sfEngine'} );
+ 
+-    # Load trusted browser engine
+-    return $self->fail
+-      unless $self->_trustedBrowser(
+-        $self->loadPlugin(
+-            $self->conf->{'trustedBrowserEngine'}
+-              || "::Plugins::TrustedBrowser"
+-        )
+-      );
+-
+-    # Load Captcha module
+-    return $self->fail
+-      unless $self->_captcha(
+-        $self->loadPlugin(
+-            $self->conf->{'captcha'} || '::Captcha::SecurityImage'
+-        )
+-      );
+-
+     # Compile macros in _macros, groups in _groups
+     foreach my $type (qw(macros groups)) {
+         $self->{"_$type"} = {};
+@@ -365,6 +357,11 @@ sub reloadConf {
+       or $self->logger->error(
+         'jsRedirect returns an error: ' . HANDLER->tsv->{jail}->error );
+ 
++    # Load services
++    foreach my $service ( $self->enabledServices ) {
++        $self->loadService(@$service) or return $self->fail;
++    }
++
+     # Load plugins
+     foreach my $plugin ( $self->enabledPlugins ) {
+         $self->loadPlugin($plugin) or return $self->fail;
+@@ -474,6 +471,17 @@ sub reloadConf {
+ }
+ 
+ # Method used to load plugins
++
++sub loadService {
++    my ( $self, $name, $plugin ) = @_;
++    return $self->_loadedServices->{$name} = $self->loadPlugin($plugin);
++}
++
++sub getService {
++    my ($self, $name) = @_;
++    return $_[0]->_loadedServices->{$name};
++}
++
+ sub loadPlugin {
+     my ( $self, $plugin ) = @_;
+     unless ($plugin) {
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm b/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm
+index c27bf01f7..d16010125 100644
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm
+@@ -54,6 +54,41 @@ our @pList = (
+ ##@method list enabledPlugins
+ #
+ #@return list of enabled plugins
++#
++# List can be:
++#  * a plugin name
++#  * an array ref containing:
++#    - the property into which the plugin has to be linked
++#    - the plugin name
++#
++# If plugin name starts with '::', the prefix Lemonldap::NG::Portal will be
++# added
++
++sub enabledServices {
++    my ($self) = @_;
++    my $conf = $self->conf;
++    my @res;
++
++    # Trusted browser
++    if ( $self->conf->{trustedBrowserRule} or $self->conf->{stayConnected} ) {
++        my $module =
++          $self->conf->{'trustedBrowserEngine'} || '::Plugins::TrustedBrowser';
++        $self->logger->debug("$module needed");
++        push @res, [ trustedBrowser => $module ];
++    }
++
++    # Captcha
++    if (   $self->conf->{captcha_mail_enabled}
++        || $self->conf->{captcha_login_enabled}
++        || $self->conf->{captcha_register_enabled} )
++    {
++        my $module = $self->conf->{'captcha'} || '::Captcha::SecurityImage';
++        $self->logger->debug("$module needed");
++        push @res, [ captcha => $module ];
++    }
++    return @res;
++}
++
+ sub enabledPlugins {
+     my ($self) = @_;
+     my $conf = $self->conf;
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm b/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm
+index 848912bd0..aac184325 100644
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm
+@@ -240,7 +240,7 @@ sub processRefreshSession {
+ 
+     # Avoid interferences when refresh is run on multiple sessions
+     # in the same request
+-    $req->sessionInfo({});
++    $req->sessionInfo( {} );
+     $req->steps( [
+             'getUser',
+             @{ $self->betweenAuthAndData },
+@@ -1513,8 +1513,10 @@ sub buildUrl {
+ sub rememberBrowser {
+     my ( $self, $req ) = @_;
+ 
+-    if ( $self->_trustedBrowser and $self->_trustedBrowser->can("newDevice") ) {
+-        return $self->_trustedBrowser->newDevice($req);
++    if (    $self->getService('trustedBrowser')
++        and $self->getService('trustedBrowser')->can("newDevice") )
++    {
++        return $self->getService('trustedBrowser')->newDevice($req);
+     }
+     else {
+         return PE_OK;
+@@ -1524,8 +1526,10 @@ sub rememberBrowser {
+ sub rememberBrowserCheck {
+     my ( $self, $req ) = @_;
+ 
+-    if ( $self->_trustedBrowser and $self->_trustedBrowser->can("check") ) {
+-        return $self->_trustedBrowser->check($req);
++    if (    $self->getService('trustedBrowser')
++        and $self->getService('trustedBrowser')->can("check") )
++    {
++        return $self->getService('trustedBrowser')->check($req);
+     }
+     else {
+         return PE_OK;
 diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CertificateResetByMail.pm b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CertificateResetByMail.pm
 index d74580f38..52375d00d 100644
 --- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CertificateResetByMail.pm
@@ -158,24 +402,28 @@ index d74580f38..52375d00d 100644
  
      # Load registered module
      $self->registerModule(
-@@ -168,7 +171,7 @@ sub _certificateReset {
+@@ -168,8 +171,8 @@ sub _certificateReset {
          $req->{user} = $req->param('mail');
  
          # Captcha for register form
 -        if ( $self->captcha ) {
+-            my $result = $self->p->_captcha->check_captcha($req);
 +        if ( $self->captcha->( $req, {} ) ) {
-             my $result = $self->p->getService('captcha')->check_captcha($req);
++            my $result = $self->p->getService('captcha')->check_captcha($req);
              if ($result) {
                  $self->logger->debug("Captcha code verified");
-@@ -559,7 +562,7 @@ sub modifyCertificate {
+             }
+@@ -559,8 +562,8 @@ sub modifyCertificate {
  sub setSecurity {
      my ( $self, $req ) = @_;
  
 -    if ( $self->captcha ) {
+-        $self->p->_captcha->init_captcha($req);
 +    if ( $self->captcha->( $req, {} ) ) {
-         $self->p->getService('captcha')->init_captcha($req);
++        $self->p->getService('captcha')->init_captcha($req);
      }
  
+     elsif ( $self->ottRule->( $req, {} ) ) {
 diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/Impersonation.pm b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/Impersonation.pm
 index e24d6b68a..29b0d86a8 100644
 --- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/Impersonation.pm
@@ -232,24 +480,28 @@ index a62cbf04c..5ffe8731b 100644
  
      # Parse password policy activation rule
      $self->passwordPolicyActivationRule(
-@@ -239,7 +242,7 @@ sub _reset {
+@@ -239,8 +242,8 @@ sub _reset {
          $req->{user} = $req->param('mail');
  
          # Captcha for register form
 -        if ( $self->captcha ) {
+-            my $result = $self->p->_captcha->check_captcha($req);
 +        if ( $self->captcha->( $req, {} ) ) {
-             my $result = $self->p->getService('captcha')->check_captcha($req);
++            my $result = $self->p->getService('captcha')->check_captcha($req);
              if ($result) {
                  $self->logger->debug("Captcha code verified");
-@@ -585,7 +588,7 @@ sub changePwd {
+             }
+@@ -585,8 +588,8 @@ sub changePwd {
  
  sub setSecurity {
      my ( $self, $req ) = @_;
 -    if ( $self->captcha ) {
+-        $self->p->_captcha->init_captcha($req);
 +    if ( $self->captcha->( $req, {} ) ) {
-         $self->p->getService('captcha')->init_captcha($req);
++        $self->p->getService('captcha')->init_captcha($req);
      }
      elsif ( $self->ottRule->( $req, {} ) ) {
+         $self->ott->setToken($req);
 diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/Register.pm b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/Register.pm
 index 616d42859..fa310149f 100644
 --- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/Register.pm
@@ -279,7 +531,7 @@ index 616d42859..fa310149f 100644
  
              # Captcha for register form
 -            if ( $self->captcha ) {
--                my $result = $self->p->getService('captcha')->check_captcha($req);
+-                my $result = $self->p->_captcha->check_captcha($req);
 +            if ( $self->captcha->( $req, {} ) ) {
 +                my $result =
 +                  $self->p->getService('captcha')->check_captcha($req);
@@ -291,9 +543,31 @@ index 616d42859..fa310149f 100644
      # Check mail
      return PE_MALFORMEDUSER
 -      unless ( $req->data->{registerInfo}->{mail} =~
--        m/$self->{conf}->{userControl}/ );
+-        m/$self->{conf}->{userControl}/o );
 +      unless (
 +        $req->data->{registerInfo}->{mail} =~ m/$self->{conf}->{userControl}/ );
  
      # Search for user using UserDB module
      # If the user already exists, register is forbidden
+@@ -542,7 +542,7 @@ sub display {
+ sub setSecurity {
+     my ( $self, $req ) = @_;
+     if ( $self->captcha ) {
+-        $self->p->_captcha->init_captcha($req);
++        $self->p->getService('captcha')->init_captcha($req);
+     }
+     elsif ( $self->ottRule->( $req, {} ) ) {
+         $self->ott->setToken($req);
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/StayConnected.pm b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/StayConnected.pm
+index 5f245a479..33b39c4da 100644
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/StayConnected.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/StayConnected.pm
+@@ -39,7 +39,7 @@ sub check {
+         $self->logger->debug("Stay Connected not allowed");
+     }
+ 
+-    my $trustedBrowser = $self->p->_trustedBrowser;
++    my $trustedBrowser = $self->p->getService('trustedBrowser');
+ 
+     # Run TrustedBrowser challenge
+     if ( $trustedBrowser->mustChallenge($req) ) {
