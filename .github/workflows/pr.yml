@@ -1,4 +1,4 @@
-name: Build and Publish Docker Images
+name: Build and test Docker Images
 
 env:
   VERSION: 2.19.0
