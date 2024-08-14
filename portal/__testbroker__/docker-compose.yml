@@ -13,8 +13,8 @@ services:
       retries: 5
     networks:
       - db
-    ports:
-      - 5432:5432
+    #ports:
+    #  - 5432:5432
 
   auth:
     container_name: test-broker-auth
@@ -28,12 +28,14 @@ services:
       - LOGGER=stderr
       - USERLOGGER=stderr
       - PORTAL=http://auth.example.com:19876/
+    volumes:
+      - ./manager-nginx.conf:/etc/nginx/sites-enabled/zzz-manager-nginx.conf
     networks:
       - db
-    ports:
-      - 19876:80
+    #ports:
+    #  - 19876:80
 
-  manager:
+  manager.example.com:
     container_name: test-broker-manager
     depends_on:
       db:
