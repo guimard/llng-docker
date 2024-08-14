@@ -1,5 +1,6 @@
 # Changes
 
+* 2024-08-14: add RELAY variable
 * 2024-08-14: add message-broker
 * 2024-08-13: add reCaptcha plugin
 * 2024-07-24: update to 2.19.1 (v2.19.1-1)

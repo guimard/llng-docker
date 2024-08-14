@@ -47,7 +47,10 @@ services:
     environment:
       - POSTGRES_PASSWORD=zz
     healthcheck:
-      test: "exit 0"
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
   redis:
     image: redis
   portal:
@@ -76,6 +79,8 @@ services:
       db:
         condition: service_healthy
       redis:
+        condition: service_started
+      portal:
         condition: service_started
   crowdsec:
     image: crowdsecurity/crowdsec

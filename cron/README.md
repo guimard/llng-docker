@@ -14,7 +14,10 @@ services:
     environment:
       - POSTGRES_PASSWORD=pwd
     healthcheck:
-      test: "exit 0"
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis
@@ -53,6 +56,8 @@ services:
     depends_on: 
       llng-db:
         condition: service_healthy
+      auth:
+        condition: service_started
 
   manager:
     image: yadd/lemonldap-ng-manager
@@ -68,6 +73,8 @@ services:
       llng-db:
         condition: service_healthy
       redis:
+        condition: service_started
+      auth:
         condition: service_started
     networks:
       - db

@@ -37,6 +37,8 @@ yadd/lemonldap-ng-cron-task)_.
 * `NPROC`: the minimal number of FastCGI server to start _(default: 7)_
 * `ENGINE`: the FastCGI server engine. _(default: [FCGI](https://metacpan.org/pod/FCGI))_.
   You can try [FCGI::Engine::ProcManager](https://metacpan.org/pod/FCGI::Engine::ProcManager).
+  See also [High performance portal](../uwsgi-portal/README.md).
+* `RELAY`: list of reverse-proxies to set. syntax: `<servername>=https://<proxy-dest>/;<servername>=https://<proxy-dest>/...`
 
 See also [yadd/lemonldap-ng-base](https://github.com/guimard/llng-docker/blob/master/base/README.md#readme)
 
@@ -53,7 +55,10 @@ services:
     environment:
       - POSTGRES_PASSWORD=zz
     healthcheck:
-      test: "exit 0"
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
   redis:
     image: redis
   portal:
@@ -71,6 +76,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+      crowdsec:
+        condition: service_started
   manager:
     image: yadd/lemonldap-ng-manager
     environment:
@@ -82,6 +89,8 @@ services:
       db:
         condition: service_healthy
       redis:
+        condition: service_started
+      portal:
         condition: service_started
 
   crowdsec:

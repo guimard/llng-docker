@@ -53,3 +53,12 @@ describe('LLNG portal', () => {
       .expect(401,done)
   })
 })
+describe('RELAY', () => {
+  const request = supertest.agent('http://foo.example.com')
+  it('should find /languages/fr.json', (done) => {
+    request.get('/languages/fr.json')
+      .expect(200)
+      .then(res => { done() })
+      .catch(done)
+  });
+})
