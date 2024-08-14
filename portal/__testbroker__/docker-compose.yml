@@ -1,0 +1,52 @@
+version: "3.4"
+
+services:
+  db:
+    image: yadd/lemonldap-ng-pg-database
+    environment:
+      - POSTGRES_PASSWORD=zz
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - db
+    ports:
+      - 5432:5432
+
+  auth:
+    depends_on:
+      db:
+        condition: service_healthy
+    image: yadd/lemonldap-ng-portal
+    environment:
+      - LOGLEVEL=debug
+      - PG_SERVER=db
+      - LOGGER=stderr
+      - USERLOGGER=stderr
+      - PORTAL=http://auth.example.com:19876/
+    networks:
+      - db
+    ports:
+      - 19876:80
+
+  manager:
+    depends_on:
+      db:
+        condition: service_healthy
+      auth:
+        condition: service_started
+    image: yadd/lemonldap-ng-manager
+    environment:
+      - LOGLEVEL=debug
+      - PG_SERVER=db
+      - LOGGER=stderr
+      - USERLOGGER=stderr
+      - PORTAL=http://auth.example.com:19876/
+    networks:
+      - db
+
+networks:
+  db:
+    name: db

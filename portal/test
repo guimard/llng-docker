@@ -10,3 +10,13 @@ set -e
 cd __test__
 $COMPOSE run --rm test
 $COMPOSE down
+
+cd ../__testbroker__
+$COMPOSE up -d
+echo "Be sure conf is loaded"
+$COMPOSE run manager /usr/share/docker-llng/updateConf get macros
+$COMPOSE run auth /usr/share/docker-llng/updateConf get macros
+echo "Modify macro on manager, define AA => CC"
+$COMPOSE run manager /usr/share/docker-llng/updateConf set macros AA CC
+echo "Verify propagation on portal, should get CC when querying for macros AA"
+$COMPOSE run auth /usr/share/docker-llng/updateConf get macros AA | grep CC

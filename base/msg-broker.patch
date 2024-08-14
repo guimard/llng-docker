@@ -280,7 +280,7 @@ new file mode 100644
 index 000000000..e15e9d0f4
 --- /dev/null
 +++ b/usr/share/perl5/Lemonldap/NG/Common/MessageBroker/Pg.pm
-@ -0,0 +1,74 @@
+@@ -0,0 +1,74 @@
 +package Lemonldap::NG::Common::MessageBroker::Pg;
 +
 +use strict;
