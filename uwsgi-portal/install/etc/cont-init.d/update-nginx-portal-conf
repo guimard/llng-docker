@@ -14,3 +14,25 @@ s#__DNSDOMAIN__#$ENV{SSODOMAIN}#g;
 s#__PORTALSITEDIR__#/usr/share/lemonldap-ng/portal/htdocs/#g;
 s#__PORTALSTATICDIR__#/usr/share/lemonldap-ng/portal/htdocs/static/#g;
 ' /etc/lemonldap-ng/portal-nginx.conf
+
+if test "$RELAY" != ''; then
+	set -e
+	perl -e '
+use strict;
+my $res;
+my @list = split /\s*;\s*/, $ENV{RELAY};
+foreach(@list) {
+	die "Bad relay value $_" unless m#^(.*?)=(https?://.*/)$#;
+	print <<EOF
+server {
+  listen 80;
+  listen [::]:80;
+  server_name $1;
+  location / {
+    proxy_pass $2;
+  }
+}
+EOF
+}
+' >/etc/nginx/sites-enabled/zzzz-relay.conf
+fi
