@@ -8,7 +8,7 @@ env:
 
 on:
   push:
-    branches: [master,stable]
+    branches: [master,stable,experimental]
 
 jobs:
   test:
@@ -51,10 +51,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
-            yadd/lemonldap-ng-pg-database:latest
-            yadd/lemonldap-ng-pg-database:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-pg-database:${{ env.PGVERSION }}
-            yadd/lemonldap-ng-pg-database:${{ env.PGVERSION }}-${{ env.DEBIANRELEASE }}
+            yadd/lemonldap-ng-pg-database:experimental
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
         env:
@@ -96,10 +93,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
-            yadd/lemonldap-ng-base:latest
-            yadd/lemonldap-ng-base:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-base:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
-            yadd/lemonldap-ng-base:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
+            yadd/lemonldap-ng-base:experimental
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
         env:
@@ -143,10 +137,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
-            yadd/lemonldap-ng-portal:latest
-            yadd/lemonldap-ng-portal:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
-            yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
+            yadd/lemonldap-ng-portal:experimental
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
         env:
@@ -190,10 +181,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
-            yadd/lemonldap-ng-portal:latest-hiperf
-            yadd/lemonldap-ng-portal:${{ steps.date.outputs.date }}-hiperf
-            yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-hiperf
-            yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-hiperf
+            yadd/lemonldap-ng-portal:experimental-hiperf
 
   build-and-push-cron:
     needs: build-and-push-base
@@ -227,10 +215,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
-            yadd/lemonldap-ng-cron:latest
-            yadd/lemonldap-ng-cron:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-cron:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
-            yadd/lemonldap-ng-cron:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
+            yadd/lemonldap-ng-cron:experimental
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
         env:
@@ -274,10 +259,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
-            yadd/lemonldap-ng-cron-task:latest
-            yadd/lemonldap-ng-cron-task:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-cron-task:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
-            yadd/lemonldap-ng-cron-task:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
+            yadd/lemonldap-ng-cron-task:experimental
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
         env:
@@ -321,10 +303,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
-            yadd/lemonldap-ng-sessions-backup:latest
-            yadd/lemonldap-ng-sessions-backup:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-sessions-backup:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
-            yadd/lemonldap-ng-sessions-backup:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
+            yadd/lemonldap-ng-sessions-backup:experimental
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
         env:
@@ -368,10 +347,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
-            yadd/lemonldap-ng-manager:latest
-            yadd/lemonldap-ng-manager:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-manager:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
-            yadd/lemonldap-ng-manager:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
+            yadd/lemonldap-ng-manager:experimental
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
         env:
@@ -415,10 +391,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
-            yadd/lemonldap-ng-full:latest
-            yadd/lemonldap-ng-full:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-full:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
-            yadd/lemonldap-ng-full:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
+            yadd/lemonldap-ng-full:experimental
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
         env:
@@ -462,10 +435,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
-            yadd/lemonldap-ng-ssoaas-fastcgi-server:latest
-            yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
-            yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
+            yadd/lemonldap-ng-ssoaas-fastcgi-server:experimental
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
         env:
@@ -476,42 +446,6 @@ jobs:
           provider: dockerhub
           short_description: 'LemonLDAP::NG SSOaaS FastCGI Server'
           readme_file: 'ssoaas-fastcgi-server/README.md'
-
-  build-and-push-dev:
-    needs: build-and-push-full
-    runs-on: ubuntu-latest
-    steps:
-      - name: Get current date
-        id: date
-        run: echo "::set-output name=date::$(date +'%Y%m%d')"
-      - name: Test with environment variables
-        run: echo $TAG_NAME
-        env:
-          TAG_NAME: |
-            latest
-            ${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ steps.date.outputs.date }}
-            ${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ steps.date.outputs.date }}-${{ env.DEBIANRELEASE }}
-      - name: Checkout code
-        uses: actions/checkout@v3
-      - name: Set up QEMU
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-dev
-      - name: Build and push Docker image for dev
-        uses: docker/build-push-action@v4
-        with:
-          context: ./dev
-          push: true
-          tags: |
-            yadd/lemonldap-ng-dev:latest
-            yadd/lemonldap-ng-dev:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-dev:${{ env.DEBIANRELEASE }}
 
   build-and-push-base-no-s6:
     runs-on: ubuntu-latest
@@ -543,10 +477,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
-            yadd/lemonldap-ng-base:latest-no-s6
-            yadd/lemonldap-ng-base:${{ steps.date.outputs.date }}-no-s6
-            yadd/lemonldap-ng-base:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
-            yadd/lemonldap-ng-base:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
+            yadd/lemonldap-ng-base:experimental-no-s6
 
   build-and-push-portal-no-s6:
     needs: build-and-push-base-no-s6
@@ -580,10 +511,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
-            yadd/lemonldap-ng-portal:latest-no-s6
-            yadd/lemonldap-ng-portal:${{ steps.date.outputs.date }}-no-s6
-            yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
-            yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
+            yadd/lemonldap-ng-portal:experimental-no-s6
 
   build-and-push-portal-hiperf-no-s6:
     needs: build-and-push-base-no-s6
@@ -617,10 +545,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
-            yadd/lemonldap-ng-portal:latest-no-s6-hiperf
-            yadd/lemonldap-ng-portal:${{ steps.date.outputs.date }}-no-s6-hiperf
-            yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6-hiperf
-            yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6-hiperf
+            yadd/lemonldap-ng-portal:experimental-no-s6-hiperf
 
   build-and-push-cron-no-s6:
     needs: build-and-push-base-no-s6
@@ -654,10 +579,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
-            yadd/lemonldap-ng-cron:latest-no-s6
-            yadd/lemonldap-ng-cron:${{ steps.date.outputs.date }}-no-s6
-            yadd/lemonldap-ng-cron:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
-            yadd/lemonldap-ng-cron:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
+            yadd/lemonldap-ng-cron:experimental-no-s6
 
   build-and-push-cron-task-no-s6:
     needs: build-and-push-base-no-s6
@@ -691,10 +613,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
-            yadd/lemonldap-ng-cron-task:latest-no-s6
-            yadd/lemonldap-ng-cron-task:${{ steps.date.outputs.date }}-no-s6
-            yadd/lemonldap-ng-cron-task:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
-            yadd/lemonldap-ng-cron-task:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
+            yadd/lemonldap-ng-cron-task:experimental-no-s6
 
   build-and-push-sessions-backup-no-s6:
     needs: build-and-push-base-no-s6
@@ -728,10 +647,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
-            yadd/lemonldap-ng-sessions-backup:latest-no-s6
-            yadd/lemonldap-ng-sessions-backup:${{ steps.date.outputs.date }}-no-s6
-            yadd/lemonldap-ng-sessions-backup:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
-            yadd/lemonldap-ng-sessions-backup:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
+            yadd/lemonldap-ng-sessions-backup:experimental-no-s6
 
   build-and-push-manager-no-s6:
     needs: build-and-push-base-no-s6
@@ -765,10 +681,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
-            yadd/lemonldap-ng-manager:latest-no-s6
-            yadd/lemonldap-ng-manager:${{ steps.date.outputs.date }}-no-s6
-            yadd/lemonldap-ng-manager:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
-            yadd/lemonldap-ng-manager:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
+            yadd/lemonldap-ng-manager:experimental-no-s6
 
   build-and-push-full-no-s6:
     needs: build-and-push-portal-no-s6
@@ -802,10 +715,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
-            yadd/lemonldap-ng-full:latest-no-s6
-            yadd/lemonldap-ng-full:${{ steps.date.outputs.date }}-no-s6
-            yadd/lemonldap-ng-full:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
-            yadd/lemonldap-ng-full:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
+            yadd/lemonldap-ng-full:experimental-no-s6
 
   build-and-push-ssoaas-fastcgi-server-no-s6:
     needs: build-and-push-base-no-s6
@@ -839,7 +749,4 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
-            yadd/lemonldap-ng-ssoaas-fastcgi-server:latest-no-s6
-            yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ steps.date.outputs.date }}-no-s6
-            yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
-            yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
+            yadd/lemonldap-ng-ssoaas-fastcgi-server:experimental-no-s6
