@@ -1,6 +1,12 @@
 #!/bin/sh
 
+if which docker-compose; then
+	COMPOSE='docker-compose'
+else
+	COMPOSE='docker compose'
+fi
+
 set -e
 cd __test__
-docker-compose run --rm test
-docker-compose down
+$COMPOSE run --rm test
+$COMPOSE down

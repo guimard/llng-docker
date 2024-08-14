@@ -5,6 +5,16 @@ set -e
 LIST=${LIST:-pg base portal uwsgi-portal manager full ssoaas-fastcgi-server cron cron-task sessions-backup}
 #LIST=${LIST:-pg base portal uwsgi-portal manager full ssoaas-fastcgi-server cron dev}
 
+if test "$(cd base && md5sum *.patch|sort)" != "$(cd base-no-s6 && md5sum *.patch|sort)"; then
+	echo "Base patches differ" >&2
+fi
+if test "$(cd portal && md5sum *.patch|sort)" != "$(cd uwsgi-portal && md5sum *.patch|sort)"; then
+	echo "Portal patches differ" >&2
+fi
+if test "$(cd manager && md5sum *.patch|sort)" != "$(cd full && md5sum *.patch|sort)"; then
+	echo "Manager patches differ" >&2
+fi
+
 for i in $LIST; do
 	(
 	cd $i

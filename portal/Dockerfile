@@ -11,7 +11,8 @@ ENV SERVERNAME= \
 RUN echo "# Install nginx and portal libs" && \
     apt-get -y update && \
     apt-get -y upgrade && \
-    apt-get -y --no-install-recommends install nginx \
+    export DEBIAN_FRONTEND=noninteractive && \
+    apt-get -y -o Dpkg::Options::="--force-confold" --no-install-recommends install nginx \
         lemonldap-ng-fastcgi-server"${LLNGDIST}" \
         liblemonldap-ng-portal-perl"${LLNGDIST}" \
         gsfonts patch \
