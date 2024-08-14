@@ -2,6 +2,7 @@ version: "3.4"
 
 services:
   db:
+    container_name: test-broker-db
     image: yadd/lemonldap-ng-pg-database
     environment:
       - POSTGRES_PASSWORD=zz
@@ -16,6 +17,7 @@ services:
       - 5432:5432
 
   auth:
+    container_name: test-broker-auth
     depends_on:
       db:
         condition: service_healthy
@@ -32,6 +34,7 @@ services:
       - 19876:80
 
   manager:
+    container_name: test-broker-manager
     depends_on:
       db:
         condition: service_healthy
