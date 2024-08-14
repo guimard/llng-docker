@@ -1,0 +1,57 @@
+version: "3.4"
+
+services:
+  db:
+    container_name: test-broker-db
+    image: yadd/lemonldap-ng-pg-database
+    environment:
+      - POSTGRES_PASSWORD=zz
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - db
+    #ports:
+    #  - 5432:5432
+
+  auth:
+    container_name: test-broker-auth
+    depends_on:
+      db:
+        condition: service_healthy
+    image: yadd/lemonldap-ng-portal
+    environment:
+      - LOGLEVEL=debug
+      - PG_SERVER=db
+      - LOGGER=stderr
+      - USERLOGGER=stderr
+      - PORTAL=http://auth.example.com:19876/
+    volumes:
+      - ./manager-nginx.conf:/etc/nginx/sites-enabled/zzz-manager-nginx.conf
+    networks:
+      - db
+    #ports:
+    #  - 19876:80
+
+  manager.example.com:
+    container_name: test-broker-manager
+    depends_on:
+      db:
+        condition: service_healthy
+      auth:
+        condition: service_started
+    image: yadd/lemonldap-ng-manager
+    environment:
+      - LOGLEVEL=debug
+      - PG_SERVER=db
+      - LOGGER=stderr
+      - USERLOGGER=stderr
+      - PORTAL=http://auth.example.com:19876/
+    networks:
+      - db
+
+networks:
+  db:
+    name: db
