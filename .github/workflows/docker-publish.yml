@@ -133,7 +133,7 @@ jobs:
         with:
           context: ./portal
           build-args: |
-            "BASE=yadd/lemonldap-ng-base:latest"
+            "BASE=yadd/lemonldap-ng-base:experimental"
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
@@ -177,7 +177,7 @@ jobs:
         with:
           context: ./uwsgi-portal
           build-args: |
-            "BASE=yadd/lemonldap-ng-base:latest"
+            "BASE=yadd/lemonldap-ng-base:experimental"
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
@@ -211,7 +211,7 @@ jobs:
         with:
           context: ./cron
           build-args: |
-            "BASE=yadd/lemonldap-ng-base:latest"
+            "BASE=yadd/lemonldap-ng-base:experimental"
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
@@ -255,7 +255,7 @@ jobs:
         with:
           context: ./cron-task
           build-args: |
-            "BASE=yadd/lemonldap-ng-base:latest"
+            "BASE=yadd/lemonldap-ng-base:experimental"
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
@@ -299,7 +299,7 @@ jobs:
         with:
           context: ./sessions-backup
           build-args: |
-            "BASE=yadd/lemonldap-ng-base:latest"
+            "BASE=yadd/lemonldap-ng-base:experimental"
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
@@ -343,7 +343,7 @@ jobs:
         with:
           context: ./manager
           build-args: |
-            "BASE=yadd/lemonldap-ng-base:latest"
+            "BASE=yadd/lemonldap-ng-base:experimental"
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
@@ -387,7 +387,7 @@ jobs:
         with:
           context: ./full
           build-args: |
-            "PORTALBASE=yadd/lemonldap-ng-portal:latest"
+            "PORTALBASE=yadd/lemonldap-ng-portal:experimental"
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
@@ -431,7 +431,7 @@ jobs:
         with:
           context: ./ssoaas-fastcgi-server
           build-args: |
-            "BASE=yadd/lemonldap-ng-base:latest"
+            "BASE=yadd/lemonldap-ng-base:experimental"
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
@@ -507,7 +507,7 @@ jobs:
         with:
           context: ./portal
           build-args: |
-            "BASE=yadd/lemonldap-ng-base:latest-no-s6"
+            "BASE=yadd/lemonldap-ng-base:experimental-no-s6"
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
@@ -541,7 +541,7 @@ jobs:
         with:
           context: ./uwsgi-portal
           build-args: |
-            "BASE=yadd/lemonldap-ng-base:latest-no-s6"
+            "BASE=yadd/lemonldap-ng-base:experimental-no-s6"
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
@@ -575,7 +575,7 @@ jobs:
         with:
           context: ./cron
           build-args: |
-            "BASE=yadd/lemonldap-ng-base:latest-no-s6"
+            "BASE=yadd/lemonldap-ng-base:experimental-no-s6"
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
@@ -609,7 +609,7 @@ jobs:
         with:
           context: ./cron-task
           build-args: |
-            "BASE=yadd/lemonldap-ng-base:latest-no-s6"
+            "BASE=yadd/lemonldap-ng-base:experimental-no-s6"
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
@@ -643,7 +643,7 @@ jobs:
         with:
           context: ./sessions-backup
           build-args: |
-            "BASE=yadd/lemonldap-ng-base:latest-no-s6"
+            "BASE=yadd/lemonldap-ng-base:experimental-no-s6"
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
@@ -677,7 +677,7 @@ jobs:
         with:
           context: ./manager
           build-args: |
-            "BASE=yadd/lemonldap-ng-base:latest-no-s6"
+            "BASE=yadd/lemonldap-ng-base:experimental-no-s6"
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
@@ -711,7 +711,7 @@ jobs:
         with:
           context: ./full
           build-args: |
-            "PORTALBASE=yadd/lemonldap-ng-portal:latest-no-s6"
+            "PORTALBASE=yadd/lemonldap-ng-portal:experimental-no-s6"
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
@@ -745,7 +745,7 @@ jobs:
         with:
           context: ./ssoaas-fastcgi-server
           build-args: |
-            "BASE=yadd/lemonldap-ng-base:latest-no-s6"
+            "BASE=yadd/lemonldap-ng-base:experimental-no-s6"
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
