@@ -16,7 +16,7 @@ s#__PORTALSTATICDIR__#/usr/share/lemonldap-ng/portal/htdocs/static/#g;
 ' /etc/lemonldap-ng/portal-nginx.conf
 
 if test "$TLS_CERT_FILE"; then
-	perl -i -pe 's/^(\s*listen.*)80/${1}443/' /etc/lemonldap-ng/portal-nginx.conf
+	perl -i -pe 's/^(\s*listen.*)80/${1}443 ssl/' /etc/lemonldap-ng/portal-nginx.conf
 	if grep ssl_certificate /etc/lemonldap-ng/portal-nginx.conf; then
 		echo "SSL already configured ?"
 	else
