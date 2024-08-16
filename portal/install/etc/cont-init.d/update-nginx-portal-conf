@@ -9,6 +9,9 @@ export SERVERNAME
 
 FILES=/etc/lemonldap-ng/portal-nginx.conf
 
+set -e
+
+echo "Configure hostname in $FILES"
 perl -i -pe 's#__FASTCGISOCKDIR__#/run/llng-fastcgi-server#g;
 s#__PORT__#80#g;
 s#__SERVERNAME__#$ENV{SERVERNAME}#g;
@@ -18,7 +21,7 @@ s#__PORTALSTATICDIR__#/usr/share/lemonldap-ng/portal/htdocs/static/#g;
 ' $FILES
 
 if test "$RELAY" != ''; then
-	set -e
+	echo "Configure wanted relay(s)"
 	perl -e '
 use strict;
 my $res;
@@ -42,7 +45,8 @@ EOF
 fi
 
 if test "$TLS_CERT_FILE"; then
-	perl -i -pe 's/^(\s*listen.*)80/${1}443 ssl/' /etc/lemonldap-ng/portal-nginx.conf
+	echo "Configure SSL into $FILES"
+	perl -i -pe 's/^(\s*listen.*)80/${1}443 ssl/' $FILES
 	if grep ssl_certificate /etc/lemonldap-ng/portal-nginx.conf; then
 		echo "SSL already configured ?"
 	else
