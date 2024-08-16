@@ -59,8 +59,8 @@ describe('RELAY', () => {
     request.get('/')
       .set('Accept', 'application/json')
       .expect(200)
+      .expect({name:'john'})
       .then(res => {
-        expect(res.body.name).toEqual('john');
         done();
       })
       .catch(done)
