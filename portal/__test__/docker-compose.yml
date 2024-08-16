@@ -7,7 +7,7 @@ services:
     environment:
       - LOGGER=stderr
       - USERLOGGER=stderr
-      - "RELAY=foo.example.com=http://auth.example.com/static/"
+      - "RELAY=foo.example.com=http://test:3000/"
     networks:
       portaltest:
         aliases:

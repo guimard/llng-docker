@@ -1,6 +1,6 @@
 FROM debian:bookworm-slim
 
-RUN apt-get update && apt-get upgrade -y && apt-get install -y mocha node-supertest node-he
+RUN apt-get update && apt-get upgrade -y && apt-get install -y mocha node-supertest node-he node-express
 
 RUN mkdir /test
 
