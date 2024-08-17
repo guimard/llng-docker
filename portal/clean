@@ -1,3 +1,4 @@
 #!/bin/sh
 
 docker rmi yadd/lemonldap-ng-portal-test
+docker rmi yadd/relay-test
