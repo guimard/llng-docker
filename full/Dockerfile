@@ -4,13 +4,14 @@ LABEL maintainer="Yadd yadd@debian.org>" \
       name="yadd/lemonldap-ng-full" \
       version="v1.0"
 
-ENV PROTECTION=manager
+ENV PROTECTION=manager \
+    AUTHBASIC=
 
 RUN echo "# Install nginx and portal and manager libs" && \
     apt-get -y update && \
     apt-get -y upgrade && \
     apt-get -y --no-install-recommends install nginx \
-          liblemonldap-ng-manager-perl${LLNGDIST} && \
+      liblemonldap-ng-manager-perl${LLNGDIST} apache2-utils && \
     mv /etc/dpkg/dpkg.cfg.d /tmp/ && \
     apt-get -y --no-install-recommends install \
       lemonldap-ng-doc${LLNGDIST} && \

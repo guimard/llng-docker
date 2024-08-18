@@ -1,8 +1,10 @@
 # Changes
 
-* 2024-08-18: add --json option to lmConfigEditor
-* 2024-08-18: add message-broker
-* 2024-08-18(v2.19.1-3):
+* 2024-08-18:
+  * add AUTHBASIC for manager
+  * add --json option to lmConfigEditor
+  * add message-broker
+* 2024-08-18 (v2.19.1-3):
   * add `TLS_CERT_FILE` and `TLS_KEY_FILE` variables
   * preserve requests in RELAY
 * 2024-08-14: add RELAY variable (v2.19.1-2)

@@ -33,6 +33,8 @@ See [yadd/lemonldap-ng-base](https://github.com/guimard/llng-docker/blob/master/
     deleted
   * `PROTECTION` = `manager`, set it to `none` if you don't want to protect
     the manager by LemonLDAP-NG itself
+  * `AUTHBASIC`, if you use `PROTECTION=none`, you can add a basic authentication
+    using `AUTHBASIC=<login>:<password>`
 
 ## Docker-compose example
 
