@@ -34,7 +34,7 @@ COPY *.patch /
 RUN for p in appgrid.patch jwt-type.patch app-scope.patch ignorepollers.patch \
     fixedLogout.patch more-logs.patch introspec-for-public-clients.patch \
     token-exchange.patch redirect-ajax.patch back-channel-debug.patch \
-    crowdsec.patch recaptcha.patch \
+    crowdsec.patch recaptcha.patch msg-broker.patch \
     ; do echo patch $p && patch -p1 < $p; done && \
     rm -f /*.patch && \
     echo "# Install nginx configuration files" && \

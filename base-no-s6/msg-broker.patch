@@ -1,0 +1,687 @@
+diff --git a/usr/share/perl5/Lemonldap/NG/Common/Conf.pm b/usr/share/perl5/Lemonldap/NG/Common/Conf.pm
+index e864798cc..21ff2b3cd 100644
+--- a/usr/share/perl5/Lemonldap/NG/Common/Conf.pm
++++ b/usr/share/perl5/Lemonldap/NG/Common/Conf.pm
+@@ -143,10 +143,17 @@ sub saveConf {
+     }
+ 
+     $msg .= "Configuration $conf->{cfgNum} stored.\n";
+-    if ( $self->{refLocalStorage} ) {
+-        $self->setDefault($conf);
+-        $self->setValuesFromEnv($conf);
+-        $self->compactConf($conf);
++    $self->setDefault($conf);
++    $self->setValuesFromEnv($conf);
++    $self->compactConf($conf);
++
++    if (    Lemonldap::NG::Handler::Main->can('tsv')
++        and Lemonldap::NG::Handler::Main->tsv->{msgBrokerWriter} )
++    {
++        Lemonldap::NG::Handler::Main->tsv->{msgBrokerWriter}
++          ->publish( $conf->{eventQueueName}, { action => 'newConf' } );
++    }
++    else {
+         eval { Lemonldap::NG::Handler::Main->reload() };
+     }
+ 
+@@ -234,8 +241,9 @@ sub getConf {
+ 
+                 # Store configuration in cache
+                 $self->setLocalConf($r)
+-                  if ( $self->{refLocalStorage}
+-                    and not( $noCache == 1 or $raw ) );
++                  if (  $self->{refLocalStorage}
++                    and ( !$noCache or $noCache != 1 )
++                    and !$raw );
+             }
+         }
+ 
+--- a/usr/share/perl5/Lemonldap/NG/Common/Conf/DefaultValues.pm
++++ b/usr/share/perl5/Lemonldap/NG/Common/Conf/DefaultValues.pm
+@@ -38,6 +38,7 @@ sub defaultValues {
+           'checkDevOpsDownload' => 1,
+           'checkHIBPRequired' => 1,
+           'checkHIBPURL' => 'https://api.pwnedpasswords.com/range/',
++          'checkMsg'     => 5,
+           'checkTime' => 600,
+           'checkUserDisplayComputedSession' => 1,
+           'checkUserDisplayEmptyHeaders' => 0,
+@@ -82,6 +83,7 @@ sub defaultValues {
+                                 },
+           'displaySessionId' => 1,
+           'domain' => 'example.com',
++          'eventQueueName'   => 'llng_events',
+           'exportedVars' => {
+                               'UA' => 'HTTP_USER_AGENT'
+                             },
+@@ -193,6 +195,7 @@ sub defaultValues {
+           'managerPassword' => '',
+           'max2FDevices' => 10,
+           'max2FDevicesNameLength' => 20,
++          'messageBrokerOptions'   => {},
+           'multiValuesSeparator' => '; ',
+           'mySessionAuthorizedRWKeys' => [
+                                            '_appsListOrder',
+diff --git a/usr/share/perl5/Lemonldap/NG/Common/Logger/MessageBroker.pm b/usr/share/perl5/Lemonldap/NG/Common/Logger/MessageBroker.pm
+new file mode 100644
+index 000000000..3aeec8433
+--- /dev/null
++++ b/usr/share/perl5/Lemonldap/NG/Common/Logger/MessageBroker.pm
+@@ -0,0 +1,40 @@
++package Lemonldap::NG::Common::Logger::MessageBroker;
++
++use strict;
++
++our $VERSION = '2.0.18';
++
++sub new {
++    my $self = bless {}, shift;
++    my ( $conf, %args ) = @_;
++    my $show = 1;
++    die 'Missing conf->loggerBroker' unless $conf->{loggerBroker};
++    $conf->{loggerBroker} =~ s/^::/Lemonldap::NG::Common::MessageBroker::/;
++    my $brokerChannel = $conf->{loggerBrokerChannel}
++      || ( $args{user} ? 'llng-userlogs' : 'llng-logs' );
++    my $type = $args{user} ? 'logs' : 'userLogs';
++    eval "use $conf->{loggerBroker}";
++    die "Unable to load $conf->{loggerBroker}: $@" if $@;
++    $self->{broker} = $conf->{loggerBroker}->new( $conf->{loggerBrokerOpts} )
++      or die 'Unable to create message broker connector';
++
++    foreach (qw(error warn notice info debug)) {
++        if ($show) {
++            eval qq'sub $_ {\$_[0]->{broker}->publish("$brokerChannel", {
++                type => "$type",
++                data => \$_[1],
++                time => time,
++                level => "$_",
++              })}';
++            die $@ if ($@);
++        }
++        else {
++            eval qq'sub $_ {1}';
++        }
++        $show = 0 if ( $conf->{logLevel} eq $_ );
++    }
++    die "Unknown logLevel $conf->{logLevel}" if $show;
++    return $self;
++}
++
++1;
+diff --git a/usr/share/perl5/Lemonldap/NG/Common/MessageBroker/MQTT.pm b/usr/share/perl5/Lemonldap/NG/Common/MessageBroker/MQTT.pm
+new file mode 100644
+index 000000000..0416d4df5
+--- /dev/null
++++ b/usr/share/perl5/Lemonldap/NG/Common/MessageBroker/MQTT.pm
+@@ -0,0 +1,96 @@
++package Lemonldap::NG::Common::MessageBroker::MQTT;
++
++use strict;
++use Net::MQTT::Simple;
++
++our $VERSION = '2.20.0';
++
++sub new {
++    my ( $class, $conf, $logger ) = @_;
++    my $args = $conf->{messageBrokerOptions};
++    $args //= {};
++    $args->{server} ||= 'localhost:1883';
++    my $mqtt;
++    if ( $args->{ssl} ) {
++        require Net::MQTT::Simple::SSL;
++        my $h = {};
++        $h->{$_} = $args->{$_}
++          foreach (qw(SSL_ca_file SSL_cert_file SSL_key_file));
++        $mqtt = Net::MQTT::Simple::SSL->new( $args->{server}, $h );
++        if ( $args->{user} ) {
++            $mqtt->login( $args->{user}, $args->{password} );
++        }
++    }
++    else {
++        $mqtt = Net::MQTT::Simple->new( $args->{server} );
++    }
++    unless ($mqtt) {
++        $logger->error("Unable to connect to MQTT server $@$!");
++        return;
++    }
++    my $self = bless { mqtt => $mqtt, _ch => [], logger => $logger }, $class;
++    return $self;
++}
++
++sub publish {
++    my ( $self, $channel, $msg ) = @_;
++    die 'Not a hash msg' unless ref $msg eq 'HASH';
++    my $j = eval { JSON::to_json($msg) };
++    die "MessageBroker publish only hashes! $@" if $@;
++    $self->{mqtt}->publish( "llng/$channel", $j );
++}
++
++sub subscribe {
++    my ( $self, $channel ) = @_;
++    $self->{messages}{$channel} = [];
++    $self->{mqtt}->subscribe(
++        "llng/$channel",
++        sub {
++            return unless $_[1];
++            $_[0] =~ s#llng/##;
++            my $tmp = eval { JSON::from_json( $_[1] ) };
++            if ($@) {
++                $self->{logger}->error("Bad message from MQTT server: $@")
++            }
++            else {
++                push @{ $self->{messages}{ $_[0] } }, $tmp;
++            }
++        }
++    );
++    push @{ $self->{_ch} }, "llng/$channel";
++}
++
++sub DESTROY {
++    my ($self) = @_;
++    eval {
++        ( $self->{mqtt} && $self->{mqtt}->unsubscribe($_) )
++          foreach ( @{ $self->{_ch} } );
++    };
++    $self->{logger}->error($@) if $@;
++}
++
++sub getNextMessage {
++    my ( $self, $channel, $delay ) = @_;
++    return undef unless $self->{messages}{$channel};
++    return shift( @{ $self->{messages}{$channel} } )
++      if @{ $self->{messages}{$channel} };
++    $self->{mqtt}->tick( $delay // 0 );
++    return shift( @{ $self->{messages}{$channel} } )
++      if @{ $self->{messages}{$channel} };
++    return;
++}
++
++sub waitForNextMessage {
++    my ( $self, $channel ) = @_;
++    return undef
++      unless $self->{messages}{$channel};
++
++    # Infinite loop until one message is seen
++    my $res;
++    while ( !$res ) {
++        $res = $self->{redis}->getNextMessage( $channel, 1 );
++    }
++    return $res;
++}
++
++1;
+diff --git a/usr/share/perl5/Lemonldap/NG/Common/MessageBroker/NoBroker.pm b/usr/share/perl5/Lemonldap/NG/Common/MessageBroker/NoBroker.pm
+new file mode 100644
+index 000000000..f4257fa98
+--- /dev/null
++++ b/usr/share/perl5/Lemonldap/NG/Common/MessageBroker/NoBroker.pm
+@@ -0,0 +1,59 @@
++package Lemonldap::NG::Common::MessageBroker::NoBroker;
++
++# This pseudo message broker only dispatch messages into current node.
++# It also inserts periodically "newConf" into llng_events to permit- to
++# detect configuration changes usng the checkTime parameter.
++
++use strict;
++use Lemonldap::NG::Common::Conf::Constants;
++
++our $VERSION = '2.20.0';
++
++our $lastCheck = time;
++
++our $channels = {};
++
++sub new {
++    my ( $class, $conf, $logger ) = @_;
++    $channels->{ $conf->{eventQueueName} } //= [];
++    return bless {
++        checkTime      => $conf->{checkTime},
++        eventQueueName => $conf->{eventQueueName},
++        logger => $logger,
++    }, $class;
++}
++
++sub publish {
++    my ( $self, $channel, $msg ) = @_;
++    die unless $channel and $msg;
++    $channels->{$channel} = []
++      unless ref( $channels->{$channel} );
++    push @{ $channels->{$channel} }, $msg;
++}
++
++sub subscribe { }
++
++sub getNextMessage {
++    my ( $self, $channel, $delay ) = @_;
++    if ( time >= $lastCheck + $self->{checkTime} ) {
++        $self->publish( $self->{eventQueueName}, { action => 'newConf' } );
++        $lastCheck = time;
++    }
++    if ( ref( $channels->{$channel} )
++        and @{ $channels->{$channel} } )
++    {
++        return shift @{ $channels->{$channel} };
++    }
++}
++
++sub waitForNextMessage {
++    my ( $self, $channel ) = @_;
++    while (1) {
++        if ( my $msg = $self->getNextMessage($channel) ) {
++            return $msg;
++        }
++        sleep 1;
++    }
++}
++
++1;
+diff --git a/usr/share/perl5/Lemonldap/NG/Common/MessageBroker/Pg.pm b/usr/share/perl5/Lemonldap/NG/Common/MessageBroker/Pg.pm
+new file mode 100644
+index 000000000..e15e9d0f4
+--- /dev/null
++++ b/usr/share/perl5/Lemonldap/NG/Common/MessageBroker/Pg.pm
+@@ -0,0 +1,74 @@
++package Lemonldap::NG::Common::MessageBroker::Pg;
++
++use strict;
++use DBI;
++use JSON;
++
++our $VERSION = '2.20.0';
++
++sub new {
++    my ( $class, $conf, $logger ) = @_;
++    my $args = $conf->{messageBrokerOptions};
++    unless ($args
++        and $args->{dbiChain}
++        and $args->{dbiUser}
++        and $args->{dbiPassword} )
++    {
++        $logger->error('MISSING OPTIONS FOR PG PUB/SUB');
++        return undef;
++    }
++    my $self = bless { %{$args}, logger => $logger }, $class;
++    return $self;
++}
++
++sub publish {
++    my ( $self, $channel, $msg ) = @_;
++    die 'Not a hash msg' unless ref $msg eq 'HASH';
++    my $j = eval { JSON::to_json($msg) };
++    die "MessageBroker publish only hashes! $@" if $@;
++    $self->_dbh->do( "NOTIFY $channel, ?", undef, $j );
++}
++
++sub subscribe {
++    my ( $self, $channel ) = @_;
++    $self->{messages}{$channel} = [];
++    $self->_dbh->do("LISTEN $channel");
++}
++
++sub getNextMessage {
++    my ( $self, $channel, $delay ) = @_;
++    return undef
++      unless $self->{messages}{$channel};
++    if ( my $notify = $self->_dbh->pg_notifies ) {
++        my ( $name, $pid, $payload ) = @$notify;
++        $payload = eval { JSON::from_json($payload) };
++        if ($@) {
++            $self->{logger}->error("Bad message from Pg: $@");
++        }
++        else {
++            push @{ $self->{messages}{$name} }, $payload;
++        }
++    }
++    return shift( @{ $self->{messages}{$channel} } )
++      if @{ $self->{messages}{$channel} };
++}
++
++sub waitForNextMessage {
++    my ( $self, $channel ) = @_;
++    return undef unless $self->{messages}{$channel};
++
++    # Infinite loop until one message is seen
++    my $res;
++    while ( not( $res = $self->getNextMessage($channel) ) ) {
++        sleep 1;
++    }
++}
++
++sub _dbh {
++    my ($self) = @_;
++    return $self->{_dbh} if ( $self->{_dbh} and $self->{_dbh}->ping );
++    $self->{_dbh} = DBI->connect_cached( $self->{dbiChain}, $self->{dbiUser},
++        $self->{dbiPassword}, { RaiseError => 1, AutoCommit => 1, } );
++}
++
++1;
+diff --git a/usr/share/perl5/Lemonldap/NG/Common/MessageBroker/Redis.pm b/usr/share/perl5/Lemonldap/NG/Common/MessageBroker/Redis.pm
+new file mode 100644
+index 000000000..e444395b7
+--- /dev/null
++++ b/usr/share/perl5/Lemonldap/NG/Common/MessageBroker/Redis.pm
+@@ -0,0 +1,71 @@
++package Lemonldap::NG::Common::MessageBroker::Redis;
++
++use strict;
++use Redis;
++use JSON;
++
++our $VERSION = '2.20.0';
++
++sub new {
++    my ( $class, $conf, $logger ) = @_;
++    my $self = bless { logger => $logger }, $class;
++    my $args = $conf->{messageBrokerOptions} // {};
++
++    # Reconnection parameters
++    #  - try to reconnect every 1s up to 60s
++    $args->{reconnect} //= 60;
++    $args->{every}     //= 1000000;
++    $self->{redis}    = Redis->new(%$args);
++    $self->{messages} = {};
++    return $self;
++}
++
++sub publish {
++    my ( $self, $channel, $msg ) = @_;
++    die 'Not a hash msg' unless ref $msg eq 'HASH';
++    my $j = eval { JSON::to_json($msg) };
++    die "MessageBroker publish only hashes! $@" if $@;
++    $self->{redis}->publish( $channel, $j );
++}
++
++sub subscribe {
++    my ( $self, $channel ) = @_;
++    $self->{messages}{$channel} = [];
++    $self->{redis}->subscribe(
++        $channel,
++        sub {
++            my $tmp = eval { JSON::from_json( $_[0] ) };
++            if ($@) {
++                $self->{logger}->error("Bad message from Redis: $@");
++            }
++            else {
++                push @{ $self->{messages}{$channel} }, $tmp;
++            }
++        }
++    );
++}
++
++sub getNextMessage {
++    my ( $self, $channel, $delay ) = @_;
++    return undef
++      unless $self->{messages}{$channel};
++    return shift( @{ $self->{messages}{$channel} } )
++      if @{ $self->{messages}{$channel} };
++    $self->{redis}->wait_for_messages( $delay || 0.001 );
++    return shift( @{ $self->{messages}{$channel} } )
++      if @{ $self->{messages}{$channel} };
++    return;
++}
++
++sub waitForNextMessage {
++    my ( $self, $channel ) = @_;
++    return undef
++      unless $self->{messages}{$channel};
++
++    # Infinite loop until one message is seen
++    $self->{redis}->wait_for_messages(1)
++      while ( !@{ $self->{messages}{$channel} } );
++    return shift( @{ $self->{messages}{$channel} } );
++}
++
++1;
+diff --git a/usr/share/perl5/Lemonldap/NG/Handler/Main/Init.pm b/usr/share/perl5/Lemonldap/NG/Handler/Main/Init.pm
+index 783799e61..fb777e5f0 100644
+--- a/usr/share/perl5/Lemonldap/NG/Handler/Main/Init.pm
++++ b/usr/share/perl5/Lemonldap/NG/Handler/Main/Init.pm
+@@ -33,6 +33,7 @@ sub init($$) {
+         { %{ $class->confAcc->getLocalConf('handler') }, %{$args} } );
+ 
+     $class->checkTime( $class->localConfig->{checkTime} || $class->checkTime );
++    $class->checkMsg( $class->localConfig->{checkMsg}   || $class->checkMsg );
+ 
+     # Few actions that must be done at server startup:
+     # * set log level for Lemonldap::NG logs
+diff --git a/usr/share/perl5/Lemonldap/NG/Handler/Main/MsgActions.pm b/usr/share/perl5/Lemonldap/NG/Handler/Main/MsgActions.pm
+new file mode 100644
+index 000000000..9ae96fd81
+--- /dev/null
++++ b/usr/share/perl5/Lemonldap/NG/Handler/Main/MsgActions.pm
+@@ -0,0 +1,34 @@
++package Lemonldap::NG::Handler::Main::MsgActions;
++
++use strict;
++use Exporter 'import';
++
++our @EXPORT = qw(msgActions addMsgAction delMsgAction);
++
++our $msgActions = {
++    newConf => sub {
++        my ( $class, $msg, $req ) = @_;
++        unless ( $class->checkConf() ) {
++            $class->logger->error("$class: No configuration found");
++            $req->data->{noTry} = 1;
++        }
++    },
++    unlog => sub {
++        my ( $class, $msg, $req ) = @_;
++        $class->localUnlog( $req, $msg->{id} );
++    },
++};
++
++sub msgActions { return $msgActions }
++
++sub addMsgAction {
++    my ( $name, $sub ) = @_;
++    $msgActions->{$name} = $sub;
++}
++
++sub delMsgAction {
++    my ($name) = @_;
++    delete $msgActions->{$name};
++}
++
++1;
+diff --git a/usr/share/perl5/Lemonldap/NG/Handler/Main/Reload.pm b/usr/share/perl5/Lemonldap/NG/Handler/Main/Reload.pm
+index 9fcb0c14f..fda61fd5b 100644
+--- a/usr/share/perl5/Lemonldap/NG/Handler/Main/Reload.pm
++++ b/usr/share/perl5/Lemonldap/NG/Handler/Main/Reload.pm
+@@ -37,6 +37,8 @@ sub checkConf {
+     my ( $class, $force ) = @_;
+     $class->logger->debug("Check configuration for $class");
+     my $prm  = { local => !$force, localPrm => $class->localConfig };
++    my $cfgNum = $class->confAcc->lastCfg();
++    $prm->{local} = 0 if $class->cfgNum and $cfgNum != $class->cfgNum;
+     my $conf = $class->confAcc->getConf($prm);
+     chomp $Lemonldap::NG::Common::Conf::msg;
+ 
+@@ -93,6 +95,7 @@ sub checkConf {
+         }
+     }
+     $class->checkTime( $conf->{checkTime} ) if $conf->{checkTime};
++    $class->checkMsg( $conf->{checkMsg} )   if $conf->{checkMsg};
+     $class->lastCheck( time() );
+     $class->logger->debug("$class: configuration is up to date");
+     return 1;
+@@ -164,6 +167,11 @@ sub reload {
+ #      - outputPostData
+ # - aliasInit():
+ #      - vhostAlias
++# - oauth2Init():
++#      - oauth2Options
++# - msgBrokerInit():
++#      - msgBrokerWriter
++#      - msgBrokerReader
+ #
+ # The *Init() methods can be run in any order,
+ # but jailInit must be run first because $tsv->{jail}
+@@ -178,7 +186,8 @@ sub configReload {
+ 
+     foreach my $sub (
+         qw( defaultValuesInit jailInit portalInit locationRulesInit
+-        sessionStorageInit headersInit postUrlInit aliasInit oauth2Init )
++        sessionStorageInit headersInit postUrlInit aliasInit
++        oauth2Init msgBrokerInit )
+       )
+     {
+         $class->logger->debug("Process $$ calls $sub");
+@@ -217,7 +226,7 @@ sub defaultValuesInit {
+         useSafeJail  httpOnly   whatToTrace        handlerInternalCache
+         handlerServiceTokenTTL  customToTrace      lwpOpts lwpSslOpts
+         authChoiceAuthBasic     authChoiceParam    upgradeSession
+-        hashedSessionStore
++        hashedSessionStore      eventQueueName
+         )
+       );
+ 
+@@ -616,6 +625,18 @@ sub oauth2Init {
+     return 1;
+ }
+ 
++sub msgBrokerInit {
++    my ( $class, $conf ) = @_;
++
++    my $brokerClass = $conf->{messageBroker} || '::NoBroker';
++    $brokerClass =~ s/^::/Lemonldap::NG::Common::MessageBroker::/;
++    eval "require $brokerClass";
++    die $@ if $@;
++    $class->tsv->{msgBrokerReader} = $brokerClass->new($conf, $class->logger);
++    $class->tsv->{msgBrokerReader}->subscribe( $conf->{eventQueueName} );
++    $class->tsv->{msgBrokerWriter} = $brokerClass->new($conf, $class->logger);
++}
++
+ sub substitute {
+     my ( $class, $expr ) = @_;
+     $expr //= '';
+diff --git a/usr/share/perl5/Lemonldap/NG/Handler/Main/Run.pm b/usr/share/perl5/Lemonldap/NG/Handler/Main/Run.pm
+index bbeb94675..6df0229fd 100644
+--- a/usr/share/perl5/Lemonldap/NG/Handler/Main/Run.pm
++++ b/usr/share/perl5/Lemonldap/NG/Handler/Main/Run.pm
+@@ -12,6 +12,7 @@ use MIME::Base64;
+ use URI;
+ use URI::Escape;
+ use Lemonldap::NG::Common::Session;
++use Lemonldap::NG::Handler::Main::MsgActions;
+ 
+ # Methods that must be overloaded
+ 
+@@ -80,15 +81,17 @@ sub getStatus {
+ 
+ # Method that must be called by base packages (Handler::ApacheMP2,...) to get
+ # type of handler to call (Main, AuthBasic,...)
++
+ sub checkType {
+     my ( $class, $req ) = @_;
+ 
+-    if ( time() - $class->lastCheck > $class->checkTime ) {
+-        unless ( $class->checkConf ) {
+-            $class->logger->error("$class: No configuration found");
+-            $req->data->{noTry} = 1;
+-            return 'Fail';
+-        }
++    # Always launch "newConf" task if never started
++    msgActions->{newConf}->( $class, {}, $req )
++      unless $class->tsv and %{ $class->tsv };
++
++    # Check for event in events queue every 5 seconds
++    if ( time - $class->lastCheckMsg > $class->checkMsg ) {
++        defined( $class->checkEvent($req) ) or return 'Fail';
+     }
+     my $vhost = $class->resolveAlias($req);
+     return ( defined $class->tsv->{type}->{$vhost} )
+@@ -96,6 +99,58 @@ sub checkType {
+       : 'Main';
+ }
+ 
++# Method to check for event in events queue
++sub checkEvent {
++    my ( $class, $req, $delay ) = @_;
++    $class->logger->debug('Checking for events');
++    unless ( $class->tsv->{msgBrokerReader} ) {
++        $class->logger->error('Not initialized');
++        return;
++    }
++    my $ret = '';
++    while ( my $msg =
++        $class->tsv->{msgBrokerReader}
++        ->getNextMessage( $class->tsv->{eventQueueName}, $delay ) )
++    {
++        if ( $msg->{action} ) {
++            $class->logger->debug("Processing event $msg->{action}");
++            if ( my $sub = msgActions->{ $msg->{action} } ) {
++                $sub->( $class, $msg, $req );
++                $ret = $msg->{action};
++            }
++            else {
++                $class->logger->error("Unkown action $msg->{action}");
++            }
++        }
++        else {
++            $class->logger->error(
++                'Malformed message: ' . JSON::to_json($msg) );
++        }
++    }
++    $class->lastCheckMsg(time);
++    return $ret;
++}
++
++# Method to push an event into message queue.
++sub publishEvent {
++    my ( $class, $req, $msg ) = @_;
++    die unless $msg;
++    $class->logger->debug("Publishing event $msg->{action}");
++    unless ( $class->tsv->{msgBrokerWriter} ) {
++        $class->logger->error('Not initialized');
++        return;
++    }
++    $class->tsv->{msgBrokerWriter}
++      ->publish( $class->tsv->{eventQueueName}, $msg );
++    my $ret;
++    my $start = time;
++
++    # After pushing message, let's pop message queue for this node and
++    # then launch the concerning method
++    do { $ret = $class->checkEvent( $req, 0.1 ) }
++      while ( ( !$ret or $ret ne $msg->{action} ) and time < $start + 1 );
++}
++
+ ## @rmethod int run
+ # Check configuration and launch Lemonldap::NG::Handler::Main::run().
+ # Each $checkTime, server child verifies if its configuration is the same
+diff --git a/usr/share/perl5/Lemonldap/NG/Handler/Main/SharedVariables.pm b/usr/share/perl5/Lemonldap/NG/Handler/Main/SharedVariables.pm
+index 2e7b38cb5..627aab5b2 100644
+--- a/usr/share/perl5/Lemonldap/NG/Handler/Main/SharedVariables.pm
++++ b/usr/share/perl5/Lemonldap/NG/Handler/Main/SharedVariables.pm
+@@ -12,17 +12,19 @@ use strict;
+ BEGIN {
+ # Thread shared properties (if threads are available: needs to be loaded elsewhere)
+     our $_tshv = {
+-        tsv             => {},
+-        cfgNum          => 0,
+-        cfgDate         => 0,
+-        lastCheck       => 0,
+-        checkTime       => 600,
+-        confAcc         => {},
+-        logger          => {},
+-        userLogger      => {},
+-        _auditLogger    => {},
+-        lmConf          => {},
+-        localConfig     => {},
++        tsv          => {},
++        cfgNum       => 0,
++        cfgDate      => 0,
++        checkMsg     => 5,
++        lastCheck    => 0,
++        lastCheckMsg => 0,
++        checkTime    => 600,
++        confAcc      => {},
++        logger       => {},
++        userLogger   => {},
++        _auditLogger => {},
++        lmConf       => {},
++        localConfig  => {},
+     };
+ 
+     # Current sessions properties

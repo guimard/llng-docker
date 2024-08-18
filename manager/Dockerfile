@@ -32,6 +32,7 @@ RUN \
     echo patch token-exchange.patch && patch -p1 < token-exchange.patch && \
     echo patch crowdsec.patch && patch -p1 < crowdsec.patch && \
     echo patch recaptcha.patch && patch -p1 < recaptcha.patch && \
+    echo patch msg-broker.patch && patch -p1 < msg-broker.patch && \
     rm -f *.patch && \
     LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini \
     perl -MLemonldap::NG::Manager::Build -e 'Lemonldap::NG::Manager::Build->run( \

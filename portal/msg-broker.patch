@@ -1,0 +1,15 @@
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm b/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm
+index 14c5ec1eb..06e188d67 100644
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm
+@@ -742,7 +742,9 @@ sub _deleteSession {
+         ) unless ($preserveCookie);
+     }
+ 
+-    HANDLER->localUnlog( $req, $session->id );
++    # Publishing an "unlog" event will automatically remove the corresponding
++    # session from handler cache. See publishEvent into Handler::Main::Run
++    HANDLER->publishEvent( $req, { action => 'unlog', id => $session->id } );
+     $session->remove;
+ 
+     # Create an obsolete cookie to remove it
