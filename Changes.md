@@ -1,8 +1,8 @@
 # Changes
 
-* 2024-08-14: add message-broker
-* 2024-08-16(v2.19.1-3):
-  * add `TLS_CERT_FILE` and `TLS_KEY_FILE` variables (v2.19.1-3)
+* 2024-08-18: add message-broker
+* 2024-08-18(v2.19.1-3):
+  * add `TLS_CERT_FILE` and `TLS_KEY_FILE` variables
   * preserve requests in RELAY
 * 2024-08-14: add RELAY variable (v2.19.1-2)
 * 2024-08-13: add reCaptcha plugin
