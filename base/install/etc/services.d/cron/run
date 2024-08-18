@@ -5,18 +5,16 @@ touch /etc/crontab /etc/cron.*/*
 
 if test "$HANDLER_CRON" != "yes"; then
 	rm -f /etc/cron.d/liblemonldap-ng-handler-perl
-fi
-
-if test "$HANDLER_CRON" != "no" -a "$HANDLER_CRON" != ""; then
-	echo "$HANDLER_CRON www-data        [ -x /usr/share/lemonldap-ng/bin/purgeLocalCache ] && /usr/share/lemonldap-ng/bin/purgeLocalCache" >/etc/cron.d/liblemonldap-ng-handler-perl
+	if test "$HANDLER_CRON" != "no" -a "$HANDLER_CRON" != ""; then
+		echo "$HANDLER_CRON www-data        [ -x /usr/share/lemonldap-ng/bin/purgeLocalCache ] && /usr/share/lemonldap-ng/bin/purgeLocalCache" >/etc/cron.d/liblemonldap-ng-handler-perl
+	fi
 fi
 
 if test "$PORTAL_CRON" != "yes"; then
 	rm -f /etc/cron.d/liblemonldap-ng-portal-perl
-fi
-
-if test "$PORTAL_CRON" != "no" -a "$PORTAL_CRON" != ""; then
-	echo "$PORTAL_CRON www-data [ -x /usr/share/lemonldap-ng/bin/purgeCentralCache ] && /usr/share/lemonldap-ng/bin/purgeCentralCache" > /etc/cron.d/liblemonldap-ng-portal-perl
+	if test "$PORTAL_CRON" != "no" -a "$PORTAL_CRON" != ""; then
+		echo "$PORTAL_CRON www-data [ -x /usr/share/lemonldap-ng/bin/purgeCentralCache ] && /usr/share/lemonldap-ng/bin/purgeCentralCache" > /etc/cron.d/liblemonldap-ng-portal-perl
+	fi
 fi
 
 cron -f
