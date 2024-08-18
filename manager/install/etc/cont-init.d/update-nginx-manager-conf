@@ -4,6 +4,22 @@ FILES=/etc/lemonldap-ng/manager-nginx.conf
 
 set -e
 
+if test "$AUTHBASIC" != ""; then
+	AUTHUSER=${AUTHBASIC%%:*}
+	AUTHPWD=${AUTHBASIC#*:}
+	if test "$AUTHBASIC" = "$AUTHUSER" -o "$AUTHPWD" = "" -o "$AUTHUSER" = ""; then
+		echo "Malformed AUTHBASIC" >&2
+		exit 1
+	fi
+	echo "Configure AuthBasic"
+	if grep auth_basic $FILES; then
+		echo "Auth basic already configured"
+	else
+		htpasswd -bc /etc/lemonldap-ng/htpasswd "$AUTHUSER" "$AUTHPWD"
+		perl -i -pe 's#^(\s*server_name)#auth_basic "LLNG admin";\nauth_basic_user_file /etc/lemonldap-ng/htpasswd;\n$1#' $FILES
+	fi
+fi
+
 echo "Configure hostname in $FILES"
 perl -i -pe 's#__FASTCGISOCKDIR__#/run/llng-fastcgi-server#g;
 s#__PORT__#80#g;

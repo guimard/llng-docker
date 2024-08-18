@@ -1,5 +1,6 @@
 # Changes
 
+* 2024-08-18: add AUTHBASIC for manager
 * 2024-08-18: add message-broker
 * 2024-08-18(v2.19.1-3):
   * add `TLS_CERT_FILE` and `TLS_KEY_FILE` variables

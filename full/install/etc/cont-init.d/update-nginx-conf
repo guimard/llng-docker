@@ -1,5 +1,7 @@
 #!/command/with-contenv sh
 
+set -e
+
 PORTAL=${PORTAL:-auth.example.com}
 PORTALHOST=`portalHost "$PORTAL"`
 SSODOMAIN=${SSODOMAIN:-example.com}
@@ -7,6 +9,7 @@ SERVERNAME=${SERVERNAME:-${PORTALHOST}}
 SERVERNAME=${SERVERNAME%/*}
 export SERVERNAME
 
+echo "Configure hostname in portal-nginx.conf"
 perl -i -pe 's#__FASTCGISOCKDIR__#/run/llng-fastcgi-server#g;
 s#__PORT__#80#g;
 s#__SERVERNAME__#$ENV{SERVERNAME}#g;
@@ -15,7 +18,23 @@ s#__PORTALSITEDIR__#/usr/share/lemonldap-ng/portal/htdocs/#g;
 s#__PORTALSTATICDIR__#/usr/share/lemonldap-ng/portal/htdocs/static/#g;
 ' /etc/lemonldap-ng/portal-nginx.conf
 
-echo "Configure hostname in $FILES"
+if test "$AUTHBASIC" != ""; then
+	AUTHUSER=${AUTHBASIC%%:*}
+	AUTHPWD=${AUTHBASIC#*:}
+	if test "$AUTHBASIC" = "$AUTHUSER" -o "$AUTHPWD" = "" -o "$AUTHUSER" = ""; then
+		echo "Malformed AUTHBASIC" >&2
+		exit 1
+	fi
+	echo "Configure AuthBasic"
+	if grep auth_basic /etc/lemonldap-ng/manager-nginx.conf; then
+		echo "Auth basic already configured"
+	else
+		htpasswd -bc /etc/lemonldap-ng/htpasswd "$AUTHUSER" "$AUTHPWD"
+		perl -i -pe 's#^(\s*server_name)#auth_basic "LLNG admin";\nauth_basic_user_file /etc/lemonldap-ng/htpasswd;\n$1#' /etc/lemonldap-ng/manager-nginx.conf
+	fi
+fi
+
+echo "Configure hostname in manager-nginx.conf"
 perl -i -pe 's#__FASTCGISOCKDIR__#/run/llng-fastcgi-server#g;
 s#__PORT__#80#g;
 s#__DNSDOMAIN__#$ENV{SSODOMAIN}#g;

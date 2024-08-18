@@ -4,7 +4,8 @@ LABEL maintainer="Yadd yadd@debian.org>" \
       name="yadd/lemonldap-ng-manager" \
       version="v1.0"
 
-ENV PROTECTION=manager
+ENV PROTECTION=manager \
+    AUTHBASIC=
 
 RUN echo "# Install nginx and manager libs" && \
     apt-get -y update && \
@@ -17,7 +18,7 @@ RUN echo "# Install nginx and manager libs" && \
       libconvert-base32-perl libio-string-perl libipc-run-perl \
       libgd-securityimage-perl libmime-tools-perl libnet-ldap-perl \
       libio-socket-timeout-perl libunicode-string-perl \
-      libio-string-perl libregexp-assemble-perl && \
+      libio-string-perl libregexp-assemble-perl apache2-utils && \
     mv /etc/dpkg/dpkg.cfg.d /tmp/ && \
     apt-get -y --no-install-recommends install \
       lemonldap-ng-doc${LLNGDIST} && \
