@@ -7,12 +7,19 @@ LIST=${LIST:-pg base portal uwsgi-portal manager full ssoaas-fastcgi-server cron
 
 if test "$(cd base && md5sum *.patch|sort)" != "$(cd base-no-s6 && md5sum *.patch|sort)"; then
 	echo "Base patches differ" >&2
+	exit 1
 fi
 if test "$(cd portal && md5sum *.patch|sort)" != "$(cd uwsgi-portal && md5sum *.patch|sort)"; then
 	echo "Portal patches differ" >&2
+	exit 1
 fi
 if test "$(cd manager && md5sum *.patch|sort)" != "$(cd full && md5sum *.patch|sort)"; then
 	echo "Manager patches differ" >&2
+	exit 1
+fi
+if test "`md5sum uwsgi-portal/install/etc/cont-init.d/update-nginx-portal-conf|sed -e 's/ .*$//'`" != "`md5sum portal/install/etc/cont-init.d/update-nginx-portal-conf|sed -e 's/ .*$//'`"; then
+	echo "Portal install differ" >&2
+	exit 1
 fi
 
 for i in $LIST; do
