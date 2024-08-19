@@ -1,6 +1,8 @@
 # Changes
 
-* 2024-08-19: add libconvert-pem-perl into portal
+* 2024-08-19:
+  * add `libconvert-pem-perl` package into portal
+  * add `FORWARDED_BY`
 * 2024-08-18:
   * add AUTHBASIC for manager
   * add --json option to lmConfigEditor

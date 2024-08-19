@@ -1,0 +1,16 @@
+#!/bin/bash
+
+FILES="$@"
+
+set -e
+
+if test "$FORWARDED_BY" != ""; then
+	for file in "$FILES"; do
+		if grep -E '^[^#]*set_real_ip_from'; then
+			echo "$file already configured"
+		else
+			perl -i -pe 's/#set_real_ip_from\s*.*$/set_real_ip_from $ENV{FORWARDED_BY};/;
+				s/#(real_ip_header\s*X-Forwarded-For)/$1/;' $file
+		fi
+	done
+fi

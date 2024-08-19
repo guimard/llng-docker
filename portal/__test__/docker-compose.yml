@@ -17,6 +17,7 @@ services:
       - LOGGER=stderr
       - USERLOGGER=stderr
       - "RELAY=foo.example.com=http://relay.example.com:3000/"
+      - FORWARDED_BY=1.2.3.4
     depends_on:
       relay:
         condition: service_started

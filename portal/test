@@ -9,6 +9,10 @@ fi
 set -e
 cd __test__
 $COMPOSE run --rm test
+
+echo "Verify X-Forwarded-For config"
+docker exec test_portal_with_supertest cat /etc/lemonldap-ng/portal-nginx.conf | grep -E '^ *set_real_ip_from 1.2.3.4;'
+
 $COMPOSE down
 
 cd ../__testbroker__
