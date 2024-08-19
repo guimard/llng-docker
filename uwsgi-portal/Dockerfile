@@ -13,7 +13,7 @@ RUN echo "# Install nginx and portal libs" && \
     apt-get -y -o Dpkg::Options::="--force-confold" --no-install-recommends install nginx \
         lemonldap-ng-uwsgi-app"${LLNGDIST}" \
         liblemonldap-ng-portal-perl"${LLNGDIST}" \
-        gsfonts patch uwsgi uwsgi-plugin-psgi \
+        gsfonts patch libconvert-pem-perl \
         libcrypt-u2f-server-perl libgeoip2-perl \
         libglib-perl libgssapi-perl libhttp-browserdetect-perl \
         libimage-magick-perl liblasso-perl libnet-facebook-oauth2-perl \
@@ -24,9 +24,10 @@ RUN echo "# Install nginx and portal libs" && \
         libgd-securityimage-perl libmime-tools-perl libnet-ldap-perl \
         libio-socket-timeout-perl libunicode-string-perl liblasso-perl \
         libio-string-perl libemail-sender-perl libregexp-common-perl \
-	libcrypt-jwt-perl libdigest-hmac-perl libdata-password-zxcvbn-perl \
-	libhttp-browserdetect-perl libnet-dns-perl \
-	&& \
+        libcrypt-jwt-perl libdigest-hmac-perl libdata-password-zxcvbn-perl \
+        libhttp-browserdetect-perl libnet-dns-perl \
+        uwsgi uwsgi-plugin-psgi \
+        && \
     apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY *.patch /
