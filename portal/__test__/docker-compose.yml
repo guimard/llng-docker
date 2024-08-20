@@ -1,11 +1,31 @@
 version: "3.4"
 
 services:
+  relay:
+    image: yadd/relay-test
+    build:
+      context: ./server
+    networks:
+      portaltest:
+        aliases:
+          - relay.example.com
+
   auth.example.com:
+    container_name: test_portal_with_supertest
     image: yadd/lemonldap-ng-portal
     environment:
       - LOGGER=stderr
       - USERLOGGER=stderr
+      - "RELAY=foo.example.com=http://relay.example.com:3000/"
+      - FORWARDED_BY=1.2.3.4
+    depends_on:
+      relay:
+        condition: service_started
+    networks:
+      portaltest:
+        aliases:
+          - foo.example.com
+
   test:
     image: yadd/lemonldap-ng-portal-test
     build:
@@ -13,3 +33,9 @@ services:
     depends_on:
       auth.example.com:
         condition: service_started
+    networks:
+      portaltest:
+
+networks:
+  portaltest:
+    name: portaltest

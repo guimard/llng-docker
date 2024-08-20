@@ -6,4 +6,4 @@ RUN mkdir /test
 
 COPY *.test.js /test/
 
-CMD [ "mocha", "-t", "30000", "/test/*.test.js" ]
+CMD [ "mocha", "--exit", "-t", "30000", "/test/*.test.js" ]

@@ -1,6 +1,18 @@
 # Changes
 
-* 2024-07-24: update to 2.19.1
+* 2024-08-19:
+  * add `libconvert-pem-perl` package into portal
+  * add `FORWARDED_BY`
+* 2024-08-18:
+  * add AUTHBASIC for manager
+  * add --json option to lmConfigEditor
+  * add message-broker
+* 2024-08-18 (v2.19.1-3):
+  * add `TLS_CERT_FILE` and `TLS_KEY_FILE` variables
+  * preserve requests in RELAY
+* 2024-08-14: add RELAY variable (v2.19.1-2)
+* 2024-08-13: add reCaptcha plugin
+* 2024-07-24: update to 2.19.1 (v2.19.1-1)
 * 2024-07-15: add sessions-backup task docker (v2.19.0-9)
 * 2024-07-15: add "backup/restore" commands into session cli
 * 2024-07-10: add "count" command into session cli

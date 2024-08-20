@@ -5,5 +5,4 @@ set -e
 mkdir -p /run/llng-fastcgi-server
 chown www-data:www-data /run/llng-fastcgi-server
 chmod 750 /run/llng-fastcgi-server
-ls -l /run /run/llng-fastcgi-server
 /usr/sbin/llng-fastcgi-server --foreground -u www-data -g www-data -s /run/llng-fastcgi-server/llng-fastcgi.sock

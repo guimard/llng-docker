@@ -4,13 +4,14 @@ LABEL maintainer="Yadd yadd@debian.org>" \
       name="yadd/lemonldap-ng-full" \
       version="v1.0"
 
-ENV PROTECTION=manager
+ENV PROTECTION=manager \
+    AUTHBASIC=
 
 RUN echo "# Install nginx and portal and manager libs" && \
     apt-get -y update && \
     apt-get -y upgrade && \
     apt-get -y --no-install-recommends install nginx \
-          liblemonldap-ng-manager-perl${LLNGDIST} && \
+      liblemonldap-ng-manager-perl${LLNGDIST} apache2-utils && \
     mv /etc/dpkg/dpkg.cfg.d /tmp/ && \
     apt-get -y --no-install-recommends install \
       lemonldap-ng-doc${LLNGDIST} && \
@@ -24,6 +25,9 @@ RUN \
     echo patch fixedLogout.patch && patch -p1 < fixedLogout.patch && \
     echo patch token-exchange.patch && patch -p1 < token-exchange.patch && \
     echo patch crowdsec.patch && patch -p1 < crowdsec.patch && \
+    echo patch recaptcha.patch && patch -p1 < recaptcha.patch && \
+    echo patch msg-broker.patch && patch -p1 < msg-broker.patch && \
+    echo patch lmConfigEditor.patch && patch -p1 < lmConfigEditor.patch && \
     rm -f *.patch && \
     LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini \
     perl -MLemonldap::NG::Manager::Build -e 'Lemonldap::NG::Manager::Build->run( \

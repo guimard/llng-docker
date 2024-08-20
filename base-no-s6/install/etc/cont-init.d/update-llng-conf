@@ -82,6 +82,8 @@ if test "$DBI_CHAIN" != ""; then
        /usr/share/docker-llng/updateConf set casStorage "Apache::Session::Browseable::PgJSON"
        /usr/share/docker-llng/updateConf set casStorageOptions '{"TableName":"'"$PG_CAS_TABLE"'","DataSource":"'"$DBI_CHAIN"'","UserName":"'"$DBI_USER"'","Password":"'"$DBI_PASSWORD"'","Commit":1}'
      fi
+     /usr/share/docker-llng/updateConf set messageBroker ::Pg
+     /usr/share/docker-llng/updateConf set messageBrokerOptions '{"dbiChain":"'"$DBI_CHAIN"'","dbiUser":"'"$DBI_USER"'","dbiPassword":"'"$DBI_PASSWORD"'"}'
    else
      echo "Previous configuration found, skipping configuration conversion"
    fi

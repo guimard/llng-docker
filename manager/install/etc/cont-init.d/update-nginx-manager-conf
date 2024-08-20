@@ -1,14 +1,80 @@
 #!/command/with-contenv sh
 
+FILES=/etc/lemonldap-ng/manager-nginx.conf
+
+set -e
+
+if test "$AUTHBASIC" != ""; then
+	AUTHUSER=${AUTHBASIC%%:*}
+	AUTHPWD=${AUTHBASIC#*:}
+	if test "$AUTHBASIC" = "$AUTHUSER" -o "$AUTHPWD" = "" -o "$AUTHUSER" = ""; then
+		echo "Malformed AUTHBASIC" >&2
+		exit 1
+	fi
+	echo "Configure AuthBasic"
+	if grep auth_basic $FILES; then
+		echo "Auth basic already configured"
+	else
+		htpasswd -bc /etc/lemonldap-ng/htpasswd "$AUTHUSER" "$AUTHPWD"
+		perl -i -pe 's#^(\s*server_name)#auth_basic "LLNG admin";\nauth_basic_user_file /etc/lemonldap-ng/htpasswd;\n$1#' $FILES
+	fi
+fi
+
+echo "Configure hostname in $FILES"
 perl -i -pe 's#__FASTCGISOCKDIR__#/run/llng-fastcgi-server#g;
 s#__PORT__#80#g;
 s#__DNSDOMAIN__#$ENV{SSODOMAIN}#g;
 s#__MANAGERSITEDIR__#/usr/share/lemonldap-ng/manager/htdocs/#g;
 s#__MANAGERSTATICDIR__#/usr/share/lemonldap-ng/manager/htdocs/static/#g;
 s#__DEFDOCDIR__#/usr/share/doc/lemonldap-ng/#g;
-' /etc/lemonldap-ng/manager-nginx.conf
+' $FILES
 
 if test "$PROTECTION" != ""; then
   echo "Set manager protection to $PROTECTION"
   perl -i -pe 's/^protection\s*=.*$/protection='$PROTECTION'/' /etc/lemonldap-ng/lemonldap-ng.ini
 fi
+
+if test "$RELAY" != ''; then
+	echo "Configure wanted relay(s)"
+	perl -e '
+use strict;
+my $res;
+my @list = split /\s*;\s*/, $ENV{RELAY};
+foreach(@list) {
+	die "Bad relay value $_" unless m#^(.*?)=(https?://.*/)$#;
+	print <<EOF
+server {
+  listen 80;
+  listen [::]:80;
+  server_name $1;
+  #set_real_ip_from  127.0.0.1;
+  #real_ip_header    X-Forwarded-For;
+  location / {
+    proxy_pass $2;
+    proxy_redirect off;
+    proxy_set_header Host \$host:\$server_port;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+  }
+}
+EOF
+}
+' >/etc/nginx/sites-enabled/zzzz-relay.conf
+	FILES="$FILES /etc/nginx/sites-enabled/zzzz-relay.conf"
+
+fi
+
+if test "$TLS_CERT_FILE"; then
+	echo "Configure SSL into $FILES"
+	perl -i -pe 's/^(\s*listen.*)80/${1}443 ssl/' $FILES
+	if grep ssl_certificate /etc/lemonldap-ng/portal-nginx.conf; then
+		echo "SSL already configured ?"
+	else
+		perl -i -pe 'BEGIN{our $setCert="
+  ssl_certificate $ENV{TLS_CERT_FILE};
+  ssl_certificate_key $ENV{TLS_KEY_FILE};
+"};s/^(\s*server_name)/$setCert$1/' $FILES
+	fi
+fi
+
+setXforwardedForIfNeeded $FILES

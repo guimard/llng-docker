@@ -86,13 +86,19 @@ services:
     environment:
       - POSTGRES_PASSWORD=zz
     healthcheck:
-      test: "exit 0"
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis
 
   auth:
     image: yadd/lemonldap-ng-portal
+    depends_on:
+      db:
+        condition: service_healthy
     environment:
       - PG_SERVER=db
       - REDIS_SERVER=redis:6379
@@ -105,6 +111,11 @@ services:
 
   manager:
     image: yadd/lemonldap-ng-manager
+    depends_on:
+      db:
+        condition: service_healthy
+      auth:
+        condition: service_started
     environment:
       - PG_SERVER=db
       - REDIS_SERVER=redis:6379
@@ -134,13 +145,19 @@ services:
     environment:
       - POSTGRES_PASSWORD=zz
     healthcheck:
-      test: "exit 0"
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis
 
   portal:
     image: yadd/lemonldap-ng-portal
+    depends_on:
+      db:
+        condition: service_healthy
     environment:
       - LOGGER=stderr
       - USERLOGGER=stderr
@@ -179,9 +196,12 @@ services:
       - PG_SERVER=db
       - REDIS_SERVER=redis:6379
     depends_on:
+    depends_on:
       db:
         condition: service_healthy
       redis:
+        condition: service_started
+      auth:
         condition: service_started
 
   crowdsec:

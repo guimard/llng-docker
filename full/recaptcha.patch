@@ -1,0 +1,25 @@
+diff --git a/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm b/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
+index 8fc62ec91..50cad654c 100644
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
+@@ -1666,17 +1666,17 @@ sub attributes {
+         # Captcha
+         captcha_login_enabled => {
+             default       => 0,
+-            type          => 'bool',
++            type          => 'boolOrExpr',
+             documentation => 'Captcha on login page',
+         },
+         captcha_mail_enabled => {
+             default       => 1,
+-            type          => 'bool',
++            type          => 'boolOrExpr',
+             documentation => 'Captcha on password reset page',
+         },
+         captcha_register_enabled => {
+             default       => 1,
+-            type          => 'bool',
++            type          => 'boolOrExpr',
+             documentation => 'Captcha on account creation page',
+         },
+         captcha_size => {

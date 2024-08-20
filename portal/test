@@ -9,4 +9,18 @@ fi
 set -e
 cd __test__
 $COMPOSE run --rm test
+
+echo "Verify X-Forwarded-For config"
+docker exec test_portal_with_supertest cat /etc/lemonldap-ng/portal-nginx.conf | grep -E '^ *set_real_ip_from 1.2.3.4;'
+
 $COMPOSE down
+
+cd ../__testbroker__
+$COMPOSE up -d
+echo "Be sure conf is loaded"
+docker exec test-broker-manager /usr/share/docker-llng/updateConf get macros && echo
+docker exec test-broker-auth /usr/share/docker-llng/updateConf get macros && echo
+echo "Modify macro on manager, define AA => CC"
+docker exec test-broker-manager /usr/share/docker-llng/updateConf set macros AA CC
+echo "Verify propagation on portal, should get CC when querying for macros AA"
+docker exec test-broker-auth /usr/share/docker-llng/updateConf get macros AA | grep CC

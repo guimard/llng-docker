@@ -15,7 +15,7 @@ RUN echo "# Install nginx and portal libs" && \
     apt-get -y -o Dpkg::Options::="--force-confold" --no-install-recommends install nginx \
         lemonldap-ng-fastcgi-server"${LLNGDIST}" \
         liblemonldap-ng-portal-perl"${LLNGDIST}" \
-        gsfonts patch \
+        gsfonts patch libconvert-pem-perl \
         libcrypt-u2f-server-perl libgeoip2-perl \
         libglib-perl libgssapi-perl libhttp-browserdetect-perl \
         libimage-magick-perl liblasso-perl libnet-facebook-oauth2-perl \
@@ -26,10 +26,10 @@ RUN echo "# Install nginx and portal libs" && \
         libgd-securityimage-perl libmime-tools-perl libnet-ldap-perl \
         libio-socket-timeout-perl libunicode-string-perl liblasso-perl \
         libio-string-perl libemail-sender-perl libregexp-common-perl \
-	libcrypt-jwt-perl libdigest-hmac-perl libdata-password-zxcvbn-perl \
-	libhttp-browserdetect-perl libnet-dns-perl libfcgi-engine-perl \
-	libfcgi-procmanager-maxrequests-perl \
-	&& \
+        libcrypt-jwt-perl libdigest-hmac-perl libdata-password-zxcvbn-perl \
+        libhttp-browserdetect-perl libnet-dns-perl \
+	libfcgi-engine-perl libfcgi-procmanager-maxrequests-perl \
+        && \
     apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY *.patch /
@@ -37,7 +37,7 @@ COPY *.patch /
 RUN for p in appgrid.patch jwt-type.patch app-scope.patch ignorepollers.patch \
     fixedLogout.patch more-logs.patch introspec-for-public-clients.patch \
     token-exchange.patch redirect-ajax.patch back-channel-debug.patch \
-    crowdsec.patch \
+    crowdsec.patch recaptcha.patch msg-broker.patch \
     ; do echo patch $p && patch -p1 < $p; done && \
     rm -f /*.patch && \
     echo "# Install nginx configuration files" && \
