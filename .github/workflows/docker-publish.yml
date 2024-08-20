@@ -11,18 +11,8 @@ on:
     branches: [master,stable,experimental]
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      - name: build_and_test
-        run: ./build-all
-        env:
-          VERSION: ${{ env.VERSION }}-${{ env.DOCKERREVISION }}
 
   build-and-push-pg:
-    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Get current date
@@ -65,7 +55,6 @@ jobs:
 
   build-and-push-base:
     runs-on: ubuntu-latest
-    needs: test
     steps:
       - name: Get current date
         id: date
@@ -449,7 +438,6 @@ jobs:
 
   build-and-push-base-no-s6:
     runs-on: ubuntu-latest
-    needs: test
     steps:
       - name: Get current date
         id: date
