@@ -29,7 +29,7 @@ for i in $LIST; do
 		./build-dev
 	else
 		NAME=`grep 'name="yadd/' Dockerfile|sed -e 's/.*name="//' -e 's/".*$//'`
-		docker build --rm -t $NAME --build-arg="BASE=yadd/lemonldap-ng-base:latest" --build-arg "PORTALBASE=yadd/lemonldap-ng-portal:latest" .
+		docker build --rm -t $NAME --build-arg="BASE=yadd/lemonldap-ng-base:stable" --build-arg "PORTALBASE=yadd/lemonldap-ng-portal:stable" .
 		if test "$IMAGE_EXPORT" = "yes"; then
 			docker save $NAME > /tmp/$i.tar
 		fi
