@@ -1,14 +1,3 @@
---- a/etc/lemonldap-ng/lemonldap-ng.ini
-+++ b/etc/lemonldap-ng/lemonldap-ng.ini
-@@ -198,7 +198,7 @@ staticPrefix = /static
- templateDir  = /usr/share/lemonldap-ng/portal/templates
-
- ; languages: available languages for portal interface
--languages    = en, fr, vi, it, ar, de, fi, tr, pl, zh_TW, es, pt_BR, he, ru
-+languages    = en, fr, vi, it, ar, de, fi, tr, pl, zh_TW, es, pt_BR, he, ru, mfe
-
- ; II - Optional parameters (overwrite configuration)
-
 --- /dev/null
 +++ b/usr/share/lemonldap-ng/portal/htdocs/static/languages/mfe.json
 @@ -0,0 +1,388 @@
