@@ -1,5 +1,7 @@
 # Changes
 
+* 2024-08-22:
+  * Add Mauritian Creole translation
 * 2024-08-19 (v2.19.1-4):
   * add `libconvert-pem-perl` package into portal
   * add `FORWARDED_BY`
