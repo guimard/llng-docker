@@ -165,3 +165,7 @@ for key in `(env | grep OVERRIDE || true) | sed -e 's/=.*$//'`; do
     echo "Set $KEYNAME to $VAL"
     /usr/share/docker-llng/updateConf set `echo $KEYNAME|perl -pe 's/_/\n/g'` "$VAL"
 done
+
+if test "$LANGUAGES" != ''; then
+	perl -i -pe "s/^(languages\s*=\s*).*\$/\$1$LANGUAGES/" /etc/lemonldap-ng/lemonldap-ng.ini
+fi
