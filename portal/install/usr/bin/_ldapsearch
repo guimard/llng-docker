@@ -1,0 +1,98 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use Net::LDAP;
+use Getopt::Long;
+use Pod::Usage;
+
+# Variables pour les options de ligne de commande
+my $host = 'localhost';
+my $port = 389;
+my $binddn;
+my $password;
+my $base;
+my $scope  = 'sub';               # sub, one, or base
+my $filter = '(objectClass=*)';
+my @attrs;
+my $url;
+my $help = 0;
+my $x;
+
+# Récupération des options
+GetOptions(
+    'x'            => \$x,
+    'h|host=s'     => \$host,
+    'H|url=s'      => \$url,
+    'p|port=i'     => \$port,
+    'D|binddn=s'   => \$binddn,
+    'w|password=s' => \$password,
+    'b|base=s'     => \$base,
+    's|scope=s'    => \$scope,
+    'f|filter=s'   => \$filter,
+    'a|attrs=s'    => \@attrs,
+    'help|?'       => \$help,
+) or pod2usage(2);
+
+pod2usage(1) if $help;
+
+$filter = shift if @ARGV;
+
+@attrs = @ARGV if ( @ARGV and !@attrs );
+
+# Connexion au serveur LDAP
+my $ldap = Net::LDAP->new( $url ? ($url) : ( $host, port => $port ) )
+  or die "Erreur de connexion à " . ( $url ? $url : "$host:$port" ) . " : $@";
+
+# Authentification
+if ( $binddn && $password ) {
+    my $mesg = $ldap->bind( $binddn, password => $password );
+    die "Erreur d'authentification: ", $mesg->error if $mesg->code;
+}
+
+# Recherche LDAP
+my $mesg = $ldap->search(
+    base   => $base,
+    scope  => $scope,
+    filter => $filter,
+    ( @attrs ? ( attrs => \@attrs ) : () ),
+);
+
+# Vérification des erreurs de recherche
+die "Erreur lors de la recherche: ", $mesg->error if $mesg->code;
+
+# Affichage des résultats
+foreach my $entry ( $mesg->entries ) {
+    $entry->dump;    # Affiche toutes les informations de l'entrée
+}
+
+# Fermeture de la connexion LDAP
+$ldap->unbind;
+
+__END__
+
+=head1 NAME
+
+ldapsearch.pl - Un utilitaire Perl qui imite ldapsearch
+
+=head1 SYNOPSIS
+
+ldapsearch.pl [options]
+
+ Options:
+   -h | --host       Nom d'hôte du serveur LDAP (par défaut: localhost)
+   -p | --port       Port du serveur LDAP (par défaut: 389)
+   -D | --binddn     DN pour se lier au serveur LDAP
+   -w | --password   Mot de passe pour l'authentification
+   -b | --base       DN de base pour la recherche
+   -s | --scope      Portée de la recherche: base, one, sub (par défaut: sub)
+   -f | --filter     Filtre LDAP pour la recherche (par défaut: (objectClass=*))
+   -a | --attrs      Attributs à récupérer (peut être utilisé plusieurs fois)
+   --help            Affiche ce message d'aide
+
+=head1 DESCRIPTION
+
+Ce script Perl imite le comportement de base de la commande ldapsearch.
+
+=cut
+
