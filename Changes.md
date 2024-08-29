@@ -1,5 +1,8 @@
 # Changes
 
+* 2024-08-29:
+  * Add security patch
+  * Add `_ldapsearch` command
 * 2024-08-22:
   * Add Mauritian Creole translation
   * Add `LANGUAGES` variable
