@@ -18,4 +18,5 @@ $COMPOSE run base /usr/share/docker-llng/updateConf get applicationList 1sample 
 $COMPOSE run base /usr/share/docker-llng/updateConf get exportedVars aa | grep bb
 $COMPOSE run base /usr/share/docker-llng/updateConf get macros | grep ZZ
 $COMPOSE run base /usr/share/docker-llng/updateConf get portal | grep dockertest.com
+$COMPOSE run base grep languages /etc/lemonldap-ng/lemonldap-ng.ini | perl -pe 's/\r//g' | grep -E '^languages *= *en,fr$'
 $COMPOSE down

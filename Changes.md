@@ -1,6 +1,12 @@
 # Changes
 
-* 2024-08-19:
+* 2024-08-29:
+  * Add security patch
+  * Add `_ldapsearch` command
+* 2024-08-22:
+  * Add Mauritian Creole translation
+  * Add `LANGUAGES` variable
+* 2024-08-19 (v2.19.1-4):
   * add `libconvert-pem-perl` package into portal
   * add `FORWARDED_BY`
 * 2024-08-18:

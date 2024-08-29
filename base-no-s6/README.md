@@ -42,6 +42,7 @@ LemonLDAP::NG.
 * `LOGGER` = `syslog` _(possible values: stderr, syslog)_
 * `USERLOGGER` = `syslog` _(possible values: stderr, syslog)_
 * `FORCE_KEY_REGENERATION` = `no`
+* `LANGUAGES` = default LLNG list _(set here the wanted languages separated by comma. Example: `fr,en`)_
 * Configuration and persistent session storage
   * `PG_SERVER` =
   * `PG_DATABASE` = `lemonldapng`
