@@ -1,5 +1,7 @@
 # Changes
 
+* 2024-08-31 (v2.19.1-5):
+  * Update to Debian 12.7
 * 2024-08-29:
   * Add security patch
   * Add `_ldapsearch` command
