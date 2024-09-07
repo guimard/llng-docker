@@ -1,9 +1,11 @@
 # Changes
 
+* 2024-09-07 (v2.19.2-1):
+  * Update to LLNG 2.19.2
 * 2024-08-31 (v2.19.1-5):
   * Update to Debian 12.7
-* 2024-08-29:
-  * Add security patch
+* 2024-08-29 (v2.19.1-5):
+  * Add security patch (CVE-2024-45160)
   * Add `_ldapsearch` command
 * 2024-08-22:
   * Add Mauritian Creole translation
