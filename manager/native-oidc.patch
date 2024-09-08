@@ -1,0 +1,231 @@
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
+@@ -5161,6 +5161,10 @@ m{^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
+             test          => sub { return perlExpr(@_) },
+             documentation => 'Rule to grant access to this RP',
+         },
++        oidcRPMetaDataOptionsAllowNativeSso => {
++            type          => 'bool',
++            documentation => 'Allow Native SSO for Mobile Apps',
++        },
+         oidcRPMetaDataMacros => {
+             type => 'keyTextContainer',
+             help =>
+diff --git a/usr/share/perl5/Lemonldap/NG/Manager/Build/CTrees.pm b/usr/share/perl5/Lemonldap/NG/Manager/Build/CTrees.pm
+index a117adc0f..deddda159 100644
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/CTrees.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/CTrees.pm
+@@ -262,6 +262,7 @@ sub cTrees {
+                             'oidcRPMetaDataOptionsRequirePKCE',
+                             'oidcRPMetaDataOptionsRefreshTokenRotation',
+                             'oidcRPMetaDataOptionsAllowOffline',
++                            'oidcRPMetaDataOptionsAllowNativeSso',
+                             'oidcRPMetaDataOptionsAllowPasswordGrant',
+                             'oidcRPMetaDataOptionsAllowClientCredentialsGrant',
+                             'oidcRPMetaDataOptionsRequestUris',
+diff --git a/usr/share/perl5/Lemonldap/NG/Manager/Conf/Tests.pm b/usr/share/perl5/Lemonldap/NG/Manager/Conf/Tests.pm
+index 8c2ea5568..624acb693 100644
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Conf/Tests.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Conf/Tests.pm
+@@ -1271,6 +1271,33 @@ sub tests {
+                 and $conf->{passwordPolicyActivation} );
+             return 1;
+         },
++        oidcNativeSso => sub {
++            return ( 0, 'Native SSO without OIDC identity service' )
++              if $conf->{oidcServiceAllowNativeSso}
++              and not $conf->{issuerDBOpenIDConnectActivation};
++            return 1
++              unless $conf->{oidcRPMetaDataOptions}
++              and ref $conf->{oidcRPMetaDataOptions};
++            my @needNativeSso;
++            if ( $conf->{oidcRPMetaDataOptions}
++                and ref $conf->{oidcRPMetaDataOptions} )
++            {
++                for my $rp ( keys %{ $conf->{oidcRPMetaDataOptions} } ) {
++                    push @needNativeSso, $rp
++                      if $conf->{oidcRPMetaDataOptions}->{$rp}
++                      ->{oidcRPMetaDataOptionsAllowNativeSso};
++                }
++            }
++            if ( @needNativeSso and not $conf->{oidcServiceAllowNativeSso} ) {
++                return ( 1,
++                    "Native SSO isn't enabled but needed by: "
++                      . join( ', ', @needNativeSso ) );
++            }
++            if ( !@needNativeSso and $conf->{oidcServiceAllowNativeSso} ) {
++                return ( 1, 'Native SSO service enabled but useless' );
++            }
++            return 1;
++        },
+     };
+ }
+ 
+diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json
+index 606ed207c..b3bb0565b 100644
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json
+@@ -737,6 +737,7 @@
+ "oidcRPMetaDataOptionsAdditionalAudiences":"Additional audiences",
+ "oidcRPMetaDataOptionsAdvanced":"المتقدمة",
+ "oidcRPMetaDataOptionsAllowClientCredentialsGrant":"Allow OAuth2.0 Client Credentials Grant",
++"oidcRPMetaDataOptionsAllowNativeSso":"Allow Native SSO for Mobile App",
+ "oidcRPMetaDataOptionsAllowOffline":"Allow offline access",
+ "oidcRPMetaDataOptionsAllowPasswordGrant":"Allow OAuth2.0 Password Grant",
+ "oidcRPMetaDataOptionsAuthMethod":"توكن نقطة النهاية لطريقة إثبات الهوية",
+diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json
+index ff32004ef..4d138160c 100644
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json
+@@ -737,6 +737,7 @@
+ "oidcRPMetaDataOptionsAdditionalAudiences":"Additional audiences",
+ "oidcRPMetaDataOptionsAdvanced":"Advanced",
+ "oidcRPMetaDataOptionsAllowClientCredentialsGrant":"Allow OAuth2.0 Client Credentials Grant",
++"oidcRPMetaDataOptionsAllowNativeSso":"Allow Native SSO for Mobile App",
+ "oidcRPMetaDataOptionsAllowOffline":"Allow offline access",
+ "oidcRPMetaDataOptionsAllowPasswordGrant":"Allow OAuth2.0 Password Grant",
+ "oidcRPMetaDataOptionsAuthMethod":"Token endpoint authentication method",
+diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json
+index fc6a890e5..072caaba5 100644
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json
+@@ -737,6 +737,7 @@
+ "oidcRPMetaDataOptionsAdditionalAudiences":"Additional audiences",
+ "oidcRPMetaDataOptionsAdvanced":"Advanced",
+ "oidcRPMetaDataOptionsAllowClientCredentialsGrant":"Allow OAuth2.0 Client Credentials Grant",
++"oidcRPMetaDataOptionsAllowNativeSso":"Allow Native SSO for Mobile App",
+ "oidcRPMetaDataOptionsAllowOffline":"Permitir acceso sin conexión",
+ "oidcRPMetaDataOptionsAllowPasswordGrant":"Allow OAuth2.0 Password Grant",
+ "oidcRPMetaDataOptionsAuthMethod":"Token endpoint authentication method",
+diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json
+index dbf782b04..9a9c64a68 100644
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json
+@@ -737,6 +737,7 @@
+ "oidcRPMetaDataOptionsAdditionalAudiences":"Audiences supplémentaires",
+ "oidcRPMetaDataOptionsAdvanced":"Avancées",
+ "oidcRPMetaDataOptionsAllowClientCredentialsGrant":"Autoriser le Client Credentials Grant OAuth2.0",
++"oidcRPMetaDataOptionsAllowNativeSso":"Autorise le SSO natif pour application mobile",
+ "oidcRPMetaDataOptionsAllowOffline":"Autoriser l'accès hors ligne",
+ "oidcRPMetaDataOptionsAllowPasswordGrant":"Autoriser le Password Grant OAuth2.0",
+ "oidcRPMetaDataOptionsAuthMethod":"Méthode d'authentification pour l'accès aux jetons",
+diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json
+index 741deb5ca..8d98262e1 100644
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json
+@@ -737,6 +737,7 @@
+ "oidcRPMetaDataOptionsAdditionalAudiences":"Additional audiences",
+ "oidcRPMetaDataOptionsAdvanced":"מתקדם",
+ "oidcRPMetaDataOptionsAllowClientCredentialsGrant":"Allow OAuth2.0 Client Credentials Grant",
++"oidcRPMetaDataOptionsAllowNativeSso":"Allow Native SSO for Mobile App",
+ "oidcRPMetaDataOptionsAllowOffline":"לאפשר גישה בלתי מקוונת",
+ "oidcRPMetaDataOptionsAllowPasswordGrant":"Allow OAuth2.0 Password Grant",
+ "oidcRPMetaDataOptionsAuthMethod":"Token endpoint authentication method",
+diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json
+index f4cc99a37..f80d6519a 100644
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json
+@@ -737,6 +737,7 @@
+ "oidcRPMetaDataOptionsAdditionalAudiences":"Additional audiences",
+ "oidcRPMetaDataOptionsAdvanced":"Avanzato",
+ "oidcRPMetaDataOptionsAllowClientCredentialsGrant":"Allow OAuth2.0 Client Credentials Grant",
++"oidcRPMetaDataOptionsAllowNativeSso":"Allow Native SSO for Mobile App",
+ "oidcRPMetaDataOptionsAllowOffline":"Allow offline access",
+ "oidcRPMetaDataOptionsAllowPasswordGrant":"Allow OAuth2.0 Password Grant",
+ "oidcRPMetaDataOptionsAuthMethod":"Metodo di autenticazione degli endpoint di token",
+diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json
+index e62ce7a14..42275ac63 100644
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json
+@@ -737,6 +737,7 @@
+ "oidcRPMetaDataOptionsAdditionalAudiences":"Dodatkowi odbiorcy",
+ "oidcRPMetaDataOptionsAdvanced":"Zaawansowane",
+ "oidcRPMetaDataOptionsAllowClientCredentialsGrant":"Zezwalaj na przyznanie poświadczeń klienta OAuth2.0",
++"oidcRPMetaDataOptionsAllowNativeSso":"Allow Native SSO for Mobile App",
+ "oidcRPMetaDataOptionsAllowOffline":"Zezwalaj na dostęp offline",
+ "oidcRPMetaDataOptionsAllowPasswordGrant":"Zezwól na przyznanie hasła OAuth2.0",
+ "oidcRPMetaDataOptionsAuthMethod":"Metoda uwierzytelniania tokena punktu końcowego",
+diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json
+index bce3a79e3..8718ba034 100644
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json
+@@ -737,6 +737,7 @@
+ "oidcRPMetaDataOptionsAdditionalAudiences":"Audiências adicionais",
+ "oidcRPMetaDataOptionsAdvanced":"Avançado",
+ "oidcRPMetaDataOptionsAllowClientCredentialsGrant":"Permitir concessão de credenciais OAuth2.0 de cliente",
++"oidcRPMetaDataOptionsAllowNativeSso":"Allow Native SSO for Mobile App",
+ "oidcRPMetaDataOptionsAllowOffline":"Permitir acesso offline",
+ "oidcRPMetaDataOptionsAllowPasswordGrant":"Permitir concessão de senha OAuth2.0",
+ "oidcRPMetaDataOptionsAuthMethod":"Método de autenticação do ponto final de Token",
+diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json
+index abf3e6315..6e581311a 100644
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json
+@@ -737,6 +737,7 @@
+ "oidcRPMetaDataOptionsAdditionalAudiences":"Audiências adicionais",
+ "oidcRPMetaDataOptionsAdvanced":"Avançado",
+ "oidcRPMetaDataOptionsAllowClientCredentialsGrant":"Permitir concessão de credenciais OAuth2.0 de cliente",
++"oidcRPMetaDataOptionsAllowNativeSso":"Allow Native SSO for Mobile App",
+ "oidcRPMetaDataOptionsAllowOffline":"Permitir acesso offline",
+ "oidcRPMetaDataOptionsAllowPasswordGrant":"Permitir concessão de senha OAuth2.0",
+ "oidcRPMetaDataOptionsAuthMethod":"Método de autenticação do ponto final de Token",
+diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json
+index a62b79a74..64f0fd69e 100644
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json
+@@ -737,6 +737,7 @@
+ "oidcRPMetaDataOptionsAdditionalAudiences":"Дополнительные аудитории",
+ "oidcRPMetaDataOptionsAdvanced":"Расширенные",
+ "oidcRPMetaDataOptionsAllowClientCredentialsGrant":"Разрешить предоставление учетных данных клиента OAuth2.0",
++"oidcRPMetaDataOptionsAllowNativeSso":"Allow Native SSO for Mobile App",
+ "oidcRPMetaDataOptionsAllowOffline":"Разрешить автономный доступ",
+ "oidcRPMetaDataOptionsAllowPasswordGrant":"Разрешить предоставление пароля OAuth2.0",
+ "oidcRPMetaDataOptionsAuthMethod":"Метод аутентификации конечной точки токена",
+diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json
+index f128d5e11..537d97f25 100644
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json
+@@ -737,6 +737,7 @@
+ "oidcRPMetaDataOptionsAdditionalAudiences":"Ek hedef kitleler",
+ "oidcRPMetaDataOptionsAdvanced":"Gelişmiş",
+ "oidcRPMetaDataOptionsAllowClientCredentialsGrant":"OAuth2.0 Client Credentials Grant İzin Ver",
++"oidcRPMetaDataOptionsAllowNativeSso":"Allow Native SSO for Mobile App",
+ "oidcRPMetaDataOptionsAllowOffline":"Çevrimdışı erişime izin ver",
+ "oidcRPMetaDataOptionsAllowPasswordGrant":"OAuth2.0 Password Grant İzin Ver",
+ "oidcRPMetaDataOptionsAuthMethod":"Jeton uç noktası doğrulama metodu",
+diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json
+index 346c10098..a47ba66a9 100644
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json
+@@ -737,6 +737,7 @@
+ "oidcRPMetaDataOptionsAdditionalAudiences":"Đối tượng bổ sung",
+ "oidcRPMetaDataOptionsAdvanced":"Nâng cao",
+ "oidcRPMetaDataOptionsAllowClientCredentialsGrant":"Cho phép cấp thông tin xác thực ứng dụng khách OAuth2.0",
++"oidcRPMetaDataOptionsAllowNativeSso":"Allow Native SSO for Mobile App",
+ "oidcRPMetaDataOptionsAllowOffline":"Cho phép truy cập ngoại tuyến",
+ "oidcRPMetaDataOptionsAllowPasswordGrant":"Cho phép cấp mật khẩu OAuth2.0",
+ "oidcRPMetaDataOptionsAuthMethod":"Phương pháp xác thực thiết bị đầu cuối Token",
+diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json
+index 975c20b21..84f1c9d75 100644
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json
+@@ -737,6 +737,7 @@
+ "oidcRPMetaDataOptionsAdditionalAudiences":"額外聽眾",
+ "oidcRPMetaDataOptionsAdvanced":"進階",
+ "oidcRPMetaDataOptionsAllowClientCredentialsGrant":"Allow OAuth2.0 Client Credentials Grant",
++"oidcRPMetaDataOptionsAllowNativeSso":"Allow Native SSO for Mobile App",
+ "oidcRPMetaDataOptionsAllowOffline":"允許離線存取",
+ "oidcRPMetaDataOptionsAllowPasswordGrant":"允許 OAuth2.0 密碼授權",
+ "oidcRPMetaDataOptionsAuthMethod":"權杖端點驗證方法",
+diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json
+index 5600c2c68..6bfead0da 100644
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json
+@@ -737,6 +737,7 @@
+ "oidcRPMetaDataOptionsAdditionalAudiences":"額外聽眾",
+ "oidcRPMetaDataOptionsAdvanced":"進階",
+ "oidcRPMetaDataOptionsAllowClientCredentialsGrant":"Allow OAuth2.0 Client Credentials Grant",
++"oidcRPMetaDataOptionsAllowNativeSso":"Allow Native SSO for Mobile App",
+ "oidcRPMetaDataOptionsAllowOffline":"允許離線存取",
+ "oidcRPMetaDataOptionsAllowPasswordGrant":"允許 OAuth2.0 密碼授權",
+ "oidcRPMetaDataOptionsAuthMethod":"權杖端點驗證方法",

@@ -28,13 +28,10 @@ RUN echo "# Install nginx and manager libs" && \
 COPY *.patch /
 
 RUN \
-    echo patch ignorepollers.patch && patch -p1 < ignorepollers.patch && \
-    echo patch fixedLogout.patch && patch -p1 < fixedLogout.patch && \
-    echo patch token-exchange.patch && patch -p1 < token-exchange.patch && \
-    echo patch crowdsec.patch && patch -p1 < crowdsec.patch && \
-    echo patch recaptcha.patch && patch -p1 < recaptcha.patch && \
-    echo patch msg-broker.patch && patch -p1 < msg-broker.patch && \
-    echo patch lmConfigEditor.patch && patch -p1 < lmConfigEditor.patch && \
+    for p in ignorepollers.patch fixedLogout.patch token-exchange.patch \
+    crowdsec.patch recaptcha.patch msg-broker.patch lmConfigEditor.patch \
+    native-oidc.patch \
+    ; do echo patch $p && patch -p1 < $p; done && \
     rm -f *.patch && \
     LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini \
     perl -MLemonldap::NG::Manager::Build -e 'Lemonldap::NG::Manager::Build->run( \
