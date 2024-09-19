@@ -95,6 +95,7 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     perl -i -pe 's/\r//g' /usr/share/perl5/Lemonldap/NG/Common/Conf/DefaultValues.pm && \
     echo "patch session-cli.patch" && patch -p1 <session-cli.patch && \
     echo "patch msg-broker.patch" && patch -p1 <msg-broker.patch && \
+    echo "patch head.patch" && patch -p1 <head.patch && \
     rm -f *.patch
 
 #COPY syslogopt.patch .

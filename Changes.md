@@ -1,5 +1,7 @@
 # Changes
 
+* 2024-09-19:
+  * Manage HEAD requests
 * 2024-09-07 (v2.19.2-1):
   * Update to LLNG 2.19.2
 * 2024-08-31 (v2.19.1-5):
