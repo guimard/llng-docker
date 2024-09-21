@@ -84,6 +84,7 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     echo "patch session-cli.patch" && patch -p1 <session-cli.patch && \
     echo "patch msg-broker.patch" && patch -p1 <msg-broker.patch && \
     echo "patch head.patch" && patch -p1 <head.patch && \
+    echo "patch no-none.patch" && patch -p1 <no-none.patch && \
     rm -f *.patch
 
 #COPY syslogopt.patch .

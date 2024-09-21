@@ -1,5 +1,7 @@
 # Changes
 
+* 2024-09-21:
+  * Drop "none" from OIDC metadata
 * 2024-09-19:
   * Manage HEAD requests
 * 2024-09-07 (v2.19.2-1):
