@@ -1,10 +1,10 @@
 name: Build and test Docker Images
 
 env:
-  VERSION: 2.19.0
+  VERSION: 2.20.0
   PGVERSION: 15
   DEBIANRELEASE: bookworm
-  DOCKERREVISION: 9
+  DOCKERREVISION: 1
 
 on:
   push:
