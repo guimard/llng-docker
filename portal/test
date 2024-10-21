@@ -22,5 +22,6 @@ docker exec test-broker-manager /usr/share/docker-llng/updateConf get macros && 
 docker exec test-broker-auth /usr/share/docker-llng/updateConf get macros && echo
 echo "Modify macro on manager, define AA => CC"
 docker exec test-broker-manager /usr/share/docker-llng/updateConf set macros AA CC
+sleep 5
 echo "Verify propagation on portal, should get CC when querying for macros AA"
 docker exec test-broker-auth /usr/share/docker-llng/updateConf get macros AA | grep CC
