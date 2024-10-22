@@ -1,0 +1,11 @@
+--- a/usr/share/perl5/Lemonldap/NG/Common/OpenIDConnect/Metadata.pm
++++ b/usr/share/perl5/Lemonldap/NG/Common/OpenIDConnect/Metadata.pm
+@@ -81,7 +81,7 @@ sub metadataDoc {
+         push( @$grant_types, "hybrid" );
+     }
+ 
+-    my @supportedSigAlg = qw/none HS256 HS384 HS512/;
++    my @supportedSigAlg = qw/HS256 HS384 HS512/;
+     if ( $conf->{oidcServiceKeyTypeSig} eq 'EC' ) {
+         push @supportedSigAlg, qw/ES256 ES256K ES384 ES512 EdDSA/;
+     }
