@@ -1,5 +1,8 @@
 # Changes
 
+## v2.20.0-2 _(2024-10-22)_
+* Fix upstream regression on Nginx handler
+
 ## v2.20.0-1 _(2024-10-21)_
 * 2024-09-21:
   * Drop "none" from OIDC metadata
