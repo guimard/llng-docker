@@ -1,5 +1,7 @@
 # Changes
 
+* Add ReCaptcha v3
+
 ## v2.20.0-2 _(2024-10-22)_
 * Fix upstream regression on Nginx handler
 
