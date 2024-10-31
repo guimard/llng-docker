@@ -1,5 +1,9 @@
 # Changes
 
+## v2.20.0-4
+
+* Fix SAML regression
+
 ## v2.20.0-3 _(2024-10-25)_
 * Add ReCaptcha v3
 
@@ -7,9 +11,7 @@
 * Fix upstream regression on Nginx handler
 
 ## v2.20.0-1 _(2024-10-21)_
-* 2024-09-21:
   * Drop "none" from OIDC metadata
-* 2024-10-21:
   * Update to 2.20.0
 
 ## v2.19.2-1 _(2024-09-07)_
