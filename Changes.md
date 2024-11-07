@@ -3,6 +3,7 @@
 ## v2.20.0-4
 
 * Fix SAML regression
+* Fix Captcha rule bug
 
 ## v2.20.0-3 _(2024-10-25)_
 * Add ReCaptcha v3
