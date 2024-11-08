@@ -4,6 +4,7 @@
 
 * Fix SAML regression
 * Fix Captcha rule bug
+* Add admin global logout
 
 ## v2.20.0-3 _(2024-10-25)_
 * Add ReCaptcha v3
