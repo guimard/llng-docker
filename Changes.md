@@ -1,6 +1,9 @@
 # Changes
 
-## v2.20.0-4
+## v2.20.1-0
+* Update to 2.20.1
+
+## v2.20.0-4 _(2024A-11-14)_
 
 * Fix SAML regression
 * Fix Captcha rule bug
