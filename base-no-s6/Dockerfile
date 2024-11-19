@@ -82,7 +82,6 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     perl -000 -MJSON -i -ne '$_=JSON::from_json($_);$_->{reloadUrls}={};print JSON->new->pretty->canonical->encode($_)' /var/lib/lemonldap-ng/conf/lmConf-1.json && \
     perl -i -pe 's/\r//g' /usr/share/perl5/Lemonldap/NG/Common/Conf/DefaultValues.pm && \
     echo "patch no-none.patch" && patch -p1 <no-none.patch && \
-    echo "patch fix-handler.patch" && patch -p1 <fix-handler.patch && \
     rm -f *.patch
 
 #COPY syslogopt.patch .
