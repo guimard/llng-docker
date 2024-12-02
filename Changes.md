@@ -1,9 +1,12 @@
 # Changes
 
-## v2.20.1-0
+## v2.20.1-2
+* Add "Last-Modified" header for OIDC metadata
+
+## v2.20.1-1 _(2024-11-19)_
 * Update to 2.20.1
 
-## v2.20.0-4 _(2024A-11-14)_
+## v2.20.0-4 _(2024-11-14)_
 
 * Fix SAML regression
 * Fix Captcha rule bug
