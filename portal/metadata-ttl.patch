@@ -23,7 +23,7 @@
          push @{ $res->[1] }, 'Cache-Control' => 'public, max-age=' . $args{ttl};
 +        push @{ $res->[1] },
 +          'Last-Modified' =>
-+          POSIX::strftime( "%a, %b %0e %H:%M:%S %Y", $args{date} )
++          POSIX::strftime( "%a, %b %0e %H:%M:%S %Y", gmtime($args{date}) )
 +          if $args{date};
      }
      else {
