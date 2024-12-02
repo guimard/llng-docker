@@ -15,3 +15,17 @@
  }
  
  # Store request parameters in %ENV
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm
+@@ -1450,6 +1450,10 @@ sub sendJSONresponse {
+           'Cache-Control' => 'no-cache, no-store, must-revalidate',
+           'Pragma'        => 'no-cache',
+           'Expires'       => '0';
++        push @{ $res->[1] },
++          'Last-Modified' =>
++          POSIX::strftime( "%a, %b %0e %H:%M:%S %Y", $args{date} )
++          if $args{date};
+     }
+ 
+     # If this is a cross-domain request from the portal itself
+
