@@ -2,6 +2,7 @@
 
 ## v2.20.1-2
 * Add "Last-Modified" header for OIDC metadata
+* Add hook to modify refresh\_token
 
 ## v2.20.1-1 _(2024-11-19)_
 * Update to 2.20.1
