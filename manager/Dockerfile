@@ -33,6 +33,7 @@ RUN \
     echo patch matrix-token-exchange.patch && patch -p1 < matrix-token-exchange.patch && \
     echo patch globalLogout.patch && patch -p1 < globalLogout.patch && \
     echo patch metadata-ttl.patch && patch -p1 < metadata-ttl.patch && \
+    echo patch fix-sessions-count.patch && patch -p1 <fix-sessions-count.patch && \
     rm -f *.patch && \
     LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini \
     perl -MLemonldap::NG::Manager::Build -e 'Lemonldap::NG::Manager::Build->run( \
