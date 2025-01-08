@@ -1,0 +1,31 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/UserDB/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/UserDB/OpenIDConnect.pm
+@@ -42,7 +42,27 @@ sub getUser {
+         return PE_ERROR;
+     }
+ 
+-    my $userinfo_content = $self->getUserInfo( $op, $access_token );
++    my $userinfo_content;
++    if ( $self->opOptions->{$op}->{oidcOPMetaDataOptionsIDTokenForceClaims} ) {
++        my ( undef, $tmp, undef ) = split /\./, $req->data->{id_token};
++        $userinfo_content =
++          eval { JSON::from_fson( MIME::Base64::decode_base64url($tmp) ) };
++        $self->logger->error("Unable to read ID token content: $@") if ($@);
++    }
++    if ( $self->opOptions->{$op}->{oidcOPMetaDataOptionsAccessTokenClaims} ) {
++        my ( undef, $tmp, undef ) = split /\./, $req->data->{access_token};
++        eval {
++            $tmp = JSON::from_fson( MIME::Base64::decode_base64url($tmp) );
++            $userinfo_content =
++              $userinfo_content
++              ? { %{ $userinfo_content || {} }, %{ $tmp || {} } }
++              : $tmp;
++        };
++        $self->logger->error("Unable to read ID token content: $@") if ($@);
++    }
++    unless ($userinfo_content) {
++        $userinfo_content = $self->getUserInfo( $op, $access_token );
++    }
+ 
+     unless ($userinfo_content) {
+         $self->logger->warn("No User Info content");

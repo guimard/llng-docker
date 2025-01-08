@@ -1,0 +1,52 @@
+ARG DEBIANVERSION=bookworm
+
+FROM debian:${DEBIANVERSION}-slim as debian-backports-updated
+
+ENV DEBIAN_VERSION=bookworm
+
+RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
+    apt-get -y update && \
+    apt-get -y install xz-utils && \
+    apt-get -y upgrade
+
+FROM debian-backports-updated as debian-with-lemon
+
+RUN apt-get -y --no-install-recommends install procps cron \
+    liblemonldap-ng-common-perl \
+    liblemonldap-ng-handler-perl \
+        lemonldap-ng-uwsgi-app \
+        liblemonldap-ng-portal-perl \
+	liblemonldap-ng-manager-perl \
+	apache2-utils \
+    libapache-session-browseable-perl libapache-session-ldap-perl \
+    libapache-session-mongodb-perl libapache-session-sqlite3-perl \
+    libapache-session-wrapper-perl \
+    libdbi-perl libdbd-pg-perl libnet-cidr-perl \
+    libhttp-parser-xs-perl liblwp-protocol-https-perl libstring-random-perl \
+    libconvert-base32-perl libnet-ldap-perl libxml-libxml-perl libxml-simple-perl \
+    libredis-perl libyaml-perl libencode-perl patch \
+        gsfonts patch libconvert-pem-perl \
+        libcrypt-u2f-server-perl libgeoip2-perl \
+        libglib-perl libgssapi-perl libhttp-browserdetect-perl \
+        libimage-magick-perl liblasso-perl libnet-facebook-oauth2-perl \
+        libnet-openid-consumer-perl libnet-openid-server-perl \
+        libnet-oauth-perl libsoap-lite-perl fonts-urw-base35 \
+        libauthen-webauthn-perl libcrypt-openssl-bignum-perl \
+        libconvert-base32-perl libio-string-perl libipc-run-perl \
+        libgd-securityimage-perl libmime-tools-perl libnet-ldap-perl \
+        libio-socket-timeout-perl libunicode-string-perl liblasso-perl \
+        libio-string-perl libemail-sender-perl libregexp-common-perl \
+        libcrypt-jwt-perl libdigest-hmac-perl libdata-password-zxcvbn-perl \
+        libhttp-browserdetect-perl libnet-dns-perl \
+        uwsgi uwsgi-plugin-psgi nginx libnginx-mod-http-lua
+
+RUN (echo ""; echo "daemon off;") >> /etc/nginx/nginx.conf && \
+    perl -i -pe 's#access_log .*;#access_log /dev/stdout;#; s#error_log .*;#error_log /dev/stdout info;#' /etc/nginx/nginx.conf
+
+COPY start /
+
+COPY install /
+
+CMD ["/usr/sbin/nginx"]
+
+ENTRYPOINT ["./start"]
