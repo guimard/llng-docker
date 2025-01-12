@@ -1,24 +1,22 @@
-diff --git a/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm b/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
-index 55a19f8b9..be720fa24 100644
 --- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
-@@ -5051,6 +5051,14 @@ m{^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
+@@ -5051,6 +5051,16 @@ m{^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
              default       => 0,
              documentation => 'Use PKCE with this OP',
          },
-+        oidcOPMetaDataOptionsIDTokenForceClaims => {
-+            type => 'bool',
-+            documentation => "Use data from ID token instead of user_info endmoint",
-+        },
-+        oidcOPMetaDataOptionsAccessTokenClaims => {
-+            type => 'bool',
-+            documentation => "Use data from access token instead of user_info endmoint",
++        oidcOPMetaDataOptionsUserinfoSource => {
++            type    => 'select',
++            default => 'userinfo',
++            select  => [
++                { k => 'userinfo',     v => 'Userinfo endpoint' },
++                { k => 'id_token',     v => 'ID Token' },
++                { k => 'access_token', v => 'Access Token' },
++            ],
++            documentation => "Source of userinfo",
 +        },
  
          # OpenID Connect relying parties
          oidcRPMetaDataExportedVars => {
-diff --git a/usr/share/perl5/Lemonldap/NG/Manager/Build/CTrees.pm b/usr/share/perl5/Lemonldap/NG/Manager/Build/CTrees.pm
-index a117adc0f..cdd0a8a7a 100644
 --- a/usr/share/perl5/Lemonldap/NG/Manager/Build/CTrees.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/CTrees.pm
 @@ -200,7 +200,9 @@ sub cTrees {
@@ -27,288 +25,147 @@ index a117adc0f..cdd0a8a7a 100644
                              'oidcOPMetaDataOptionsIDTokenMaxAge',
 -                            'oidcOPMetaDataOptionsUseNonce'
 +                            'oidcOPMetaDataOptionsUseNonce',
-+                            'oidcOPMetaDataOptionsIDTokenForceClaims',
-+                            'oidcOPMetaDataOptionsAccessTokenClaims',
++                            'oidcOPMetaDataOptionsUserinfoSource',
                          ]
                      },
                      'oidcOPMetaDataOptionsComment'
-diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json
-index 7753c2261..4c8b66821 100644
 --- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json
 +++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json
-@@ -695,6 +695,7 @@
- "oidcOPMetaDataNode":" أوبين أيدي كونيكت بروفيدر",
- "oidcOPMetaDataNodes":" أوبين أيدي كونيكت بروفيدر",
- "oidcOPMetaDataOptions":"الخيارات",
-+"oidcOPMetaDataOptionsAccessTokenClaims":"Use claims from Access Token",
- "oidcOPMetaDataOptionsAcrValues":"قيم أل ACR",
- "oidcOPMetaDataOptionsAuthnEndpointAuthMethod":"Authentication method for authorization code request",
- "oidcOPMetaDataOptionsAuthnEndpointAuthSigAlg":"Signature algorithm for authorization code authentication",
-@@ -707,6 +708,7 @@
- "oidcOPMetaDataOptionsDisplay":"عرض",
- "oidcOPMetaDataOptionsDisplayName":"اسم",
- "oidcOPMetaDataOptionsDisplayParams":"عرض",
-+"oidcOPMetaDataOptionsIDTokenForceClaims":"Use claims from ID Token",
- "oidcOPMetaDataOptionsIDTokenMaxAge":"الحد الأقصى لعمر تعريف التوكن",
- "oidcOPMetaDataOptionsIcon":"شعار",
- "oidcOPMetaDataOptionsJWKSTimeout":"مهلة بيانات JWKS",
-diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json
-index ccb9e0be1..3ff552d65 100644
+@@ -723,6 +723,7 @@
+ "oidcOPMetaDataOptionsUiLocales":"واجهة المستخدم المحلية",
+ "oidcOPMetaDataOptionsUseNonce":"استخدام نونس",
+ "oidcOPMetaDataOptionsUserAttribute":"Attribute containing user identifier",
++"oidcOPMetaDataOptionsUserinfoSource":"User Info source",
+ "oidcOPName":"اسم موفرأوبين أيدي كونيكت",
+ "oidcParams":"معاييرأوبين أيدي كونيكت",
+ "oidcRP":"الطرف المعتمد  لي أوبين أيدي كونيكت",
 --- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json
 +++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json
-@@ -695,6 +695,7 @@
- "oidcOPMetaDataNode":"OpenID Connect Providers",
- "oidcOPMetaDataNodes":"OpenID Connect Providers",
- "oidcOPMetaDataOptions":"Options",
-+"oidcOPMetaDataOptionsAccessTokenClaims":"Use claims from Access Token",
- "oidcOPMetaDataOptionsAcrValues":"ACR values",
- "oidcOPMetaDataOptionsAuthnEndpointAuthMethod":"Authentication method for authorization code request",
- "oidcOPMetaDataOptionsAuthnEndpointAuthSigAlg":"Signature algorithm for authorization code authentication",
-@@ -707,6 +708,7 @@
- "oidcOPMetaDataOptionsDisplay":"Display",
- "oidcOPMetaDataOptionsDisplayName":"Name",
- "oidcOPMetaDataOptionsDisplayParams":"Display",
-+"oidcOPMetaDataOptionsIDTokenForceClaims":"Use claims from ID Token",
- "oidcOPMetaDataOptionsIDTokenMaxAge":"ID Token max age",
- "oidcOPMetaDataOptionsIcon":"Logo",
- "oidcOPMetaDataOptionsJWKSTimeout":"JWKS data timeout",
-diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json
-index 4acaf2893..c71a62d88 100644
+@@ -723,6 +723,7 @@
+ "oidcOPMetaDataOptionsUiLocales":"Locales UI",
+ "oidcOPMetaDataOptionsUseNonce":"Use nonce",
+ "oidcOPMetaDataOptionsUserAttribute":"Attribute containing user identifier",
++"oidcOPMetaDataOptionsUserinfoSource":"User Info source",
+ "oidcOPName":"OpenID Connect Provider Name",
+ "oidcParams":"OpenID Connect parameters",
+ "oidcRP":"OpenID Connect Relying Party",
 --- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json
 +++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json
-@@ -695,6 +695,7 @@
- "oidcOPMetaDataNode":"Proveedores de conexión OpenID",
- "oidcOPMetaDataNodes":"Proveedores de conexión OpenID",
- "oidcOPMetaDataOptions":"Opciones",
-+"oidcOPMetaDataOptionsAccessTokenClaims":"Use claims from Access Token",
- "oidcOPMetaDataOptionsAcrValues":"Valores ACR",
- "oidcOPMetaDataOptionsAuthnEndpointAuthMethod":"Authentication method for authorization code request",
- "oidcOPMetaDataOptionsAuthnEndpointAuthSigAlg":"Signature algorithm for authorization code authentication",
-@@ -707,6 +708,7 @@
- "oidcOPMetaDataOptionsDisplay":"Display",
- "oidcOPMetaDataOptionsDisplayName":"Nombre",
- "oidcOPMetaDataOptionsDisplayParams":"Display",
-+"oidcOPMetaDataOptionsIDTokenForceClaims":"Use claims from ID Token",
- "oidcOPMetaDataOptionsIDTokenMaxAge":"Caducidad de token ID",
- "oidcOPMetaDataOptionsIcon":"Logotipo",
- "oidcOPMetaDataOptionsJWKSTimeout":"Caducidad de datos JWKS",
-diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json
-index 4d3a35d78..0d1af2880 100644
+@@ -723,6 +723,7 @@
+ "oidcOPMetaDataOptionsUiLocales":"Locales UI",
+ "oidcOPMetaDataOptionsUseNonce":"Use nonce",
+ "oidcOPMetaDataOptionsUserAttribute":"Attribute containing user identifier",
++"oidcOPMetaDataOptionsUserinfoSource":"User Info source",
+ "oidcOPName":"OpenID Connect Provider Name",
+ "oidcParams":"OpenID Connect parameters",
+ "oidcRP":"OpenID Connect Relying Party",
 --- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json
 +++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json
-@@ -695,6 +695,7 @@
- "oidcOPMetaDataNode":"Fournisseurs OpenID Connect",
- "oidcOPMetaDataNodes":"Fournisseurs OpenID Connect",
- "oidcOPMetaDataOptions":"Options",
-+"oidcOPMetaDataOptionsAccessTokenClaims":"Utiliser les attributs du jeton d'accès",
- "oidcOPMetaDataOptionsAcrValues":"Valeurs ACR",
- "oidcOPMetaDataOptionsAuthnEndpointAuthMethod":"Methode d'authentification pour demande le code d'autorisation",
- "oidcOPMetaDataOptionsAuthnEndpointAuthSigAlg":"Algorithme de signature pour l'authentification du code autorisation",
-@@ -707,6 +708,7 @@
- "oidcOPMetaDataOptionsDisplay":"Affichage",
- "oidcOPMetaDataOptionsDisplayName":"Nom d'affichage",
- "oidcOPMetaDataOptionsDisplayParams":"Affichage",
-+"oidcOPMetaDataOptionsIDTokenForceClaims":"Utiliser les attributs du jeton d'identité",
- "oidcOPMetaDataOptionsIDTokenMaxAge":"Age maximum du jeton d'identité",
- "oidcOPMetaDataOptionsIcon":"Logo",
- "oidcOPMetaDataOptionsJWKSTimeout":"Durée de vie des données JWKS",
-diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json
-index c2147e920..e5c163366 100644
+@@ -723,6 +723,7 @@
+ "oidcOPMetaDataOptionsUiLocales":"UI locales",
+ "oidcOPMetaDataOptionsUseNonce":"Utilisation du nonce",
+ "oidcOPMetaDataOptionsUserAttribute":"Attribut contenant l'identité de l'utilisateur",
++"oidcOPMetaDataOptionsUserinfoSource":"Source des données utilisateur",
+ "oidcOPName":"Nom du fournisseur OpenID Connect",
+ "oidcParams":"Paramètres OpenID Connect",
+ "oidcRP":"Client OpenID Connect",
 --- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json
 +++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json
-@@ -695,6 +695,7 @@
- "oidcOPMetaDataNode":"ספקי OpenID Connect",
- "oidcOPMetaDataNodes":"ספקי OpenID Connect",
- "oidcOPMetaDataOptions":"אפשרויות",
-+"oidcOPMetaDataOptionsAccessTokenClaims":"Use claims from Access Token",
- "oidcOPMetaDataOptionsAcrValues":"ACR values",
- "oidcOPMetaDataOptionsAuthnEndpointAuthMethod":"Authentication method for authorization code request",
- "oidcOPMetaDataOptionsAuthnEndpointAuthSigAlg":"Signature algorithm for authorization code authentication",
-@@ -707,6 +708,7 @@
- "oidcOPMetaDataOptionsDisplay":"תצוגה",
- "oidcOPMetaDataOptionsDisplayName":"שם",
- "oidcOPMetaDataOptionsDisplayParams":"תצוגה",
-+"oidcOPMetaDataOptionsIDTokenForceClaims":"Use claims from ID Token",
- "oidcOPMetaDataOptionsIDTokenMaxAge":"ID Token max age",
- "oidcOPMetaDataOptionsIcon":"לוגו",
- "oidcOPMetaDataOptionsJWKSTimeout":"JWKS data timeout",
-diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json
-index e7739f3dd..d2e358224 100644
+@@ -723,6 +723,7 @@
+ "oidcOPMetaDataOptionsUiLocales":"Locales UI",
+ "oidcOPMetaDataOptionsUseNonce":"Use nonce",
+ "oidcOPMetaDataOptionsUserAttribute":"Attribute containing user identifier",
++"oidcOPMetaDataOptionsUserinfoSource":"User Info source",
+ "oidcOPName":"OpenID Connect Provider Name",
+ "oidcParams":"משתני OpenID Connect",
+ "oidcRP":"גוף סמך של OpenID Connect",
 --- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json
 +++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json
-@@ -695,6 +695,7 @@
- "oidcOPMetaDataNode":"Provider di OpenID Connect",
- "oidcOPMetaDataNodes":"Provider di OpenID Connect",
- "oidcOPMetaDataOptions":"Opzioni",
-+"oidcOPMetaDataOptionsAccessTokenClaims":"Use claims from Access Token",
- "oidcOPMetaDataOptionsAcrValues":"Valori ACR",
- "oidcOPMetaDataOptionsAuthnEndpointAuthMethod":"Authentication method for authorization code request",
- "oidcOPMetaDataOptionsAuthnEndpointAuthSigAlg":"Signature algorithm for authorization code authentication",
-@@ -707,6 +708,7 @@
- "oidcOPMetaDataOptionsDisplay":"Visualizza",
- "oidcOPMetaDataOptionsDisplayName":"Nome",
- "oidcOPMetaDataOptionsDisplayParams":"Visualizza",
-+"oidcOPMetaDataOptionsIDTokenForceClaims":"Use claims from ID Token",
- "oidcOPMetaDataOptionsIDTokenMaxAge":"Eta massima dell'ID della Token",
- "oidcOPMetaDataOptionsIcon":"Logo",
- "oidcOPMetaDataOptionsJWKSTimeout":"Timeout dei dati di JWKS",
-diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json
-index c81061a7c..42963c38a 100644
+@@ -723,6 +723,7 @@
+ "oidcOPMetaDataOptionsUiLocales":"Locales UI",
+ "oidcOPMetaDataOptionsUseNonce":"Usare nonce",
+ "oidcOPMetaDataOptionsUserAttribute":"Attributo che contiene l'identificatore dell'utente",
++"oidcOPMetaDataOptionsUserinfoSource":"User Info source",
+ "oidcOPName":"Nome del Provider di OpenID Connect",
+ "oidcParams":"Parametri di OpenID Connect",
+ "oidcRP":"Parte basata su OpenID Connect",
 --- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json
 +++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json
-@@ -695,6 +695,7 @@
- "oidcOPMetaDataNode":"Dostawcy OpenID Connect",
- "oidcOPMetaDataNodes":"Dostawcy OpenID Connect",
- "oidcOPMetaDataOptions":"Opcje",
-+"oidcOPMetaDataOptionsAccessTokenClaims":"Use claims from Access Token",
- "oidcOPMetaDataOptionsAcrValues":"Wartości ACR",
- "oidcOPMetaDataOptionsAuthnEndpointAuthMethod":"Authentication method for authorization code request",
- "oidcOPMetaDataOptionsAuthnEndpointAuthSigAlg":"Signature algorithm for authorization code authentication",
-@@ -707,6 +708,7 @@
- "oidcOPMetaDataOptionsDisplay":"Wyświetlanie",
- "oidcOPMetaDataOptionsDisplayName":"Nazwa",
- "oidcOPMetaDataOptionsDisplayParams":"Wyświetlanie",
-+"oidcOPMetaDataOptionsIDTokenForceClaims":"Use claims from ID Token",
- "oidcOPMetaDataOptionsIDTokenMaxAge":"Maksymalny czas ważności tokena identyfikacyjnego",
- "oidcOPMetaDataOptionsIcon":"Logo",
- "oidcOPMetaDataOptionsJWKSTimeout":"Limit czasu danych JWKS",
-diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json
-index 81ee2650e..63b73134e 100644
+@@ -723,6 +723,7 @@
+ "oidcOPMetaDataOptionsUiLocales":"Interfejs użytkownika Locales",
+ "oidcOPMetaDataOptionsUseNonce":"Użyj nonce",
+ "oidcOPMetaDataOptionsUserAttribute":"Atrybut zawierający identyfikator użytkownika",
++"oidcOPMetaDataOptionsUserinfoSource":"User Info source",
+ "oidcOPName":"Nazwa dostawcy OpenID Connect",
+ "oidcParams":"Parametry OpenID Connect",
+ "oidcRP":"Strona zależna od OpenID Connect",
 --- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json
 +++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json
-@@ -695,6 +695,7 @@
- "oidcOPMetaDataNode":"Provedores OpenID Connect",
- "oidcOPMetaDataNodes":"Provedores OpenID Connect",
- "oidcOPMetaDataOptions":"Opções",
-+"oidcOPMetaDataOptionsAccessTokenClaims":"Use claims from Access Token",
- "oidcOPMetaDataOptionsAcrValues":"Valores ACR",
- "oidcOPMetaDataOptionsAuthnEndpointAuthMethod":"Método de autenticação para solicitação de código de autorização",
- "oidcOPMetaDataOptionsAuthnEndpointAuthSigAlg":"Algoritmo de assinatura para solicitação de código de autorização",
-@@ -707,6 +708,7 @@
- "oidcOPMetaDataOptionsDisplay":"Exibir",
- "oidcOPMetaDataOptionsDisplayName":"Nome",
- "oidcOPMetaDataOptionsDisplayParams":"Exibir",
-+"oidcOPMetaDataOptionsIDTokenForceClaims":"Use claims from ID Token",
- "oidcOPMetaDataOptionsIDTokenMaxAge":"Idade máxima do Token do ID",
- "oidcOPMetaDataOptionsIcon":"Logo",
- "oidcOPMetaDataOptionsJWKSTimeout":"expiração de dados JWKS",
-diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json
-index bd25b2371..2bae96433 100644
+@@ -723,6 +723,7 @@
+ "oidcOPMetaDataOptionsUiLocales":"UI de Localização",
+ "oidcOPMetaDataOptionsUseNonce":"Usar nonce",
+ "oidcOPMetaDataOptionsUserAttribute":"Atributo contendo o identificador do usuário",
++"oidcOPMetaDataOptionsUserinfoSource":"User Info source",
+ "oidcOPName":"Nome do provedor OpenID Connect",
+ "oidcParams":"Parâmetros OpenID Connect",
+ "oidcRP":"OpenID Connect Relying Party",
 --- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json
 +++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json
-@@ -695,6 +695,7 @@
- "oidcOPMetaDataNode":"Provedores OpenID Connect",
- "oidcOPMetaDataNodes":"Provedores OpenID Connect",
- "oidcOPMetaDataOptions":"Opções",
-+"oidcOPMetaDataOptionsAccessTokenClaims":"Use claims from Access Token",
- "oidcOPMetaDataOptionsAcrValues":"Valores ACR",
- "oidcOPMetaDataOptionsAuthnEndpointAuthMethod":"Método de autenticação para solicitação de código de autorização",
- "oidcOPMetaDataOptionsAuthnEndpointAuthSigAlg":"Algoritmo de assinatura para solicitação de código de autorização",
-@@ -707,6 +708,7 @@
- "oidcOPMetaDataOptionsDisplay":"Exibir",
- "oidcOPMetaDataOptionsDisplayName":"Nome",
- "oidcOPMetaDataOptionsDisplayParams":"Exibir",
-+"oidcOPMetaDataOptionsIDTokenForceClaims":"Use claims from ID Token",
- "oidcOPMetaDataOptionsIDTokenMaxAge":"Idade máxima do Token do ID",
- "oidcOPMetaDataOptionsIcon":"Logo",
- "oidcOPMetaDataOptionsJWKSTimeout":"expiração de dados JWKS",
-diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json
-index 2a9787ba8..1aa02e797 100644
+@@ -723,6 +723,7 @@
+ "oidcOPMetaDataOptionsUiLocales":"UI de Locais",
+ "oidcOPMetaDataOptionsUseNonce":"Usar nonce",
+ "oidcOPMetaDataOptionsUserAttribute":"Atributo contendo o identificador do usuário",
++"oidcOPMetaDataOptionsUserinfoSource":"User Info source",
+ "oidcOPName":"Nome do provedor OpenID Connect",
+ "oidcParams":"Parâmetros OpenID Connect",
+ "oidcRP":"OpenID Connect Relying Party",
 --- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json
 +++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json
-@@ -695,6 +695,7 @@
- "oidcOPMetaDataNode":"Провайдеры OpenID Connect",
- "oidcOPMetaDataNodes":"Провайдеры OpenID Connect",
- "oidcOPMetaDataOptions":"Настройки",
-+"oidcOPMetaDataOptionsAccessTokenClaims":"Use claims from Access Token",
- "oidcOPMetaDataOptionsAcrValues":"Значения ACR",
- "oidcOPMetaDataOptionsAuthnEndpointAuthMethod":"Authentication method for authorization code request",
- "oidcOPMetaDataOptionsAuthnEndpointAuthSigAlg":"Signature algorithm for authorization code authentication",
-@@ -707,6 +708,7 @@
- "oidcOPMetaDataOptionsDisplay":"Отображение",
- "oidcOPMetaDataOptionsDisplayName":"Название",
- "oidcOPMetaDataOptionsDisplayParams":"Отображение",
-+"oidcOPMetaDataOptionsIDTokenForceClaims":"Use claims from ID Token",
- "oidcOPMetaDataOptionsIDTokenMaxAge":"Максимальный возраст токена ID",
- "oidcOPMetaDataOptionsIcon":"Лого",
- "oidcOPMetaDataOptionsJWKSTimeout":"Время ожидания данных JWKS",
-diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json
-index d51d7353d..f383f762a 100644
+@@ -723,6 +723,7 @@
+ "oidcOPMetaDataOptionsUiLocales":"UI локалей",
+ "oidcOPMetaDataOptionsUseNonce":"Использовать одноразовый номер",
+ "oidcOPMetaDataOptionsUserAttribute":"Атрибут, содержащий идентификатор пользователя",
++"oidcOPMetaDataOptionsUserinfoSource":"User Info source",
+ "oidcOPName":"Имя провайдера OpenID Connect",
+ "oidcParams":"Параметры OpenID Connect",
+ "oidcRP":"Доверяющая сторона OpenID Connect",
 --- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json
 +++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json
-@@ -695,6 +695,7 @@
- "oidcOPMetaDataNode":"OpenID Connect Sağlayıcıları",
- "oidcOPMetaDataNodes":"OpenID Connect Sağlayıcıları",
- "oidcOPMetaDataOptions":"Seçenekler",
-+"oidcOPMetaDataOptionsAccessTokenClaims":"Use claims from Access Token",
- "oidcOPMetaDataOptionsAcrValues":"ACR değerleri",
- "oidcOPMetaDataOptionsAuthnEndpointAuthMethod":"Authentication method for authorization code request",
- "oidcOPMetaDataOptionsAuthnEndpointAuthSigAlg":"Signature algorithm for authorization code authentication",
-@@ -707,6 +708,7 @@
- "oidcOPMetaDataOptionsDisplay":"Görüntüle",
- "oidcOPMetaDataOptionsDisplayName":"Ad",
- "oidcOPMetaDataOptionsDisplayParams":"Görüntüle",
-+"oidcOPMetaDataOptionsIDTokenForceClaims":"Use claims from ID Token",
- "oidcOPMetaDataOptionsIDTokenMaxAge":"ID Jetonu maksimum ömrü",
- "oidcOPMetaDataOptionsIcon":"Logo",
- "oidcOPMetaDataOptionsJWKSTimeout":"JWKS verisi zaman aşımı",
-diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json
-index 4e43d5b5f..f40c5db83 100644
+@@ -723,6 +723,7 @@
+ "oidcOPMetaDataOptionsUiLocales":"Yerel UI",
+ "oidcOPMetaDataOptionsUseNonce":"Tek seferlik anahtarı kullan",
+ "oidcOPMetaDataOptionsUserAttribute":"Nitelik kullanıcı kimliği içeriyor",
++"oidcOPMetaDataOptionsUserinfoSource":"User Info source",
+ "oidcOPName":"OpenID Connect Sağlayıcı Adı",
+ "oidcParams":"OpenID Connect parametreleri",
+ "oidcRP":"OpenID Connect Relying Party",
 --- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json
 +++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json
-@@ -695,6 +695,7 @@
- "oidcOPMetaDataNode":"Nhà cung cấp Kết nối OpenID",
- "oidcOPMetaDataNodes":"Nhà cung cấp Kết nối OpenID",
- "oidcOPMetaDataOptions":"Tùy chọn",
-+"oidcOPMetaDataOptionsAccessTokenClaims":"Use claims from Access Token",
- "oidcOPMetaDataOptionsAcrValues":"Giá trị ACR",
- "oidcOPMetaDataOptionsAuthnEndpointAuthMethod":"Authentication method for authorization code request",
- "oidcOPMetaDataOptionsAuthnEndpointAuthSigAlg":"Signature algorithm for authorization code authentication",
-@@ -707,6 +708,7 @@
- "oidcOPMetaDataOptionsDisplay":"Hiển thị",
- "oidcOPMetaDataOptionsDisplayName":"Tên",
- "oidcOPMetaDataOptionsDisplayParams":"Hiển thị",
-+"oidcOPMetaDataOptionsIDTokenForceClaims":"Use claims from ID Token",
- "oidcOPMetaDataOptionsIDTokenMaxAge":"Thời hạn ID Token",
- "oidcOPMetaDataOptionsIcon":"Logo",
- "oidcOPMetaDataOptionsJWKSTimeout":"Thời gian chờ của dữ liệu JWKS",
-diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json
-index 85ade8ee5..d88ec3c5d 100644
+@@ -723,6 +723,7 @@
+ "oidcOPMetaDataOptionsUiLocales":"Giao diện Người dùng",
+ "oidcOPMetaDataOptionsUseNonce":"Sử dụng nonce",
+ "oidcOPMetaDataOptionsUserAttribute":"Thuộc tính chứa định danh người dùng",
++"oidcOPMetaDataOptionsUserinfoSource":"User Info source",
+ "oidcOPName":"Tên bộ cung cấp kết nối OpenID",
+ "oidcParams":"Các tham số kết nối OpenID",
+ "oidcRP":"OpenID Connect Relying Party",
 --- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json
 +++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json
-@@ -695,6 +695,7 @@
- "oidcOPMetaDataNode":"OpenID 連線提供者",
- "oidcOPMetaDataNodes":"OpenID 連線提供者",
- "oidcOPMetaDataOptions":"選項",
-+"oidcOPMetaDataOptionsAccessTokenClaims":"Use claims from Access Token",
- "oidcOPMetaDataOptionsAcrValues":"ACR 值",
- "oidcOPMetaDataOptionsAuthnEndpointAuthMethod":"Authentication method for authorization code request",
- "oidcOPMetaDataOptionsAuthnEndpointAuthSigAlg":"Signature algorithm for authorization code authentication",
-@@ -707,6 +708,7 @@
- "oidcOPMetaDataOptionsDisplay":"顯示",
- "oidcOPMetaDataOptionsDisplayName":"名稱",
- "oidcOPMetaDataOptionsDisplayParams":"顯示",
-+"oidcOPMetaDataOptionsIDTokenForceClaims":"Use claims from ID Token",
- "oidcOPMetaDataOptionsIDTokenMaxAge":"ID 權杖最大時間",
- "oidcOPMetaDataOptionsIcon":"圖示",
- "oidcOPMetaDataOptionsJWKSTimeout":"JWKS 資料逾時",
-diff --git a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json
-index feac3503f..b9704bb99 100644
+@@ -723,6 +723,7 @@
+ "oidcOPMetaDataOptionsUiLocales":"在地化使用者介面",
+ "oidcOPMetaDataOptionsUseNonce":"使用隨機數",
+ "oidcOPMetaDataOptionsUserAttribute":"包含使用者識別符號的屬性",
++"oidcOPMetaDataOptionsUserinfoSource":"User Info source",
+ "oidcOPName":"OpenID 連線提供者名稱",
+ "oidcParams":"OpenID 連線參數",
+ "oidcRP":"OpenID 連線提供方",
 --- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json
 +++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json
-@@ -695,6 +695,7 @@
- "oidcOPMetaDataNode":"OpenID 連線提供者",
- "oidcOPMetaDataNodes":"OpenID 連線提供者",
- "oidcOPMetaDataOptions":"選項",
-+"oidcOPMetaDataOptionsAccessTokenClaims":"Use claims from Access Token",
- "oidcOPMetaDataOptionsAcrValues":"ACR 值",
- "oidcOPMetaDataOptionsAuthnEndpointAuthMethod":"Authentication method for authorization code request",
- "oidcOPMetaDataOptionsAuthnEndpointAuthSigAlg":"Signature algorithm for authorization code authentication",
-@@ -707,6 +708,7 @@
- "oidcOPMetaDataOptionsDisplay":"顯示",
- "oidcOPMetaDataOptionsDisplayName":"名稱",
- "oidcOPMetaDataOptionsDisplayParams":"顯示",
-+"oidcOPMetaDataOptionsIDTokenForceClaims":"Use claims from ID Token",
- "oidcOPMetaDataOptionsIDTokenMaxAge":"ID 權杖最大時間",
- "oidcOPMetaDataOptionsIcon":"圖示",
- "oidcOPMetaDataOptionsJWKSTimeout":"JWKS 資料逾時",
+@@ -723,6 +723,7 @@
+ "oidcOPMetaDataOptionsUiLocales":"在地化使用者介面",
+ "oidcOPMetaDataOptionsUseNonce":"使用隨機數",
+ "oidcOPMetaDataOptionsUserAttribute":"包含使用者識別符號的屬性",
++"oidcOPMetaDataOptionsUserinfoSource":"User Info source",
+ "oidcOPName":"OpenID 連線提供者名稱",
+ "oidcParams":"OpenID 連線參數",
+ "oidcRP":"OpenID 連線提供方",
