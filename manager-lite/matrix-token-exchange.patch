@@ -1,0 +1,25 @@
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
+@@ -5233,6 +5189,11 @@ m{^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
+             documentation =>
+               'List of RP authorized to query for an access_token of this RP',
+         },
++        oidcRPMetaDataOptionsTokenXAuthorizedMatrix => {
++            type          => 'text',
++            documentation =>
++'List of Matrix servers authorized to query for an access_token of this RP',
++        },
+     };
+ }
+ 
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/CTrees.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/CTrees.pm
+@@ -246,6 +246,7 @@ sub cTrees {
+                             'oidcRPMetaDataOptionsUserIDAttr',
+                             'oidcRPMetaDataOptionsAdditionalAudiences',
+                             'oidcRPMetaDataOptionsTokenXAuthorizedRP',
++                            'oidcRPMetaDataOptionsTokenXAuthorizedMatrix',
+                         ]
+                     },
+                     {
+
