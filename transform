@@ -4,6 +4,7 @@ use strict;
 
 my $ignore = 0;
 while (<>) {
+    next if /^(?:diff|index)/;
     if (m#^(?:(?:\-\-\- a|\+\+\+ b)/|diff )#) {
         s#([ab])/lemonldap-ng-(?:common|handler|portal|manager)/lib#$1/usr/share/perl5#g;
         s#([ab])/lemonldap-ng-(common|handler|portal|manager)/site#$1/usr/share/lemonldap-ng/$2#g;
