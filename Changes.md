@@ -5,6 +5,7 @@
 * Add hook to modify refresh\_token
 * Fix offline sessions count
 * Add patch for buggy OIDC providers
+* Close conf files
 
 ## v2.20.1-1 _(2024-11-19)_
 * Update to 2.20.1
