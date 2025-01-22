@@ -1,10 +1,47 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
+@@ -122,7 +122,7 @@ sub init {
+         oidcServiceMetaDataEndSessionURI    => 'endSessionDone',
+         oidcServiceMetaDataCheckSessionURI  => 'checkSession',
+         oidcServiceMetaDataTokenURI         => 'token',
+-        oidcServiceMetaDataUserInfoURI      => 'userInfo',
++        oidcServiceMetaDataUserInfoURI      => 'unauthUserInfo',
+         oidcServiceMetaDataJWKSURI          => 'jwks',
+         oidcServiceMetaDataRegistrationURI  => 'registration',
+         oidcServiceMetaDataIntrospectionURI => 'introspection',
+@@ -2155,9 +2155,14 @@ sub _rotateRefreshSession {
+     return $refreshSession;
+ }
+ 
++sub unauthUserInfo {
++    my ( $self, $req ) = @_;
++    return $self->userInfo( $req, 1 );
++}
++
+ # Handle userinfo endpoint
+ sub userInfo {
+-    my ( $self, $req ) = @_;
++    my ( $self, $req, $setUser ) = @_;
+     $req->data->{dropCsp} = 1 if $self->conf->{oidcDropCspHeaders};
+     $self->logger->debug("URL detected as an OpenID Connect USERINFO URL");
+ 
+@@ -2185,6 +2190,9 @@ sub userInfo {
+     my $rp              = $accessTokenSession->data->{rp};
+     my $user_session_id = $accessTokenSession->data->{user_session_id};
+ 
++    $self->p->HANDLER->set_user( $req, $self->rpOptions->{$rp}->{oidcRPMetaDataOptionsClientID} )
++      if $setUser;
++
+     if ( $self->rpOptions->{$rp}
+         ->{oidcRPMetaDataOptionsUserinfoRequireHeaderToken}
+         and $authMethod ne 'header' )
 --- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
 @@ -1828,6 +1828,7 @@ sub checkEndPointAuthenticationCredentials {
              }
          }
      }
-+    $self->p->HANDLER->set_user($req, $self->rpOptions->{$rp}->{clientId});
++    $self->p->HANDLER->set_user($req, $self->rpOptions->{$rp}->{oidcRPMetaDataOptionsClientID});
      return ( $rp, $method );
  }
  
