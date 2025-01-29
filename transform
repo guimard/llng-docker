@@ -8,7 +8,7 @@ while (<>) {
     if (m#^(?:(?:\-\-\- a|\+\+\+ b)/|diff )#) {
         s#([ab])/lemonldap-ng-(?:common|handler|portal|manager)/lib#$1/usr/share/perl5#g;
         s#([ab])/lemonldap-ng-(common|handler|portal|manager)/site#$1/usr/share/lemonldap-ng/$2#g;
-        $ignore = ( m#(?:Common/Conf/Constants.pm|Common/Conf/ReConstants.pm|Manager/Attributes.pm|htdocs/static/js/conftree.|/doc/sources|lemonldap-ng-\w+/t)# );
+        $ignore = ( m#(?:MANIFEST|Common/Conf/Constants.pm|Common/Conf/ReConstants.pm|Manager/Attributes.pm|htdocs/static/js/conftree.|/doc/sources|lemonldap-ng-\w+/t)# );
     }
     print unless $ignore;
 }
