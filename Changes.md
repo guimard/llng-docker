@@ -1,6 +1,6 @@
 # Changes
 
-## v2.20.1-2
+## v2.20.2-1 _(2024-02-02)_
 * Add "Last-Modified" header for OIDC metadata
 * Add hook to modify refresh\_token
 * Fix offline sessions count
@@ -8,6 +8,7 @@
 * Close conf files
 * Improve logs
 * allow maintainance mode for portal
+* Update to 2.20.2
 
 ## v2.20.1-1 _(2024-11-19)_
 * Update to 2.20.1
@@ -26,8 +27,8 @@
 * Fix upstream regression on Nginx handler
 
 ## v2.20.0-1 _(2024-10-21)_
-  * Drop "none" from OIDC metadata
-  * Update to 2.20.0
+* Drop "none" from OIDC metadata
+* Update to 2.20.0
 
 ## v2.19.2-1 _(2024-09-07)_
 * Update to LLNG 2.19.2
