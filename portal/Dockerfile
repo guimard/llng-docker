@@ -37,7 +37,9 @@ COPY *.patch /
 RUN for p in appgrid.patch jwt-type.patch app-scope.patch ignorepollers.patch \
     fixedLogout.patch more-logs.patch \
     matrix-token.patch redirect-ajax.patch \
-    metadata-ttl.patch \
+    metadata-ttl.patch getreftoken.patch \
+    oidc-op-claims.patch "set-client-id-in-logs.patch" \
+    portal-maintainance.patch \
     ; do echo patch $p && patch -p1 < $p; done && \
     rm -f /*.patch && \
     echo "# Install nginx configuration files" && \

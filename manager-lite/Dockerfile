@@ -1,17 +1,25 @@
-ARG PORTALBASE=
-FROM ${PORTALBASE}
+ARG BASE=
+FROM ${BASE}
 LABEL maintainer="Yadd yadd@debian.org>" \
-      name="yadd/lemonldap-ng-full" \
+      name="yadd/lemonldap-ng-manager" \
       version="v1.0"
 
 ENV PROTECTION=manager \
     AUTHBASIC=
 
-RUN echo "# Install nginx and portal and manager libs" && \
+RUN echo "# Install nginx and manager libs" && \
     apt-get -y update && \
     apt-get -y upgrade && \
-    apt-get -y --no-install-recommends install nginx \
-      liblemonldap-ng-manager-perl${LLNGDIST} apache2-utils && \
+    apt-get -y --no-install-recommends install starman \
+      liblemonldap-ng-handler-perl${LLNGDIST} \
+      lemonldap-ng-uwsgi-app${LLNGDIST} \
+      liblemonldap-ng-manager-perl${LLNGDIST} \
+      libglib-perl libgssapi-perl libsoap-lite-perl fonts-urw-base35 \
+      libcrypt-openssl-bignum-perl libemail-sender-perl \
+      libconvert-base32-perl libio-string-perl libipc-run-perl \
+      libgd-securityimage-perl libmime-tools-perl libnet-ldap-perl \
+      libio-socket-timeout-perl libunicode-string-perl \
+      libio-string-perl libregexp-assemble-perl apache2-utils && \
     mv /etc/dpkg/dpkg.cfg.d /tmp/ && \
     apt-get -y --no-install-recommends install \
       lemonldap-ng-doc${LLNGDIST} && \
@@ -26,6 +34,7 @@ RUN \
     echo patch matrix-token-exchange.patch && patch -p1 < matrix-token-exchange.patch && \
     echo patch globalLogout.patch && patch -p1 < globalLogout.patch && \
     echo patch metadata-ttl.patch && patch -p1 < metadata-ttl.patch && \
+    echo patch fix-sessions-count.patch && patch -p1 <fix-sessions-count.patch && \
     echo patch oidc-op-claims.patch && patch -p1 <oidc-op-claims.patch && \
     rm -f *.patch && \
     LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini \
@@ -47,9 +56,9 @@ RUN \
     rm -f /usr/share/lemonldap-ng/manager/htdocs/static/js/conftree.min.js && \
     ln -s conftree.js /usr/share/lemonldap-ng/manager/htdocs/static/js/conftree.min.js
 
-RUN echo "# Install nginx configuration files" && \
-    ln -s ../../lemonldap-ng/manager-nginx.conf /etc/nginx/sites-enabled/z_manager-nginx.conf
-
 COPY install /
+COPY start.sh /
 
-CMD ["/usr/sbin/nginx"]
+EXPOSE 80
+
+CMD ["/start.sh"]

@@ -1,0 +1,14 @@
+--- a/usr/share/perl5/Lemonldap/NG/Common/JWT.pm
++++ b/usr/share/perl5/Lemonldap/NG/Common/JWT.pm
+@@ -40,9 +40,9 @@ sub getAccessTokenSessionId {
+ sub getJWTPart {
+     my ( $jwt, $part ) = @_;
+     my @jwt_parts = split( /\./, $jwt );
+-    my $data      = decode_base64url( $jwt_parts[$part] );
++    return undef unless @jwt_parts > 1;
+     my $json_hash;
+-    eval { $json_hash = from_json($data); };
++    eval { $json_hash = from_json( decode_base64url( $jwt_parts[$part] ) ); };
+     return undef if ($@);
+     return $json_hash;
+ }

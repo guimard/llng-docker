@@ -1,15 +1,31 @@
 --- a/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
-@@ -2704,8 +2704,11 @@ sub logout {
+@@ -2704,8 +2704,13 @@ sub logout {
  sub metadata {
      my ( $self, $req ) = @_;
      $req->data->{dropCsp} = 1 if $self->conf->{oidcDropCspHeaders};
 +    my %args;
-+    $args{ttl} = $self->conf->{oidcServiceMetadataTtl}
-+      if $self->conf->{oidcServiceMetadataTtl};
++    if ( $self->conf->{oidcServiceMetadataTtl} ) {
++        $args{ttl}  = $self->conf->{oidcServiceMetadataTtl};
++        $args{date} = $self->conf->{cfgDate};
++    }
      return $self->p->sendJSONresponse( $req,
 -        $self->metadataDoc( $self->get_issuer($req) ) );
 +        $self->metadataDoc( $self->get_issuer($req) ), %args );
  }
  
  # Store request parameters in %ENV
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm
+@@ -1444,6 +1444,10 @@ sub sendJSONresponse {
+     # Handle caching
+     if ( $args{ttl} and $args{ttl} =~ /^\d+$/ ) {
+         push @{ $res->[1] }, 'Cache-Control' => 'public, max-age=' . $args{ttl};
++        push @{ $res->[1] },
++          'Last-Modified' =>
++          POSIX::strftime( "%a, %0e %b %Y %H:%M:%S GMT", gmtime($args{date}) )
++          if $args{date};
+     }
+     else {
+         push @{ $res->[1] },
+
