@@ -37,7 +37,7 @@
 -                    if ( $session->data ) {
 -                        $session->remove;
 -                        $count++;
-+                    if ( $self->{callPortalOnAdminLogout} ) {
++                    if ( $self->{callPortalOnAdminLogout} and $storage eq 'sessionStorage' ) {
 +                        my $r = HTTP::Request->new(
 +                            GET => "$self->{portal}?logout=1" );
 +                        $r->header( Cookie => "$self->{cookienName}=$sid" );
