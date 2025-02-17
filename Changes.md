@@ -1,5 +1,8 @@
 # Changes
 
+## v2.20.2-2
+* Don't use cache when getting a refresh\_token
+
 ## v2.20.2-1 _(2024-02-02)_
 * Add "Last-Modified" header for OIDC metadata
 * Add hook to modify refresh\_token
