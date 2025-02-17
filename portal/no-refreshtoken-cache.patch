@@ -1,6 +1,6 @@
 --- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
-@@ -1141,10 +1141,10 @@ sub newAuthorizationCode {
+@@ -1141,11 +1141,10 @@ sub newAuthorizationCode {
      return $self->getOpenIDConnectSession(
          undef,
          "authorization_code",
@@ -8,6 +8,7 @@
 +        ttl => $self->rpOptions->{$rp}
            ->{oidcRPMetaDataOptionsAuthorizationCodeExpiration}
            || $self->conf->{oidcServiceAuthorizationCodeExpiration},
+-        ,
 -        $info
 +        info => $info
      );
@@ -62,24 +63,20 @@
  
      my $oidcSession = Lemonldap::NG::Common::Session->new( {
              $self->_storeOpts(),
--            cacheModule        => $self->conf->{localSessionStorage},
--            cacheModuleOptions => $self->conf->{localSessionStorageOptions},
--            hashStore          => $self->conf->{hashedSessionStore},
--            id                 => $id,
--            kind               => $self->sessionKind,
-             (
--                $info
++            (
 +                $opts{noCache} ? ()
 +                : (
-+                    cacheModule        => $self->conf->{localSessionStorage},
+             cacheModule        => $self->conf->{localSessionStorage},
+-            cacheModuleOptions => $self->conf->{localSessionStorageOptions},
 +                    cacheModuleOptions =>
 +                      $self->conf->{localSessionStorageOptions}
 +                )
 +            ),
-+            hashStore => $self->conf->{hashedSessionStore},
-+            id        => $id,
-+            kind      => $self->sessionKind,
-+            (
+             hashStore          => $self->conf->{hashedSessionStore},
+             id                 => $id,
+             kind               => $self->sessionKind,
+             (
+-                $info
 +                $opts{info}
                  ? (
                      info => {
