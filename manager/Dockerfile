@@ -34,6 +34,7 @@ RUN \
     echo patch globalLogout.patch && patch -p1 < globalLogout.patch && \
     echo patch metadata-ttl.patch && patch -p1 < metadata-ttl.patch && \
     echo patch oidc-op-claims.patch && patch -p1 <oidc-op-claims.patch && \
+    echo patch improve-disconnect.patch && patch -p1 <improve-disconnect.patch && \
     rm -f *.patch && \
     LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini \
     perl -MLemonldap::NG::Manager::Build -e 'Lemonldap::NG::Manager::Build->run( \

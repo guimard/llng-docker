@@ -1,0 +1,92 @@
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Sessions.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Sessions.pm
+@@ -25,6 +25,8 @@ our $VERSION = '2.18.0';
+ use constant defaultRoute => 'sessions.html';
+ use constant icon         => 'duplicate';
+ 
++has ua => ( is => 'rw' );
++
+ sub init {
+     my ( $self, $conf ) = @_;
+ 
+@@ -64,6 +66,11 @@ sub init {
+     $self->{hiddenAttributes} //= '_password';
+     $self->{hiddenAttributes} .= ' _session_id'
+       unless $conf->{displaySessionId};
++    if ( $self->{callPortalOnAdminLogout} = $conf->{callPortalOnAdminLogout} ) {
++        $self->ua( Lemonldap::NG::Common::UserAgent->new($conf) );
++        $self->{portal}     = $conf->{portal};
++        $self->{cookieName} = $conf->{cookieName};
++    }
+     return 1;
+ }
+ 
+@@ -98,18 +105,26 @@ sub userLogout {
+             if ( $sessions and %$sessions ) {
+                 @keys = keys %$sessions;
+                 foreach my $sid (@keys) {
+-                    my $session = Lemonldap::NG::Common::Session->new(
+-                        storageModule        => $storageModule,
+-                        storageModuleOptions => $opts,
+-                        cacheModule => Lemonldap::NG::Handler::Main->tsv
+-                          ->{sessionCacheModule},
+-                        cacheModuleOptions => Lemonldap::NG::Handler::Main->tsv
+-                          ->{sessionCacheOptions},
+-                        id => $sid,
+-                    );
+-                    if ( $session->data ) {
+-                        $session->remove;
+-                        $count++;
++                    if ( $self->{callPortalOnAdminLogout} ) {
++                        my $r = HTTP::Request->new(
++                            GET => "$self->{portal}?logout=1" );
++                        $r->header( Cookie => "$self->{cookienName}=$sid" );
++                        $self->ua->request($r);
++                    }
++                    else {
++                        my $session = Lemonldap::NG::Common::Session->new(
++                            storageModule        => $storageModule,
++                            storageModuleOptions => $opts,
++                            cacheModule => Lemonldap::NG::Handler::Main->tsv
++                              ->{sessionCacheModule},
++                            cacheModuleOptions => Lemonldap::NG::Handler::Main->tsv
++                              ->{sessionCacheOptions},
++                            id => $sid,
++                        );
++                        if ( $session->data ) {
++                            $session->remove;
++                            $count++;
++                        }
+                     }
+                 }
+             }
+@@ -397,7 +412,7 @@ qq{Use of an uninitialized attribute "$group" to group sessions},
+ 
+         # Build result
+         $total = 0;
+-        $res = [
++        $res   = [
+             sort {
+                 my @a = ( $a->{value} =~ /^(\d+)(?:\.(\d+))*$/ );
+                 my @b = ( $b->{value} =~ /^(\d+)(?:\.(\d+))*$/ );
+@@ -407,8 +422,9 @@ qq{Use of an uninitialized attribute "$group" to group sessions},
+                       or $a[2] <=> $b[2]
+                       or $a[3] <=> $b[3] )
+                   : $a->{value} cmp $b->{value}
+-              }
+-              map { $total += $r->{$_}; { value => $_, count => $r->{$_} } } keys %$r
++            }
++            map { $total += $r->{$_}; { value => $_, count => $r->{$_} } }
++              keys %$r
+         ];
+     }
+ 
+@@ -458,7 +474,7 @@ qq{Use of an uninitialized attribute "$group" to group sessions},
+     else {
+         $res = [
+             sort { $a->{date} <=> $b->{date} }
+-              map {
++            map {
+                 {
+                     session => $self->_maybeEncryptSessionId($_),
+                     date    => $res->{$_}->{_utime}
