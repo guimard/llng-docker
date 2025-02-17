@@ -21,46 +21,27 @@
      return 1;
  }
  
-@@ -98,18 +105,26 @@ sub userLogout {
+@@ -98,6 +105,19 @@ sub userLogout {
              if ( $sessions and %$sessions ) {
                  @keys = keys %$sessions;
                  foreach my $sid (@keys) {
--                    my $session = Lemonldap::NG::Common::Session->new(
--                        storageModule        => $storageModule,
--                        storageModuleOptions => $opts,
--                        cacheModule => Lemonldap::NG::Handler::Main->tsv
--                          ->{sessionCacheModule},
--                        cacheModuleOptions => Lemonldap::NG::Handler::Main->tsv
--                          ->{sessionCacheOptions},
--                        id => $sid,
--                    );
--                    if ( $session->data ) {
--                        $session->remove;
--                        $count++;
-+                    if ( $self->{callPortalOnAdminLogout} and $storage eq 'sessionStorage' ) {
++                    if (    $self->{callPortalOnAdminLogout}
++                        and $storage eq 'sessionStorage' )
++                    {
 +                        my $r = HTTP::Request->new(
 +                            GET => "$self->{portal}?logout=1" );
-+                        $r->header( Cookie => "$self->{cookienName}=$sid" );
-+                        $self->ua->request($r);
++                        $r->header( Cookie => "$self->{cookieName}=$sid" );
++                        $r->header( Accept => 'application/json' );
++                        $r = $self->ua->request($r);
++                        $self->logger->warn( "Unable to logout: "
++                              . $r->status_line . ' - '
++                              . $r->decoded_content )
++                          unless $r->is_success;
 +                    }
-+                    else {
-+                        my $session = Lemonldap::NG::Common::Session->new(
-+                            storageModule        => $storageModule,
-+                            storageModuleOptions => $opts,
-+                            cacheModule => Lemonldap::NG::Handler::Main->tsv
-+                              ->{sessionCacheModule},
-+                            cacheModuleOptions => Lemonldap::NG::Handler::Main->tsv
-+                              ->{sessionCacheOptions},
-+                            id => $sid,
-+                        );
-+                        if ( $session->data ) {
-+                            $session->remove;
-+                            $count++;
-+                        }
-                     }
-                 }
-             }
-@@ -397,7 +412,7 @@ qq{Use of an uninitialized attribute "$group" to group sessions},
+                     my $session = Lemonldap::NG::Common::Session->new(
+                         storageModule        => $storageModule,
+                         storageModuleOptions => $opts,
+@@ -397,7 +417,7 @@ qq{Use of an uninitialized attribute "$group" to group sessions},
  
          # Build result
          $total = 0;
@@ -69,7 +50,7 @@
              sort {
                  my @a = ( $a->{value} =~ /^(\d+)(?:\.(\d+))*$/ );
                  my @b = ( $b->{value} =~ /^(\d+)(?:\.(\d+))*$/ );
-@@ -407,8 +422,9 @@ qq{Use of an uninitialized attribute "$group" to group sessions},
+@@ -407,8 +427,9 @@ qq{Use of an uninitialized attribute "$group" to group sessions},
                        or $a[2] <=> $b[2]
                        or $a[3] <=> $b[3] )
                    : $a->{value} cmp $b->{value}
@@ -81,7 +62,7 @@
          ];
      }
  
-@@ -458,7 +474,7 @@ qq{Use of an uninitialized attribute "$group" to group sessions},
+@@ -458,7 +479,7 @@ qq{Use of an uninitialized attribute "$group" to group sessions},
      else {
          $res = [
              sort { $a->{date} <=> $b->{date} }
