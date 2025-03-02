@@ -339,3 +339,59 @@
  }
  
  # RUNNING METHODS
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
+@@ -1799,7 +1799,7 @@ sub _handleAuthorizationCodeGrant {
+     # Generate refresh_token
+     my $refresh_token = undef;
+ 
+-    my $sid;
++    my $sid = $self->getSidFromSession($rp, $apacheSession->data);
+ 
+     # For offline access, the refresh token isn't tied to the session ID
+     if ( $codeSession->{data}->{offline} ) {
+@@ -1826,6 +1826,7 @@ sub _handleAuthorizationCodeGrant {
+                   $apacheSession->data->{ $self->conf->{whatToTrace} },
+                 auth_time  => $apacheSession->data->{_lastAuthnUTime},
+                 grant_type => "authorizationcode",
++                _oidc_sid  => $sid,
+             },
+             1,
+         );
+@@ -1855,6 +1856,7 @@ sub _handleAuthorizationCodeGrant {
+                   $apacheSession->data->{ $self->conf->{whatToTrace} },
+                 user_session_id => $codeSession->data->{user_session_id},
+                 grant_type      => "authorizationcode",
++                _oidc_sid  => $sid,
+             },
+             0,
+         );
+@@ -1886,7 +1888,6 @@ sub _handleAuthorizationCodeGrant {
+             ( $nonce   ? ( nonce   => $nonce )   : () ),
+             ( $at_hash ? ( at_hash => $at_hash ) : () ),
+         },
+-        $sid,
+     );
+ 
+     unless ($id_token) {
+@@ -2672,7 +2673,7 @@ sub _backChannelLogout {
+     if ( $self->rpOptions->{$rp}->{oidcRPMetaDataOptionsLogoutSessionRequired} )
+     {
+         $logoutToken->{sid} =
+-          $self->getSidFromSession( $rp, $req->{sessionInfo} );
++          $self->getSidFromSession( $rp, $sessionInfo );
+     }
+     $self->logger->debug(
+         "Logout token content: " . JSON::to_json($logoutToken) );
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
+@@ -2744,7 +2744,8 @@ sub generateNonce {
+ 
+ sub getSidFromSession {
+     my ( $self, $rp, $sessionInfo ) = @_;
+-    return Digest::SHA::hmac_sha256_base64(
++    return $sessionInfo->{_oidc_sid}
++      || Digest::SHA::hmac_sha256_base64(
+         $sessionInfo->{_session_id} . ':' . $rp );
+ }
+ 
