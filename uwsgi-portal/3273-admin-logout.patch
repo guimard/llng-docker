@@ -1,0 +1,341 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
+@@ -38,6 +38,11 @@ with 'Lemonldap::NG::Portal::Lib::LazyLoadedConfiguration',
+ # INTERFACE
+ 
+ sub beforeAuth { 'exportRequestParameters' }
++use constant hook => {
++    updateSessionId => 'updateOidcSecondarySessions',
++    eventLogout     => 'rtLogout',
++    unAuthLogout    => 'rtLogout'
++};
+ 
+ # INITIALIZATION
+ 
+@@ -1832,9 +1837,6 @@ sub _handleAuthorizationCodeGrant {
+         $refresh_token = $refreshTokenSession->id;
+ 
+         $self->logger->debug("Generated offline refresh token: $refresh_token");
+-
+-        $sid = $self->getSidFromSession( $rp,
+-            { _session_id => $refreshTokenSession->id } );
+     }
+ 
+     # For online access, if configured
+@@ -2188,7 +2190,8 @@ sub userInfo {
+     my $rp              = $accessTokenSession->data->{rp};
+     my $user_session_id = $accessTokenSession->data->{user_session_id};
+ 
+-    $self->p->HANDLER->set_user( $req, $self->rpOptions->{$rp}->{oidcRPMetaDataOptionsClientID} )
++    $self->p->HANDLER->set_user( $req,
++        $self->rpOptions->{$rp}->{oidcRPMetaDataOptionsClientID} )
+       if $setUser;
+ 
+     if ( $self->rpOptions->{$rp}
+@@ -2618,90 +2621,8 @@ sub logout {
+ 
+                 # BACK CHANNEL
+                 elsif ( $rpConf->{oidcRPMetaDataOptionsLogoutType} eq 'back' ) {
+-
+-                    # Logout token must contain:
+-                    #  - iss: issuer identifier
+-                    #  - sub: subject id (user id)
+-                    #  OR/AND
+-                    #  - sid: OP session id given to the RP
+-                    #  - aud: audience
+-                    #  - iat: issue at time
+-                    #  - jti: JWT token id
+-                    #  - events: should be :
+-                    #   { 'http://schemas.openid.net/event/backchannel-logout"
+-                    #     => {} } # or a JSON object
+-                    #
+-                    # Logout token should be send using a POST request:
+-                    #
+-                    #   POST /backChannelUri HTTP/1.1
+-                    #   Host: rp
+-                    #   Content-Type: application/x-www-form-urlencoded
+-                    #
+-                    #   logout_token=<JWT value>
+-                    #
+-                    # RP response should be 200 (204 accepted) or 400 for errors
+-                    my $alg =
+-                      $self->rpOptions->{$rp}
+-                      ->{oidcRPMetaDataOptionsAccessTokenSignAlg}
+-                      || (
+-                        $self->conf->{oidcServiceKeyTypeSig} eq 'EC'
+-                        ? 'ES256'
+-                        : 'RS256'
+-                      );
+-                    $self->logger->debug(
+-                        "Access Token signature algorithm: $alg");
+-                    my $userId =
+-                      $self->getUserIDForRP( $req, $rp, $req->userData );
+-                    my $logoutToken = {
+-                        iss => $self->get_issuer($req),
+-                        sub => $userId,
+-                        aud => $self->getAudiences($rp),
+-                        iat => time,
+-
+-                        # Random string: no response expected from RP
+-                        jti => join( "",
+-                            map { [ "0" .. "9", 'A' .. 'Z' ]->[ rand 36 ] }
+-                              1 .. 8 ),
+-                        events => { $self->BACKCHANNEL_EVENTSKEY => {} },
+-                    };
+-                    if ( $self->rpOptions->{$rp}
+-                        ->{oidcRPMetaDataOptionsLogoutSessionRequired} )
+-                    {
+-                        $logoutToken->{sid} =
+-                          $self->getSidFromSession( $rp, $req->{sessionInfo} );
+-                    }
+-                    $self->logger->debug( "Logout token content: "
+-                          . JSON::to_json($logoutToken) );
+-                    my $jwt = $self->encryptToken(
+-                        $rp,
+-                        $self->createJWT( $logoutToken, $alg, $rp ),
+-                        $self->rpOptions->{$rp}
+-                          ->{oidcRPMetaDataOptionsLogoutEncKeyMgtAlg},
+-                        $self->rpOptions->{$rp}
+-                          ->{oidcRPMetaDataOptionsLogoutEncContentEncAlg},
+-                    );
+-                    my $resp = $self->ua->post(
+-                        $url,
+-                        { logout_token => $jwt },
+-                        'Content-Type' => 'application/x-www-form-urlencoded',
+-                    );
+-                    if ( $resp->is_error ) {
+-                        $self->logger->warn(
+-                                "OIDC back channel: unable to unlog"
+-                              . " $userId from $rp: "
+-                              . $resp->message );
+-                        $self->logger->debug("Logout token: $jwt");
+-                        $self->logger->debug(
+-                            'Upstream status: ' . $resp->status_line );
+-                        $self->logger->debug(
+-                            'Upstream response: ' . ( $resp->content // '' ) );
+-                        $code = PE_SLO_ERROR;
+-                    }
+-                    else {
+-                        $self->logger->info(
+-                            "OIDC back channel: user $userId unlogged from $rp"
+-                        );
+-                    }
++                    my $c = $self->_backChannelLogout( $req, $rp, $req->userData );
++                    $code = $c if $c;
+                 }
+             }
+         }
+@@ -2710,6 +2631,77 @@ sub logout {
+ }
+ 
+ # Internal methods
++sub _backChannelLogout {
++    my ( $self, $req, $rp, $sessionInfo ) = @_;
++
++    # Logout token must contain:
++    #  - iss: issuer identifier
++    #  - sub: subject id (user id)
++    #  OR/AND
++    #  - sid: OP session id given to the RP
++    #  - aud: audience
++    #  - iat: issue at time
++    #  - jti: JWT token id
++    #  - events: should be :
++    #   { 'http://schemas.openid.net/event/backchannel-logout"
++    #     => {} } # or a JSON object
++    #
++    # Logout token should be send using a POST request:
++    #
++    #   POST /backChannelUri HTTP/1.1
++    #   Host: rp
++    #   Content-Type: application/x-www-form-urlencoded
++    #
++    #   logout_token=<JWT value>
++    #
++    # RP response should be 200 (204 accepted) or 400 for errors
++    my $alg         = $self->getSignAlg($rp);
++    my $userId      = $self->getUserIDForRP( $req, $rp, $sessionInfo );
++    my $logoutToken = {
++        iss => $self->get_issuer($req),
++        sub => $userId,
++        aud => $self->getAudiences($rp),
++        iat => time,
++
++        # Random string: no response expected from RP
++        jti =>
++          join( "", map { [ "0" .. "9", 'A' .. 'Z' ]->[ rand 36 ] } 1 .. 8 ),
++        events => { $self->BACKCHANNEL_EVENTSKEY => {} },
++    };
++    if ( $self->rpOptions->{$rp}->{oidcRPMetaDataOptionsLogoutSessionRequired} )
++    {
++        $logoutToken->{sid} =
++          $self->getSidFromSession( $rp, $req->{sessionInfo} );
++    }
++    $self->logger->debug(
++        "Logout token content: " . JSON::to_json($logoutToken) );
++    my $jwt = $self->encryptToken(
++        $rp,
++        $self->createJWT( $logoutToken, $alg, $rp ),
++        $self->rpOptions->{$rp}->{oidcRPMetaDataOptionsLogoutEncKeyMgtAlg},
++        $self->rpOptions->{$rp}->{oidcRPMetaDataOptionsLogoutEncContentEncAlg},
++    );
++    my $resp = $self->ua->post(
++        $self->rpOptions->{$rp}->{oidcRPMetaDataOptionsLogoutUrl},
++        { logout_token => $jwt },
++        'Content-Type' => 'application/x-www-form-urlencoded',
++    );
++    if ( $resp->is_error ) {
++        $self->logger->warn( "OIDC back channel: unable to unlog"
++              . " $userId from $rp: "
++              . $resp->message );
++        $self->logger->debug("Logout token: $jwt");
++        $self->logger->debug( 'Upstream status: ' . $resp->status_line );
++        $self->logger->debug(
++            'Upstream response: ' . ( $resp->content // '' ) );
++        return PE_SLO_ERROR;
++    }
++    else {
++        $self->logger->info(
++            "OIDC back channel: user $userId unlogged from $rp");
++    }
++    return PE_OK;
++}
+ 
+ sub metadata {
+     my ( $self, $req ) = @_;
+@@ -2975,4 +2967,29 @@ sub encryptToken {
+     return $token;
+ }
+ 
++sub rtLogout {
++    my ( $self, $req, $msg ) = @_;
++
++    # $msg is set when the logout comes from an event
++    my $id;
++    unless ( $msg and $id = $msg->{id} ) {
++        my $auth = $req->{env}->{HTTP_AUTHORIZATION};
++        if ( $auth and my $rt = ( $auth =~ /^Bearer (.+)$/i )[0] ) {
++            $id = $1;
++        }
++    }
++    return PE_OK unless $id;
++    my $session = $self->getRefreshToken($id);
++    return PE_OK unless $session;
++    my $rp     = $self->getRP($session->data->{client_id});
++    my $bck = $self->rpOptions->{$rp}->{oidcRPMetaDataOptionsLogoutType};
++    if ( $bck and $bck eq 'back' ) {
++        if ( my $err = $self->_backChannelLogout( $req, $rp, $session->data ) ) {
++            return $err unless $msg;
++        }
++    }
++    $session->remove;
++    return PE_OK;
++}
++
+ 1;
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
+@@ -1270,9 +1270,7 @@ sub makeJWT {
+     return undef if ( $h != PE_OK );
+ 
+     # Get signature algorithm
+-    my $alg = $self->rpOptions->{$rp}->{oidcRPMetaDataOptionsAccessTokenSignAlg}
+-      || ( $self->conf->{oidcServiceKeyTypeSig} eq 'EC' ? 'ES256' : 'RS256' );
+-    $self->logger->debug("Access Token signature algorithm: $alg");
++    my $alg = $self->getSignAlg($rp);
+ 
+     my $jwt = $self->createJWT( $access_token_payload, $alg, $rp, "at+JWT" );
+ 
+@@ -1454,6 +1452,14 @@ sub getOpenIDConnectSession {
+     return $oidcSession;
+ }
+ 
++sub getSignAlg {
++    my ( $self, $rp ) = @_;
++    my $alg = $self->rpOptions->{$rp}->{oidcRPMetaDataOptionsAccessTokenSignAlg}
++      || ( $self->conf->{oidcServiceKeyTypeSig} eq 'EC' ? 'ES256' : 'RS256' );
++    $self->logger->debug("Access Token signature algorithm: $alg");
++    return $alg;
++}
++
+ # Store information in state database and return
+ # corresponding session_id
+ # @return State Session ID
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Init.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Init.pm
+@@ -170,6 +170,15 @@ sub init {
+     # Insert `reloadConf` in handler reload stack
+     Lemonldap::NG::Handler::Main->onReload( $self, 'reloadConf' );
+ 
++    # Register logout event (unlog event is only a local unlog: clean cache)
++    &Lemonldap::NG::Handler::Main::MsgActions::addMsgAction(
++        'logout',
++        sub {
++            my ( $class, $id, $req ) = @_;
++            return $self->eventLogout( $req, $id );
++        }
++    );
++
+     # Handler::PSGI::Try initialization
+     unless ( $self->SUPER::init( $self->localConfig ) ) {
+         $self->logger->error( 'Initialization failed: ' . $self->error );
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Process.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Process.pm
+@@ -249,6 +249,30 @@ sub checkUnauthLogout {
+     return PE_OK;
+ }
+ 
++sub eventLogout {
++    my ( $self, $req, $msg ) = @_;
++    bless $req, 'Lemonldap::NG::Portal::Main::Request';
++    $self->logger->debug("Receive a logout event");
++    $self->processHook( $req, 'eventLogout', $msg );
++    if ( $msg->{id} ) {
++        $self->logger->debug(" -> logout asked for $msg->{id}");
++        if ( my $session = HANDLER->retrieveSession( $req, $msg->{id} ) ) {
++            $req->id( $session->{_session_id} );
++            $req->pdata( {} );
++            $self->do( $req,
++                [ @{ $self->beforeLogout }, 'authLogout', 'deleteSession' ],
++                1 );
++        }
++        else {
++            $self->_unauthLogout($req);
++        }
++    }
++    else {
++        $self->logger->debug('Logout event without id');
++        $self->_unauthLogout($req);
++    }
++}
++
+ sub checkCancel {
+     my ( $self, $req ) = @_;
+     if ( $req->param('cancel') ) {
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm
+@@ -322,12 +322,14 @@ sub logout {
+ 
+ sub unauthLogout {
+     my ( $self, $req ) = @_;
+-    $self->_unauthLogout($req);
+-    return $self->do( $req, [ 'controlUrl', sub { PE_LOGOUT_OK } ] );
++    my $err = $self->_unauthLogout($req);
++    return $self->do( $req,
++        [ 'controlUrl', sub { $err > 0 ? $err : PE_LOGOUT_OK } ] );
+ }
+ 
+ sub _unauthLogout {
+     my ( $self, $req ) = @_;
++    my $err = $self->processHook( $req, 'unAuthLogout' );
+     $self->logger->debug('Unauthenticated logout request');
+     $self->logger->debug('Cleaning pdata');
+     $self->logger->debug("Removing $self->{conf}->{cookieName} cookie");
+@@ -341,6 +343,7 @@ sub _unauthLogout {
+             value   => 0
+         )
+     );
++    return $err;
+ }
+ 
+ # RUNNING METHODS
