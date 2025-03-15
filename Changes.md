@@ -5,6 +5,7 @@
 * Improve global logout by calling portal
 * Add patch for JWKS refresh
 * Add login\_hint management
+* Fix Forwarded-For script
 
 ## v2.20.2-1 _(2024-02-02)_
 * Add "Last-Modified" header for OIDC metadata
