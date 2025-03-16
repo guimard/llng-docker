@@ -1,0 +1,19 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
+@@ -1754,10 +1754,12 @@ sub _handleAuthorizationCodeGrant {
+     }
+ 
+     # Check we have the same redirect_uri value
+-    unless ( $req->param("redirect_uri") eq $codeSession->data->{redirect_uri} )
++    unless ( my $uri =
++        $req->param("redirect_uri") eq $codeSession->data->{redirect_uri} )
+     {
+-        $self->userLogger->error( "Provided redirect_uri does not match "
+-              . $codeSession->data->{redirect_uri} );
++        $self->userLogger->error( "Provided redirect_uri does not match: "
++              . $codeSession->data->{redirect_uri}
++              . " != $uri" );
+         return $self->sendOIDCError( $req, 'invalid_grant', 400 );
+     }
+ 
+
