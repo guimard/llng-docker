@@ -40,6 +40,7 @@ ENV SSODOMAIN=example.com \
     CROWDSEC_IGNORE_FAILURES= \
     FORWARDED_BY= \
     PORTAL=http://auth.example.com/ \
+    LLNG_AUDITLOGGER=Lemonldap::NG::Common::AuditLogger::UserLoggerJSON \
     LOGLEVEL=info \
     LOGGER=stderr \
     USERLOGGER=stderr \
@@ -95,6 +96,7 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     perl -i -pe 's/\r//g' /usr/share/perl5/Lemonldap/NG/Common/Conf/DefaultValues.pm && \
     echo "patch no-none.patch" && patch -p1 <no-none.patch && \
     echo "patch oidc-op-claims.patch" && patch -p1 <oidc-op-claims.patch && \
+    echo "patch json-logger.patch" && patch -p1 <json-logger.patch && \
     rm -f *.patch
 
 #COPY syslogopt.patch .

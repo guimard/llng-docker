@@ -38,6 +38,8 @@ LemonLDAP::NG.
 * `FORWARDED_BY` = _(set here the IP address of reverse proxy if any)_
 * `PORTAL` = `http://auth.example.com/` _(full URL needed here)_
 * `LISTEN` = _(set `:PORTNUMBER` here if you want to access directly to FastCGI server)_
+* `LLNG_AUDITLOGGER` = `Lemonldap::NG::Common::AuditLogger::UserLoggerJSON`
+  _(alternative value: `Lemonldap::NG::Common::AuditLogger::UserLoggerCompat` to keep logs as text)_
 * `LOGLEVEL` = `info` _(possible values: debug, info, notice, warn, error)_
 * `LOGGER` = `syslog` _(possible values: stderr, syslog)_
 * `USERLOGGER` = `syslog` _(possible values: stderr, syslog)_
