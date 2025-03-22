@@ -1,0 +1,108 @@
+--- a/usr/share/perl5/Lemonldap/NG/Common/PSGI.pm
++++ b/usr/share/perl5/Lemonldap/NG/Common/PSGI.pm
+@@ -145,6 +145,7 @@ sub _getLanguageListFromHeader {
+ 
+ sub auditLog {
+     my ( $self, $req, %info ) = @_;
++    $info{remote_addr} = $req->address;
+     $self->_auditLogger->log( $req, %info );
+ }
+ 
+--- a/usr/share/perl5/Lemonldap/NG/Handler/Main/Run.pm
++++ b/usr/share/perl5/Lemonldap/NG/Handler/Main/Run.pm
+@@ -308,6 +308,7 @@ sub lmLog {
+ 
+ sub auditLog {
+     my ( $class, $req, %info ) = @_;
++    $info{remote_addr} = $req->address;
+     $class->_auditLogger->log( $req, %info );
+ }
+ 
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Issuer/CAS.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Issuer/CAS.pm
+@@ -1114,6 +1114,7 @@ sub _failValidate1 {
+         ( $reason ? ( reason => $reason ) : () ),
+         ( $app    ? ( app    => $app )    : () ),
+         portal_error => portalConsts->{$res},
++        user         => $req->sessionInfo->{ $self->conf->{whatToTrace} },
+     );
+ 
+     return $self->returnCasValidateError();
+@@ -1135,6 +1136,7 @@ sub _failValidate2 {
+         ( $app    ? ( app    => $app )    : () ),
+         cas_code     => $code,
+         portal_error => portalConsts->{$res},
++        user         => $req->sessionInfo->{ $self->conf->{whatToTrace} },
+     );
+ 
+     return $self->returnCasServiceValidateError( $req, $code, $reason );
+@@ -1156,6 +1158,7 @@ sub _failValidateSaml {
+         ( $app    ? ( app    => $app )    : () ),
+         cas_code     => $code,
+         portal_error => portalConsts->{$res},
++        user         => $req->sessionInfo->{ $self->conf->{whatToTrace} },
+     );
+ 
+     return $self->returnSamlValidateError( $req, $code, $reason );
+@@ -1174,6 +1177,7 @@ sub _failLogin {
+         ( $reason ? ( reason => $reason ) : () ),
+         ( $app    ? ( app    => $app )    : () ),
+         portal_error => portalConsts->{$res},
++        user         => $req->sessionInfo->{ $self->conf->{whatToTrace} },
+     );
+ 
+     return $res;
+@@ -1190,6 +1194,7 @@ sub _failLoginRule {
+         ( $app ? ( app => $app ) : () ),
+         message => ("User $user is not authorized to access to $app"),
+         reason  => "User is not authorized by access rule",
++        user    => $user,
+     );
+ 
+     if ( $casAccessControlPolicy =~ /^(error)$/i ) {
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
+@@ -1199,6 +1199,7 @@ sub _failAuthorize {
+         message => ( "OIDC login failed" . $reason ),
+         ( $reason ? ( reason => $reason ) : () ),
+         portal_error => portalConsts->{$res},
++        user         => $req->sessionInfo->{ $self->conf->{whatToTrace} },
+     );
+ 
+     return $res;
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
+@@ -1741,6 +1741,7 @@ sub returnRedirectError {
+         ( $error_description ? ( reason => $error_description ) : () ),
+         oauth_error  => $error,
+         portal_error => portalConsts->{PE_REDIRECT},
++        user         => $req->sessionInfo->{ $self->conf->{whatToTrace} },
+     );
+ 
+     my $urldc =
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm
+@@ -494,6 +494,7 @@ sub autoRedirect {
+                 message => "Redirection to $req->{urldc} blocked",
+                 code    => "UNAUTHORIZED_REDIRECT",
+                 url     => $req->{urldc},
++                user    => $req->sessionInfo->{ $self->conf->{whatToTrace} } || $req->user,
+             );
+             delete $req->{urldc};
+         }
+@@ -793,6 +794,7 @@ sub _deleteSession {
+ "User $user has been disconnected from $mod ($req->{sessionInfo}->{ipAddr})"
+             ),
+             code => "LOGOUT",
++            user => $user,
+             auth => $mod,
+         );
+     }
+@@ -830,6 +832,7 @@ sub autoPost {
+             message => "Redirection to $req->{urldc} blocked",
+             code    => "UNAUTHORIZED_REDIRECT",
+             url     => $req->{urldc},
++            user    => $req->sessionInfo->{ $self->conf->{whatToTrace} } || $req->user,
+         );
+         return PE_BADURL;
+     }
