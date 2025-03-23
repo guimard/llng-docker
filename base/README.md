@@ -36,6 +36,7 @@ LemonLDAP::NG.
 * `CROWDSEC_KEY` = _(required, given by `cscli bouncers add mylemon`)_
 * `CROWDSEC_IGNORE_FAILURES` = _(possible values: <empty> 1)_
 * `FORWARDED_BY` = _(set here the IP address of reverse proxy if any)_
+* `FORWARDED_HEADER` = `X-Forwarded-For`
 * `PORTAL` = `http://auth.example.com/` _(full URL needed here)_
 * `LISTEN` = _(set `:PORTNUMBER` here if you want to access directly to FastCGI server)_
 * `LLNG_AUDITLOGGER` = `Lemonldap::NG::Common::AuditLogger::UserLoggerJSON`

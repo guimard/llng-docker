@@ -27,6 +27,7 @@ ENV SSODOMAIN=example.com \
     CROWDSEC_KEY= \
     CROWDSEC_IGNORE_FAILURES= \
     FORWARDED_BY= \
+    FORWARDED_HEADER=X-Forwarded-For \
     PORTAL=http://auth.example.com/ \
     LLNG_AUDITLOGGER=Lemonldap::NG::Common::AuditLogger::UserLoggerJSON \
     LOGLEVEL=info \

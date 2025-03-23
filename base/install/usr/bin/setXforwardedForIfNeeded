@@ -4,12 +4,14 @@ FILES="$@"
 
 set -e
 
+FORWARDED_HEADER=${FORWARDED_HEADER:-X-Forwarded-For}
+
 if test "$FORWARDED_BY" != ""; then
 	for file in "$FILES"; do
 		if grep -E '^[^#]*set_real_ip_from' $file; then
 			echo "$file already configured"
 		else
-			perl -i -pe 'BEGIN{$s=join "\n","real_ip_recursive on;","real_ip_header X-Forwarded-For;",map{"set_real_ip_from $_;"}split(/[,\s]\s*/,$ENV{FORWARDED_BY});}
+			perl -i -pe 'BEGIN{$s=join "\n","real_ip_recursive on;","real_ip_header '"$FORWARDED_HEADER"';",map{"set_real_ip_from $_;"}split(/[,\s]\s*/,$ENV{FORWARDED_BY});}
 				s/\s*#.*set_real_ip_from.*$/$s\n/;' $file
 		fi
 	done
