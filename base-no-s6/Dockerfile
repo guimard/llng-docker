@@ -33,6 +33,8 @@ ENV SSODOMAIN=example.com \
     LOGLEVEL=info \
     LOGGER=stderr \
     USERLOGGER=stderr \
+    LOKIURL= \
+    AUDITLOGGER= \
     REDIS_SERVER="" \
     REDIS_INDEXES="_whatToTrace _session_kind _utime ipAddr _httpSessionType _user" \
     LISTEN= \
@@ -86,6 +88,7 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     echo "patch no-none.patch" && patch -p1 <no-none.patch && \
     echo "patch oidc-op-claims.patch" && patch -p1 <oidc-op-claims.patch && \
     echo "patch json-logger.patch" && patch -p1 <json-logger.patch && \
+    echo "patch loki.patch" && patch -p1 <loki.patch && \
     rm -f *.patch
 
 #COPY syslogopt.patch .

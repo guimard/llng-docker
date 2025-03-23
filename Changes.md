@@ -1,6 +1,6 @@
 # Changes
 
-## v2.20.2-2
+## v2.20.2-2 _(dev)_
 * Don't use cache when getting a refresh\_token
 * Improve global logout by calling portal
 * Add patch for JWKS refresh
@@ -8,6 +8,7 @@
 * Fix Forwarded-For script
 * Add JSON auditLogger (enabled by default)
 * Set "user" when possible in all auditLogs
+* Add loki logger
 
 ## v2.20.2-1 _(2024-02-02)_
 * Add "Last-Modified" header for OIDC metadata

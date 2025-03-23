@@ -44,6 +44,7 @@ LemonLDAP::NG.
 * `LOGLEVEL` = `info` _(possible values: debug, info, notice, warn, error)_
 * `LOGGER` = `syslog` _(possible values: stderr, syslog)_
 * `USERLOGGER` = `syslog` _(possible values: stderr, syslog)_
+* `AUDITLOGGER` =
 * `FORCE_KEY_REGENERATION` = `no`
 * `LANGUAGES` = default LLNG list _(set here the wanted languages separated by comma. Example: `fr,en`)_
 * Configuration and persistent session storage

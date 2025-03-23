@@ -25,6 +25,8 @@ services:
       - OVERRIDE_applicationList_1sample_catname="Some applications"
       - OVERRIDE_exportedVars_aa=bb
       - LANGUAGES=en,fr
+      - USERLOGGER=loki
+      - "LOKIURL=https://dest.com/api"
     volumes:
       - ./test-over:/over
     depends_on:
