@@ -44,12 +44,12 @@ if test "$LOKI" != "" -a "$AUDITLOGGER" = ""; then
 
     if test "$LOKITENANT" != ""; then
         echo "Configure Loki tenant"
-        /usr/share/docker-llng/updateConf set lokiTenant "$LOKITENANT"
+        perl -i -ne 'print unless /^(?:lokiTenant)\s*=/;print "lokiTenant = '"$LOKITENANT"'\n" if/^\[\s*all\s*\]/;' $INI
     fi
 
     if test "$LOKIAUTHORIZATION" != ""; then
         echo "Configure Loki tenant"
-        /usr/share/docker-llng/updateConf set lokiAuthorization "$LOKIAUTHORIZATION"
+        perl -i -ne 'print unless /^(?:lokiAuthorization)\s*=/;print "lokiAuthorization = '"$LOKIAUTHORIZATION"'\n" if/^\[\s*all\s*\]/;' $INI
     fi
 fi
 
