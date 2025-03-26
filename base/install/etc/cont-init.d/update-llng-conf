@@ -46,6 +46,11 @@ if test "$LOKI" != "" -a "$AUDITLOGGER" = ""; then
         echo "Configure Loki tenant"
         /usr/share/docker-llng/updateConf set lokiTenant "$LOKITENANT"
     fi
+
+    if test "$LOKIAUTHORIZATION" != ""; then
+        echo "Configure Loki tenant"
+        /usr/share/docker-llng/updateConf set lokiAuthorization "$LOKIAUTHORIZATION"
+    fi
 fi
 
 if test "$AUDITLOGGER" != ""; then
