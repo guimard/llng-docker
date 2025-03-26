@@ -32,6 +32,7 @@ ENV SSODOMAIN=example.com \
     LLNG_AUDITLOGGER=Lemonldap::NG::Common::AuditLogger::UserLoggerJSON \
     LOGLEVEL=info \
     LOGGER=stderr \
+    LOKITENANT= \
     USERLOGGER=stderr \
     LOKIURL= \
     AUDITLOGGER= \

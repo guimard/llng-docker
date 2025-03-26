@@ -41,6 +41,11 @@ fi
 
 if test "$LOKI" != "" -a "$AUDITLOGGER" = ""; then
     AUDITLOGGER='Lemonldap::NG::Common::AuditLogger::UserLoggerJSON'
+
+    it test "$LOKITENANT" != ""; then
+        echo "Configure Loki tenant"
+        /usr/share/docker-llng/updateConf set lokiTenant "$LOKITENANT"
+    fi
 fi
 
 if test "$AUDITLOGGER" != ""; then

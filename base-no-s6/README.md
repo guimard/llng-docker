@@ -42,9 +42,11 @@ LemonLDAP::NG.
 * `LLNG_AUDITLOGGER` = `Lemonldap::NG::Common::AuditLogger::UserLoggerJSON`
   _(alternative value: `Lemonldap::NG::Common::AuditLogger::UserLoggerCompat` to keep logs as text)_
 * `LOGLEVEL` = `info` _(possible values: debug, info, notice, warn, error)_
-* `LOGGER` = `syslog` _(possible values: stderr, syslog)_
-* `USERLOGGER` = `syslog` _(possible values: stderr, syslog)_
+* `LOGGER` = `syslog` _(possible values: stderr, syslog, loki)_
+* `USERLOGGER` = `syslog` _(possible values: stderr, syslog, loki)_
 * `AUDITLOGGER` =
+* `LOKIURL` = `http://localhost:3100/loki/api/v1/push`
+* `LOKITENANT` =
 * `FORCE_KEY_REGENERATION` = `no`
 * `LANGUAGES` = default LLNG list _(set here the wanted languages separated by comma. Example: `fr,en`)_
 * Configuration and persistent session storage
