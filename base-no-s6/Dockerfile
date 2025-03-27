@@ -90,6 +90,7 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     echo "patch oidc-op-claims.patch" && patch -p1 <oidc-op-claims.patch && \
     echo "patch json-logger.patch" && patch -p1 <json-logger.patch && \
     echo "patch loki.patch" && patch -p1 <loki.patch && \
+    echo "patch log-dup.patch" && patch -p1 <log-dup.patch && \
     rm -f *.patch
 
 #COPY syslogopt.patch .
