@@ -1,6 +1,6 @@
 # Changes
 
-## v2.20.2-2 _(dev)_
+## v2.20.2-2 _(2024-03-27)_
 * Don't use cache when getting a refresh\_token
 * Improve global logout by calling portal
 * Add patch for JWKS refresh
