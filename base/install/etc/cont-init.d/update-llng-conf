@@ -20,14 +20,42 @@ echo "Set logLevel to $LOGLEVEL"
 perl -i -pe 's/^logLevel\s*=.*$/logLevel=$ENV{LOGLEVEL}/' $INI
 
 # Fix logger
+LOKI=""
 if test "$LOGGER" = "stderr"; then
     echo "Set logger to Lemonldap::NG::Common::Logger::Std"
     perl -i -ne 'print unless /^logger\s*=/;print "logger = Lemonldap::NG::Common::Logger::Std\n" if/^\[\s*all\s*\]/;' $INI
+elif test "$LOGGER" = "loki"; then
+    echo "Set logger to Lemonldap::NG::Common::Logger::Loki"
+    perl -i -ne 'print unless /^logger\s*=/;print "logger = Lemonldap::NG::Common::Logger::Loki\nlokiUrl = '"$LOKIURL"'\n" if/^\[\s*all\s*\]/;' $INI
+    LOKI=1
 fi
 
 if test "$USERLOGGER" = "stderr"; then
     echo "Set userLogger to Lemonldap::NG::Common::Logger::Std"
     perl -i -ne 'print unless /^userLogger\s*=/;print "userLogger = Lemonldap::NG::Common::Logger::Std\n" if/^\[\s*all\s*\]/;' $INI
+elif test "$USERLOGGER" = "loki"; then
+    echo "Set userLogger to Lemonldap::NG::Common::Logger::Loki"
+    perl -i -ne 'print unless /^(?:userLogger|lokiUrl)\s*=/;print "userLogger = Lemonldap::NG::Common::Logger::Loki\nlokiUrl = '"$LOKIURL"'\n" if/^\[\s*all\s*\]/;' $INI
+    LOKI=1
+fi
+
+if test "$LOKI" != "" -a "$AUDITLOGGER" = ""; then
+    AUDITLOGGER='Lemonldap::NG::Common::AuditLogger::UserLoggerJSON'
+
+    if test "$LOKITENANT" != ""; then
+        echo "Configure Loki tenant"
+        perl -i -ne 'print unless /^(?:lokiTenant)\s*=/;print "lokiTenant = '"$LOKITENANT"'\n" if/^\[\s*all\s*\]/;' $INI
+    fi
+
+    if test "$LOKIAUTHORIZATION" != ""; then
+        echo "Configure Loki tenant"
+        perl -i -ne 'print unless /^(?:lokiAuthorization)\s*=/;print "lokiAuthorization = '"$LOKIAUTHORIZATION"'\n" if/^\[\s*all\s*\]/;' $INI
+    fi
+fi
+
+if test "$AUDITLOGGER" != ""; then
+    echo "Set auditLogger to $AUDITLOGGER"
+    perl -i -ne 'print unless /^auditLogger\s*=/;print "auditLogger = '"$AUDITLOGGER"'\n" if/^\[\s*all\s*\]/;' $INI
 fi
 
 if test "$DEFAULT_WEBSITE" = "yes"; then

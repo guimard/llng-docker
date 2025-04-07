@@ -4,7 +4,7 @@ env:
   VERSION: 2.20.2
   PGVERSION: 15
   DEBIANRELEASE: bookworm
-  DOCKERREVISION: 1
+  DOCKERREVISION: 3
 
 on:
   push:
@@ -17,7 +17,7 @@ jobs:
     steps:
       - name: Get current date
         id: date
-        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Set up QEMU
@@ -58,7 +58,7 @@ jobs:
     steps:
       - name: Get current date
         id: date
-        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Set up QEMU
@@ -100,7 +100,7 @@ jobs:
     steps:
       - name: Get current date
         id: date
-        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Set up QEMU
@@ -144,7 +144,7 @@ jobs:
     steps:
       - name: Get current date
         id: date
-        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Set up QEMU
@@ -178,7 +178,7 @@ jobs:
     steps:
       - name: Get current date
         id: date
-        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Set up QEMU
@@ -222,7 +222,7 @@ jobs:
     steps:
       - name: Get current date
         id: date
-        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Set up QEMU
@@ -266,7 +266,7 @@ jobs:
     steps:
       - name: Get current date
         id: date
-        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Set up QEMU
@@ -310,7 +310,7 @@ jobs:
     steps:
       - name: Get current date
         id: date
-        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Set up QEMU
@@ -354,7 +354,7 @@ jobs:
     steps:
       - name: Get current date
         id: date
-        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Set up QEMU
@@ -398,7 +398,7 @@ jobs:
     steps:
       - name: Get current date
         id: date
-        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Set up QEMU
@@ -441,7 +441,7 @@ jobs:
     steps:
       - name: Get current date
         id: date
-        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Set up QEMU
@@ -473,7 +473,7 @@ jobs:
     steps:
       - name: Get current date
         id: date
-        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Set up QEMU
@@ -507,7 +507,7 @@ jobs:
     steps:
       - name: Get current date
         id: date
-        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Set up QEMU
@@ -541,7 +541,7 @@ jobs:
     steps:
       - name: Get current date
         id: date
-        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Set up QEMU
@@ -575,7 +575,7 @@ jobs:
     steps:
       - name: Get current date
         id: date
-        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Set up QEMU
@@ -609,7 +609,7 @@ jobs:
     steps:
       - name: Get current date
         id: date
-        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Set up QEMU
@@ -643,7 +643,7 @@ jobs:
     steps:
       - name: Get current date
         id: date
-        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Set up QEMU
@@ -677,7 +677,7 @@ jobs:
     steps:
       - name: Get current date
         id: date
-        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Set up QEMU
@@ -711,7 +711,7 @@ jobs:
     steps:
       - name: Get current date
         id: date
-        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Set up QEMU

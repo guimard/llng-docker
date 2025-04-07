@@ -1,0 +1,95 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
+@@ -337,7 +337,7 @@ sub refreshJWKSdata {
+ }
+ 
+ sub refreshJWKSdataForOp {
+-    my ( $self, $op ) = @_;
++    my ( $self, $op, $force ) = @_;
+ 
+     $self->logger->debug("Attempting to refresh JWKS data for $op");
+ 
+@@ -349,22 +349,27 @@ sub refreshJWKSdataForOp {
+       $self->opOptions->{$op}->{oidcOPMetaDataOptionsJWKSTimeout};
+     my $jwksUri = $self->opMetadata->{$op}->{conf}->{jwks_uri};
+ 
+-    unless ($jwksTimeout) {
+-        $self->logger->debug(
+-            "No JWKS refresh timeout defined for $op, skipping...");
+-        return;
+-    }
+-
+     unless ($jwksUri) {
+         $self->logger->debug("No JWKS URI defined for $op, skipping...");
+         return;
+     }
+ 
+-    if ( $self->opMetadata->{$op}->{jwks}->{time}
+-        && ( $self->opMetadata->{$op}->{jwks}->{time} + $jwksTimeout > time ) )
+-    {
+-        $self->logger->debug("JWKS data still valid for $op, skipping...");
+-        return;
++    if ( !$force ) {
++        unless ($jwksTimeout) {
++            $self->logger->debug(
++                "No JWKS refresh timeout defined for $op, skipping...");
++            return;
++        }
++
++        if (
++            $self->opMetadata->{$op}->{jwks}->{time}
++            && (
++                $self->opMetadata->{$op}->{jwks}->{time} + $jwksTimeout > time )
++          )
++        {
++            $self->logger->debug("JWKS data still valid for $op, skipping...");
++            return;
++        }
+     }
+ 
+     $self->logger->debug("Refresh JWKS data for $op from $jwksUri");
+@@ -1540,7 +1545,25 @@ sub decodeJWT {
+ 
+     my $jwks;
+     if ($op) {
++
++        # Always refresh JWKS if timeout has elapsed
+         $self->refreshJWKSdataForOp($op);
++
++        my $kid = $jwt_header->{kid};
++
++        # If the JWT is signed by an unknown kid, force a refresh
++        if (
++            $kid
++            and !$self->_kid_found_in_jwks(
++                $kid, $self->opMetadata->{$op}->{jwks}
++            )
++          )
++        {
++            $self->logger->debug(
++                "Key ID $kid not found in current JWKS, forcing JWKS refresh");
++            $self->refreshJWKSdataForOp( $op, 1 );
++        }
++
+         $jwks = $self->opMetadata->{$op}->{jwks};
+     }
+     else {
+@@ -1615,6 +1638,18 @@ sub decodeJWT {
+     return wantarray ? ( $content, $alg ) : $content;
+ }
+ 
++sub _kid_found_in_jwks {
++    my ( $self, $kid, $jwks ) = @_;
++
++    return 0 if !$kid;
++
++    my @keys = $jwks ? @{ $jwks->{keys} // [] } : ();
++
++    my @found = grep { $_->{kid} and $_->{kid} eq $kid } @keys;
++
++    return @found > 0;
++}
++
+ ### HERE
+ 
+ # Check value hash

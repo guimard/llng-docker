@@ -9,6 +9,8 @@ fi
 set -e
 
 $COMPOSE run base cat /etc/lemonldap-ng/lemonldap-ng.ini | grep 'dbiChain=DBI:Pg:database=lemonldapng;host=db'
+$COMPOSE run base cat /etc/lemonldap-ng/lemonldap-ng.ini | grep 'auditLogger = Lemonldap::NG::Common::AuditLogger::UserLoggerJSON'
+$COMPOSE run base cat /etc/lemonldap-ng/lemonldap-ng.ini | grep 'userLogger = Lemonldap::NG::Common::Logger::Loki'
 $COMPOSE run base /usr/share/docker-llng/updateConf get persistentStorage | grep Apache::Session::Browseable::PgJSON
 $COMPOSE run base /usr/share/docker-llng/updateConf get globalStorage | grep Apache::Session::Browseable::Redis
 $COMPOSE run base /usr/share/docker-llng/updateConf get globalStorageOptions Index | grep _whatToTrace

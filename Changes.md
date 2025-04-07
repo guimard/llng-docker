@@ -1,5 +1,18 @@
 # Changes
 
+## v2.20.2-3 _(2024-03-29)_
+* Fix CVE-2025-31510
+
+## v2.20.2-2 _(2024-03-27)_
+* Don't use cache when getting a refresh\_token
+* Improve global logout by calling portal
+* Add patch for JWKS refresh
+* Add login\_hint management
+* Fix Forwarded-For script
+* Add JSON auditLogger (enabled by default)
+* Set "user" when possible in all auditLogs
+* Add loki logger
+
 ## v2.20.2-1 _(2024-02-02)_
 * Add "Last-Modified" header for OIDC metadata
 * Add hook to modify refresh\_token

@@ -36,11 +36,17 @@ LemonLDAP::NG.
 * `CROWDSEC_KEY` = _(required, given by `cscli bouncers add mylemon`)_
 * `CROWDSEC_IGNORE_FAILURES` = _(possible values: <empty> 1)_
 * `FORWARDED_BY` = _(set here the IP address of reverse proxy if any)_
+* `FORWARDED_HEADER` = `X-Forwarded-For`
 * `PORTAL` = `http://auth.example.com/` _(full URL needed here)_
 * `LISTEN` = _(set `:PORTNUMBER` here if you want to access directly to FastCGI server)_
+* `LLNG_AUDITLOGGER` = `Lemonldap::NG::Common::AuditLogger::UserLoggerJSON`
+  _(alternative value: `Lemonldap::NG::Common::AuditLogger::UserLoggerCompat` to keep logs as text)_
 * `LOGLEVEL` = `info` _(possible values: debug, info, notice, warn, error)_
-* `LOGGER` = `syslog` _(possible values: stderr, syslog)_
-* `USERLOGGER` = `syslog` _(possible values: stderr, syslog)_
+* `LOGGER` = `syslog` _(possible values: stderr, syslog, loki)_
+* `USERLOGGER` = `syslog` _(possible values: stderr, syslog, loki)_
+* `AUDITLOGGER` =
+* `LOKIURL` = `http://localhost:3100/loki/api/v1/push`
+* `LOKITENANT` =
 * `FORCE_KEY_REGENERATION` = `no`
 * `LANGUAGES` = default LLNG list _(set here the wanted languages separated by comma. Example: `fr,en`)_
 * Configuration and persistent session storage

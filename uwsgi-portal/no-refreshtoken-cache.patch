@@ -1,0 +1,100 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
+@@ -1141,11 +1141,10 @@ sub newAuthorizationCode {
+     return $self->getOpenIDConnectSession(
+         undef,
+         "authorization_code",
+-        $self->rpOptions->{$rp}
++        ttl => $self->rpOptions->{$rp}
+           ->{oidcRPMetaDataOptionsAuthorizationCodeExpiration}
+           || $self->conf->{oidcServiceAuthorizationCodeExpiration},
+-        ,
+-        $info
++        info => $info
+     );
+ }
+ 
+@@ -1182,8 +1182,11 @@ sub newAccessToken {
+     my $ttl =
+          $self->rpOptions->{$rp}->{oidcRPMetaDataOptionsAccessTokenExpiration}
+       || $self->conf->{oidcServiceAccessTokenExpiration};
+-    my $session =
+-      $self->getOpenIDConnectSession( undef, "access_token", $ttl, $at_info, );
++    my $session = $self->getOpenIDConnectSession(
++        undef, "access_token",
++        ttl  => $ttl,
++        info => $at_info,
++    );
+ 
+     if ($session) {
+ 
+@@ -1320,8 +1323,11 @@ sub newRefreshToken {
+           || $self->conf->{oidcServiceOfflineSessionExpiration} )
+       : $self->conf->{timeout};
+ 
+-    return $self->getOpenIDConnectSession( undef, "refresh_token", $ttl,
+-        $info );
++    return $self->getOpenIDConnectSession(
++        undef, "refresh_token",
++        ttl  => $ttl,
++        info => $info
++    );
+ }
+ 
+ # Get existing Refresh Token
+@@ -1331,7 +1337,7 @@ sub newRefreshToken {
+ sub getRefreshToken {
+     my ( $self, $id ) = @_;
+ 
+-    return $self->getOpenIDConnectSession( $id, "refresh_token" );
++    return $self->getOpenIDConnectSession( $id, "refresh_token", noCache => 1 );
+ }
+ 
+ sub updateRefreshToken {
+@@ -1365,24 +1371,30 @@ sub updateToken {
+ # If id is set to undef, return a new session
+ # @return Lemonldap::NG::Common::Session object
+ sub getOpenIDConnectSession {
+-    my ( $self, $id, $type, $ttl, $info ) = @_;
++    my ( $self, $id, $type, %opts ) = @_;
+ 
+-    $ttl ||= $self->conf->{timeout};
++    $opts{ttl} ||= $self->conf->{timeout};
+ 
+     my $oidcSession = Lemonldap::NG::Common::Session->new( {
+             $self->_storeOpts(),
++            (
++                $opts{noCache} ? ()
++                : (
+             cacheModule        => $self->conf->{localSessionStorage},
+-            cacheModuleOptions => $self->conf->{localSessionStorageOptions},
++                    cacheModuleOptions =>
++                      $self->conf->{localSessionStorageOptions}
++                )
++            ),
+             hashStore          => $self->conf->{hashedSessionStore},
+             id                 => $id,
+             kind               => $self->sessionKind,
+             (
+-                $info
++                $opts{info}
+                 ? (
+                     info => {
+                         _type  => $type,
+-                        _utime => time + $ttl - $self->conf->{timeout},
+-                        %{$info}
++                        _utime => time + $opts{ttl} - $self->conf->{timeout},
++                        %{ $opts{info} }
+                     }
+                   )
+                 : ()
+@@ -1828,7 +1840,8 @@ sub checkEndPointAuthenticationCredentials {
+             }
+         }
+     }
+-    $self->p->HANDLER->set_user($req, $self->rpOptions->{$rp}->{oidcRPMetaDataOptionsClientID});
++    $self->p->HANDLER->set_user( $req,
++        $self->rpOptions->{$rp}->{oidcRPMetaDataOptionsClientID} );
+     return ( $rp, $method );
+ }
+ 
