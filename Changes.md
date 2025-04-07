@@ -1,6 +1,7 @@
 # Changes
 
-## v2.20.2-3 _(dev)_
+## v2.20.2-3 _(2024-03-29)_
+* Fix CVE-2025-31510
 
 ## v2.20.2-2 _(2024-03-27)_
 * Don't use cache when getting a refresh\_token
