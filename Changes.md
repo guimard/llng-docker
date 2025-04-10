@@ -2,6 +2,7 @@
 
 ## v2.20.2-4 _(dev)_
 * add sid in userinfo response
+* Update Apache::Session::Browseable::Redis to 1.3.15
 
 ## v2.20.2-3 _(2024-03-29)_
 * Fix CVE-2025-31510
