@@ -1,10 +1,10 @@
 name: Build and Publish Docker Images
 
 env:
-  VERSION: 2.20.2
+  VERSION: 2.21.0
   PGVERSION: 15
   DEBIANRELEASE: bookworm
-  DOCKERREVISION: 4
+  DOCKERREVISION: 1
 
 on:
   push:

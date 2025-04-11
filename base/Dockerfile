@@ -77,7 +77,7 @@ ENV SSODOMAIN=example.com \
     DEFAULT_WEBSITE=no \
     PGSSLCERT=/tmp/postgres.crt
 
-COPY *.patch /
+#COPY *.patch /
 
 RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     mkdir /over && \
@@ -98,12 +98,7 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     chmod 750 /var/lib/lemonldap-ng/cache && \
     perl -000 -MJSON -i -ne '$_=JSON::from_json($_);$_->{reloadUrls}={};print JSON->new->pretty->canonical->encode($_)' /var/lib/lemonldap-ng/conf/lmConf-1.json && \
     perl -i -pe 's/\r//g' /usr/share/perl5/Lemonldap/NG/Common/Conf/DefaultValues.pm && \
-    echo "patch no-none.patch" && patch -p1 <no-none.patch && \
-    echo "patch oidc-op-claims.patch" && patch -p1 <oidc-op-claims.patch && \
-    echo "patch json-logger.patch" && patch -p1 <json-logger.patch && \
-    echo "patch loki.patch" && patch -p1 <loki.patch && \
-    echo "patch log-dup.patch" && patch -p1 <log-dup.patch && \
-    rm -f *.patch
+    echo rm -f *.patch
 
 #COPY syslogopt.patch .
 #
