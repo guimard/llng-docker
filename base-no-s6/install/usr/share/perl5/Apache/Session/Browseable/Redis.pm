@@ -9,7 +9,7 @@ use Apache::Session::Lock::Null;
 use Apache::Session::Serialize::JSON;
 use Apache::Session::Browseable::_common;
 
-our $VERSION = '1.3.15';
+our $VERSION = '1.3.16';
 our @ISA     = qw(Apache::Session);
 
 our $redis = $Apache::Session::Browseable::Store::Redis::redis;
@@ -141,7 +141,7 @@ sub deleteIfLowerThan {
             }
             if ( $rule->{or} ) {
                 foreach ( keys %{ $rule->{or} } ) {
-                    if ( defined( $v->{$_} ) and $v->{$_} < $rule->{not}->{$_} )
+                    if ( defined( $v->{$_} ) and $v->{$_} < $rule->{or}->{$_} )
                     {
                         $redisObj->del($k);
                         $deleted++;
