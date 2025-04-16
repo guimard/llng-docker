@@ -1,7 +1,10 @@
 # Changes
 
-## v2.21.0-1 _(dev)_
-* add sid in userinfo response
+## v2.21.0-2 _(dev)_
+* Fix prompt=none
+
+## v2.21.0-1 _(2024-04-11)_
+* Add sid in userinfo response
 * Update Apache::Session::Browseable::Redis to 1.3.15
 * Update to LLNG 2.21.0
 
