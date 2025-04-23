@@ -1,0 +1,12 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
+@@ -2343,6 +2343,9 @@ sub introspection {
+             $response->{iss} = $self->get_issuer($req);
+             $response->{exp} =
+               $oidcSession->{data}->{_utime} + $self->conf->{timeout};
++            $response->{sid} =
++              $self->getSidFromSession( $oidcSession->{data}->{rp},
++                $apacheSession->data );
+         }
+         else {
+             $self->logger->warn("Count not find session tied to Access Token");
