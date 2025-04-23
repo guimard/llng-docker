@@ -5,11 +5,15 @@ for INITSCRIPT in /etc/cont-init.d/*; do
 	sh $INITSCRIPT
 done
 
-for STARTDIR in /etc/services.d/*; do
-	NAME=${STARTDIR##*/}
-	echo "Starting service: $NAME"
-	start-stop-daemon -C --background --oknodo --start --exec $STARTDIR/run
-done
+if [ -z "$( ls '/etc/services.d/' )" ]; then
+	echo "No services to run"
+else
+	for STARTDIR in /etc/services.d/*; do
+		NAME=${STARTDIR##*/}
+		echo "Starting service: $NAME"
+		start-stop-daemon -C --background --oknodo --start --exec $STARTDIR/run
+	done
+fi
 
 echo "ARGS $@"
 
