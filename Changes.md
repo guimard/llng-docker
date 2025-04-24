@@ -2,7 +2,7 @@
 
 ## v2.21.0-2 _(dev)_
 * Fix prompt=none
-* Add "sid" into introspection
+* Add "aud" into introspection
 
 ## v2.21.0-1 _(2024-04-11)_
 * Add sid in userinfo response
