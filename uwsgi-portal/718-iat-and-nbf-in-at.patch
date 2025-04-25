@@ -1,0 +1,61 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
+@@ -1194,6 +1194,8 @@ sub newAccessToken {
+         scope     => $scope,
+         rp        => $rp,
+         client_id => $client_id,
++        iat       => time,
++        nbf       => time,
+         %{$info},
+     };
+ 
+@@ -1221,7 +1223,8 @@ sub newAccessToken {
+ 
+         if ( $self->_wantJWT($rp) ) {
+             my $at_jwt =
+-              $self->makeJWT( $req, $rp, $scope, $session->id, $sessionInfo );
++              $self->makeJWT( $req, $session->id, $sessionInfo, $at_info,
++                $ttl );
+             $at_jwt = $self->encryptToken(
+                 $rp,
+                 $at_jwt,
+@@ -1249,27 +1252,25 @@ sub _wantJWT {
+ }
+ 
+ sub makeJWT {
+-    my ( $self, $req, $rp, $scope, $id, $sessionInfo ) = @_;
++    my ( $self, $req, $id, $sessionInfo, $at_info, $ttl ) = @_;
+ 
+-    my $exp =
+-         $self->rpOptions->{$rp}->{oidcRPMetaDataOptionsAccessTokenExpiration}
+-      || $self->conf->{oidcServiceAccessTokenExpiration};
+-    $exp += time;
++    my $rp        = $at_info->{rp};
++    my $exp       = $ttl + time;
+     my $client_id = $self->rpOptions->{$rp}->{oidcRPMetaDataOptionsClientID};
+ 
+     my $access_token_payload = {
+-        iss       => $self->get_issuer($req),     # Issuer Identifier
+-        exp       => $exp,                        # expiration
+-        aud       => $self->getAudiences($rp),    # Audience
+-        client_id => $client_id,                  # Client ID
+-        iat       => time,                        # Issued time
+-        jti       => $id,                         # Access Token session ID
+-        scope     => $scope,                      # Scope
+-        sid       => $self->getSidFromSession( $rp, $sessionInfo ), # Session id
++        iss => $self->get_issuer($req),     # Issuer Identifier
++        exp => $exp,                        # expiration
++        aud => $self->getAudiences($rp),    # Audience
++        jti => $id,                         # Access Token session ID
++        sid => $self->getSidFromSession( $rp, $sessionInfo ),    # Session id
+     };
++    $access_token_payload->{$_} = $at_info->{$_}
++      foreach (qw(scope client_id iat));
+ 
+     my $claims =
+-      $self->buildUserInfoResponseFromData( $req, $scope, $rp, $sessionInfo );
++      $self->buildUserInfoResponseFromData( $req, $at_info->{scope}, $rp,
++        $sessionInfo );
+ 
+     # Release claims, or only sub
+     if ( $self->rpOptions->{$rp}->{oidcRPMetaDataOptionsAccessTokenClaims} ) {

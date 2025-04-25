@@ -1,6 +1,6 @@
 --- a/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
-@@ -2329,20 +2329,24 @@ sub introspection {
+@@ -2329,20 +2329,27 @@ sub introspection {
          my $apacheSession =
            $self->_getSessionFromAccessTokenData( $oidcSession->{data} );
          if ($apacheSession) {
@@ -22,10 +22,11 @@
 +                active    => JSON::true,
 +                aud       => $self->getAudiences( $oidcSession->data->{rp} ),
 +                client_id => $oidcSession->{data}->{client_id},
-+                exp => $oidcSession->{data}->{_utime} + $self->conf->{timeout},
-+                iss => $self->get_issuer($req),
-+                nbf => time,
-+                scope      => $oidcSession->{data}->{scope},
++                exp   => $oidcSession->data->{_utime} + $self->conf->{timeout},
++                iat   => $oidcSession->data->{iat},
++                iss   => $self->get_issuer($req),
++                nbf   => $oidcSession->data->{nbf},
++                scope => $oidcSession->{data}->{scope},
 +                token_type => 'bearer',
 +
 +                # The ID attribute we choose is the one of the calling
@@ -34,7 +35,9 @@
 +                sub => $self->getUserIDForRP( $req, $rp, $apacheSession->data ),
 +            };
 +            foreach ( keys %$response ) {
-+                delete $response->{$_} unless defined $response->{$_};
++                delete $response->{$_}
++                  unless defined $response->{$_}
++                  and length( $response->{$_} ) > 0;
 +            }
          }
          else {
