@@ -1,5 +1,14 @@
 # Changes
 
+## v2.21.0-2 _(2025-04-26)_
+* Fix prompt=none
+* Add "aud", "iat" and "nbf" into introspection
+
+## v2.21.0-1 _(2024-04-11)_
+* Add sid in userinfo response
+* Update Apache::Session::Browseable::Redis to 1.3.15
+* Update to LLNG 2.21.0
+
 ## v2.20.2-3 _(2024-03-29)_
 * Fix CVE-2025-31510
 

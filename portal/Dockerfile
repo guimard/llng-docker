@@ -34,15 +34,12 @@ RUN echo "# Install nginx and portal libs" && \
 
 COPY *.patch /
 
-RUN for p in appgrid.patch jwt-type.patch app-scope.patch ignorepollers.patch \
+RUN set -e && for p in appgrid.patch app-scope.patch ignorepollers.patch \
     fixedLogout.patch more-logs.patch \
     matrix-token.patch redirect-ajax.patch \
-    metadata-ttl.patch getreftoken.patch \
-    oidc-op-claims.patch "set-client-id-in-logs.patch" \
-    portal-maintainance.patch no-refreshtoken-cache.patch \
-    3273-admin-logout.patch login_hint.patch \
-    refresh-jwks.patch redirect-uri-debug.patch \
-    user-in-logout-logs.patch tab.patch \
+    664-admin-logout.patch \
+    getreftoken.patch 708-sid-in-userinfo.patch \
+    promptnode.patch 717-introspection.patch 718-iat-and-nbf-in-at.patch \
     ; do echo patch $p && patch -p1 < $p; done && \
     rm -f /*.patch && \
     echo "# Install nginx configuration files" && \
