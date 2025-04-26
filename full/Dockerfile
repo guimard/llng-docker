@@ -21,10 +21,12 @@ RUN echo "# Install nginx and portal and manager libs" && \
 COPY *.patch /
 
 RUN \
-    echo patch ignorepollers.patch && patch -p1 < ignorepollers.patch && \
-    echo patch fixedLogout.patch && patch -p1 < fixedLogout.patch && \
-    echo patch matrix-token-exchange.patch && patch -p1 < matrix-token-exchange.patch && \
-    echo patch 3273-admin-logout.patch && patch -p1 <3273-admin-logout.patch && \
+    set -e && for p in \
+        ignorepollers.patch \
+	fixedLogout.patch \
+	matrix-token-exchange.patch \
+        664-admin-logout.patch \
+    ; do echo patch $p && patch -p1 < $p; done && \
     rm -f *.patch && \
     LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini \
     perl -MLemonldap::NG::Manager::Build -e 'Lemonldap::NG::Manager::Build->run( \
