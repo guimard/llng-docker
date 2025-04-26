@@ -35,7 +35,7 @@ COPY *.patch /
 RUN set -e && for p in appgrid.patch app-scope.patch ignorepollers.patch \
     fixedLogout.patch more-logs.patch \
     matrix-token.patch redirect-ajax.patch \
-    getreftoken.patch sid-in-userinfo.patch \
+    getreftoken.patch 708-sid-in-userinfo.patch \
     promptnode.patch 717-introspection.patch 718-iat-and-nbf-in-at.patch \
     ; do echo patch $p && patch -p1 < $p; done && \
     rm -f /*.patch && \
