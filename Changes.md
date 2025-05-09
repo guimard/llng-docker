@@ -1,6 +1,7 @@
 # Changes
 
 ## v2.21.0-3 _(dev)_
+* Fix introspection patch
 
 ## v2.21.0-2 _(2025-04-26)_
 * Fix prompt=none
