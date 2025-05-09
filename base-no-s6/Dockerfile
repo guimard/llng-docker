@@ -72,7 +72,7 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     apt-get -y --no-install-recommends install procps cron \
     liblemonldap-ng-common-perl${LLNGDIST} \
     liblemonldap-ng-handler-perl${LLNGDIST} \
-    libapache-session-browseable-perl libapache-session-ldap-perl \
+    libapache-session-browseable-perl${LLNGDIST} libapache-session-ldap-perl \
     libapache-session-mongodb-perl libapache-session-sqlite3-perl \
     libapache-session-wrapper-perl libsoap-lite-perl \
     libdbi-perl libdbd-pg-perl libnet-cidr-perl \
