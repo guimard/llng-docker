@@ -65,7 +65,7 @@ ENV SSODOMAIN=example.com \
     DEFAULT_WEBSITE=no \
     PGSSLCERT=/tmp/postgres.crt
 
-#COPY *.patch /
+COPY *.patch /
 
 RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     mkdir /over && \
@@ -78,12 +78,13 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     libdbi-perl libdbd-pg-perl libnet-cidr-perl \
     libhttp-parser-xs-perl liblwp-protocol-https-perl libstring-random-perl \
     libconvert-base32-perl libnet-ldap-perl libxml-libxml-perl libxml-simple-perl \
-    libdbd-cassandra-perl \
+    libdbd-cassandra-perl libprotocol-websocket-perl \
     libredis-perl libyaml-perl libencode-perl patch && \
     apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/* && \
     mkdir -p /var/lib/lemonldap-ng/cache && \
     chown www-data:www-data /var/lib/lemonldap-ng/cache && \
     chmod 750 /var/lib/lemonldap-ng/cache && \
+    echo "# patch 724-webpubsub.patch" && patch -p1 < 724-webpubsub.patch && \
     perl -000 -MJSON -i -ne '$_=JSON::from_json($_);$_->{reloadUrls}={};print JSON->new->pretty->canonical->encode($_)' /var/lib/lemonldap-ng/conf/lmConf-1.json && \
     perl -i -pe 's/\r//g' /usr/share/perl5/Lemonldap/NG/Common/Conf/DefaultValues.pm && \
     echo rm -f *.patch
