@@ -52,5 +52,10 @@ _(the channel where the message will be published)_
 
 - URL: `/subscribe` _(this opens the websocket)_
 - Method: GET
+- Headers:
+    - **Authorization** _(optional)_: f a token is required, set it here in the form:
+```
+Authorization: Bearer <value>
+```
 - Query _(GET parameters)_:
   - **channels** _(required)_: comma separated list of channels to subscribe to.
