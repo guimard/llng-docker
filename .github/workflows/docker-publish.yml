@@ -196,7 +196,7 @@ jobs:
             yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-hiperf
 
   build-and-push-webpubsub:
-    needs: build-and-push-base
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Get current date
