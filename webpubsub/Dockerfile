@@ -1,5 +1,9 @@
 FROM alpine:latest
 
+LABEL maintainer="Yadd yadd@debian.org>" \
+      name="yadd/lemonldap-ng-webpubsub" \
+      version="v1.0"
+
 ENV \
     PUBSUB_ACCESS_LOG=STDERR \
     PUBSUB_ADDR= \

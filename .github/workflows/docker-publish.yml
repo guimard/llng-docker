@@ -222,8 +222,6 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: ./webpubsub
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:latest
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
