@@ -225,14 +225,14 @@ diff --git a/usr/share/lemonldap-ng/bin/pubsubWebServer b/usr/share/lemonldap-ng
 new file mode 100755
 --- /dev/null
 +++ b/usr/share/lemonldap-ng/bin/pubsubWebServer
-@@ -0,0 +1,498 @@
+@@ -0,0 +1,597 @@
 +#!/usr/bin/perl
 +
 +use strict;
 +use Getopt::Long;
 +use IO::Select;
 +use JSON;
-+use POSIX qw(strftime setsid);
++use POSIX qw(strftime setsid setuid setgid);
 +use Protocol::WebSocket::Handshake::Server;
 +use Protocol::WebSocket::Frame;
 +use Socket;
@@ -240,39 +240,43 @@ new file mode 100755
 +
 +# 1. Parse options
 +
-+my ( $token, $port, $addr, $cert, $key, $maxRequestSize, $maxRequestTime,
-+    $_debug, $quiet, $daemon, $accessLog, $pidFile, $help );
++my ( $accessLog, $addr, $cert, $daemon, $_debug, $group, $help, $key,
++    $maxRequestSize, $maxRequestTime, $quiet, $pidFile, $port, $token, $user );
 +
 +# HTTP header separator
 +use constant HS => qr/(?:\r?\n){2}/;
 +
 +GetOptions(
-+    'token=s'            => \$token,
-+    'port=s'             => \$port,
-+    'addr=s'             => \$addr,
++    'access-log=s'       => \$accessLog,
++    'addr|a=s'           => \$addr,
 +    'cert=s'             => \$cert,
++    'daemon'             => \$daemon,
++    'debug|d'            => \$_debug,
++    'group|g=s'          => \$group,
++    'help|h'             => \$help,
 +    'key=s'              => \$key,
 +    'max-request-size=s' => \$maxRequestSize,
 +    'max-request-time=s' => \$maxRequestTime,
-+    'debug'              => \$_debug,
-+    'quiet'              => \$quiet,
-+    'daemon'             => \$daemon,
-+    'access-log=s'       => \$accessLog,
++    'quiet|q'            => \$quiet,
 +    'pid-file=s'         => \$pidFile,
-+    'help|h'             => \$help,
++    'port|p=s'           => \$port,
++    'token=s'            => \$token,
++    'user|u=s'           => \$user,
 +);
 +
++$accessLog      ||= $ENV{PUBSUB_ACCESS_LOG};
 +$addr           ||= $ENV{PUBSUB_ADDR};
-+$token          ||= $ENV{PUBSUB_TOKEN};
 +$cert           ||= $ENV{PUBSUB_CERT};
++$daemon         ||= $ENV{PUBSUB_DAEMON};
++$_debug         ||= $ENV{PUBSUB_DEBUG};
++$group          ||= $ENV{PUBSUB_GROUP};
 +$key            ||= $ENV{PUBSUB_KEY};
 +$maxRequestSize ||= $ENV{PUBSUB_MAX_REQUEST_SIZE} || 8192;
 +$maxRequestTime ||= $ENV{PUBSUB_MAX_REQUEST_TIME} || 5;
-+$_debug         ||= $ENV{PUBSUB_DEBUG};
-+$quiet          ||= $ENV{PUBSUB_QUIET};
-+$accessLog      ||= $ENV{PUBSUB_ACCESS_LOG};
-+$daemon         ||= $ENV{PUBSUB_DAEMON};
 +$pidFile        ||= $ENV{PUBSUB_PID_FILE};
++$quiet          ||= $ENV{PUBSUB_QUIET};
++$token          ||= $ENV{PUBSUB_TOKEN};
++$user           ||= $ENV{PUBSUB_USER};
 +
 +if ($help) {
 +    require Pod::Usage;
@@ -280,13 +284,6 @@ new file mode 100755
 +}
 +
 +&daemonize if $daemon;
-+
-+if ( $accessLog and $accessLog ne '-' ) {
-+    open STDOUT, '>>', $accessLog or die "Unable to write logs: $!";
-+    if ($daemon) {
-+        open STDERR, '>&', fileno(STDOUT) or die "Can't dup STDERR: $!";
-+    }
-+}
 +
 +sub debug {
 +    print STDERR map { "$_\n" } @_ if $_debug;
@@ -304,8 +301,22 @@ new file mode 100755
 +    return if $quiet and !$accessLog;
 +    my ( $msg, $ip ) = @_;
 +    my $date = strftime( "[%d/%b/%Y:%H:%M:%S %z]", localtime );
-+    print "$ip - - $date $msg -\n";
++    my $log  = "$ip - - $date $msg -\n";
++    if ( $accessLog eq 'STDERR' ) {
++        print STDERR $log;
++    }
++    else {
++        print $log;
++    }
 +    debug "Request: $msg";
++}
++
++if ( $accessLog and $accessLog ne '-' and $accessLog ne 'STDERR' ) {
++    debug "Access logs will be written into $accessLog\n";
++    open STDOUT, '>>', $accessLog or die "Unable to write logs: $!";
++    if ($daemon) {
++        open STDERR, '>&', fileno(STDOUT) or die "Can't dup STDERR: $!";
++    }
 +}
 +
 +if ( $cert xor $key ) {
@@ -346,6 +357,16 @@ new file mode 100755
 +}
 +
 +die "Cannot create socket: $!" unless $server;
++
++if ($group) {
++    my $grp = getgrnam($group) or die "Can't change gid to $group";
++    setgid($grp)               or die "setgid: $!";
++}
++
++if ($user) {
++    my $uid = getpwnam($user) or die "Can't change uid to $user";
++    setuid($uid)              or die "setuid: $!";
++}
 +
 +my $json     = JSON->new->utf8;
 +my $selector = IO::Select->new;
@@ -509,7 +530,8 @@ new file mode 100755
 +    my ( $sock, $code, $status, $body, $request ) = @_;
 +    my $ip  = getIp($sock);
 +    my $len = length($body);
-+    my $resp = "HTTP/1.1 $code $status\r\n"
++    my $resp =
++        "HTTP/1.1 $code $status\r\n"
 +      . "Content-Type: text/plain\r\n"
 +      . "Content-Length: $len\r\n"
 +      . "Connection: close\r\n\r\n"
@@ -575,13 +597,23 @@ new file mode 100755
 +
 +  pubsubWebServer <option>
 +
++Simple client using L<wscat|https://github.com/websockets/wscat>
++
++  wscat --connect ws://localhost:8080/subscribe?channels=chan1,chan2
++
++Simple publisher
++
++  curl -XPOST -d '{"foo":"bar","bar":"baz","baz":"foo","channel":"chan1"}' http://localhost:8080/publish
++
++Note that "channel" is required.
++
 +=head1 DESCRIPTION
 +
 +B<pubsubWebServer> is a web-based pub/sub server designed for L<LemonLDAP::NG|https://lemonldap-ng.org>.
 +
 +=head2 Options
 +
-+ALl options except B<--help> can have default value overriden by an
++All options except B<--help> can have default value overriden by an
 +environment variable.
 +
 +=head3 HTTP options
@@ -635,6 +667,36 @@ new file mode 100755
 +
 +=back
 +
++=head3 Server options
++
++=over
++
++=item * B<--daemon>
++
++Daemonize the server.
++
++Environment variable: B<PUBSUB_DAEMON>
++
++=item * B<--pid-file E<lt>valueE<gt>>
++
++When B<--daemon> is set, write the processus number into the given file.
++
++Environment variable: B<PUBSUB_PID_FILE>
++
++=item * B<--user> E<lt>valueE<gt>>
++
++Change uid to the given value after opening socket.
++
++Environment variable: B<PUBSUB_USER>
++
++=item * B<--group> E<lt>valueE<gt>>
++
++Change gid to the given value after opening socket.
++
++Environment variable: B<PUBSUB_GROUP>
++
++=back
++
 +=head3 Logging options
 +
 +=over
@@ -660,25 +722,62 @@ new file mode 100755
 +
 +=back
 +
-+=head3 Server options
++=head3 Other
 +
 +=over
-+
-+=item * B<--daemon>
-+
-+Daemonize the server.
-+
-+Environment variable: B<PUBSUB_DAEMON>
-+
-+=item * B<--pid-file E<lt>valueE<gt>>
-+
-+When B<--daemon> is set, write the processus number into the given file.
-+
-+Environment variable: B<PUBSUB_PID_FILE>
 +
 +=item * B<--help>
 +
 +Display this.
++
++=back
++
++=head2 API
++
++=head3 Publisher
++
++=over
++
++=item * URL: C</publish>
++
++=item * Method: POST
++
++=item * Headers:
++
++=over
++
++=item * B<Authorization> I<(optional)>
++
++If a token is required, set it here in the form:
++
++  Authorization: Bearer <value>
++
++=back
++
++=item * Request body:
++
++JSON content with at least a "B<channel>" key
++I<(the channel where the message will be published)>
++
++=back
++
++=head3 Reader I<(websockets)>
++
++=over
++
++=item * URL: C</subscribe> I<(this opens the websocket)>
++
++=item * Method: GET
++
++=item * Query I<(GET parameters)>
++
++=over
++
++=item * B<channels> I<(required)>
++
++Comma separated list of channels to subscribe to.
++
++=back
 +
 +=back
 +

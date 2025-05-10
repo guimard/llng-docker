@@ -9,12 +9,14 @@ ENV \
     PUBSUB_ADDR= \
     PUBSUB_CERT= \
     PUBSUB_DEBUG= \
+    PUBSUB_GROUP=nogroup \
     PUBSUB_KEY= \
     PUBSUB_MAX_REQUEST_SIZE=8192 \
     PUBSUB_MAX_REQUEST_TIME=5 \
     PUBSUB_QUIET=1 \
     PUBSUB_PORT= \
-    PUBSUB_TOKEN=
+    PUBSUB_TOKEN= \
+    PUBSUB_USER=nobody
 
 RUN apk update && \
     apk upgrade && \

@@ -1,0 +1,3 @@
+#!/bin/sh
+
+docker rmi yadd/lemonldap-ng-webpubsub-test

@@ -1,0 +1,28 @@
+services:
+  pubsub:
+    image: yadd/lemonldap-ng-webpubsub
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    environment:
+      - PUBSUB_TOKEN=qwerty
+    ports:
+      - 58080:8080
+    networks:
+      pubsubtest:
+        aliases:
+          - pubsub.example.com
+
+  test:
+    image: yadd/lemonldap-ng-webpubsub-test
+    build:
+      context: .
+    depends_on:
+      pubsub:
+        condition: service_started
+    networks:
+      pubsubtest:
+
+networks:
+  pubsubtest:
+    name: pubsubtest

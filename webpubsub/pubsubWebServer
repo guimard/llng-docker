@@ -369,13 +369,23 @@ pubsubWebServer - Pub/Sub server based on websockets
 
   pubsubWebServer <option>
 
+Simple client using L<wscat|https://github.com/websockets/wscat>
+
+  wscat --connect ws://localhost:8080/subscribe?channels=chan1,chan2
+
+Simple publisher
+
+  curl -XPOST -d '{"foo":"bar","bar":"baz","baz":"foo","channel":"chan1"}' http://localhost:8080/publish
+
+Note that "channel" is required.
+
 =head1 DESCRIPTION
 
 B<pubsubWebServer> is a web-based pub/sub server designed for L<LemonLDAP::NG|https://lemonldap-ng.org>.
 
 =head2 Options
 
-ALl options except B<--help> can have default value overriden by an
+All options except B<--help> can have default value overriden by an
 environment variable.
 
 =head3 HTTP options
@@ -491,6 +501,55 @@ Environment variable: B<PUBSUG_ACCESS_LOG>
 =item * B<--help>
 
 Display this.
+
+=back
+
+=head2 API
+
+=head3 Publisher
+
+=over
+
+=item * URL: C</publish>
+
+=item * Method: POST
+
+=item * Headers:
+
+=over
+
+=item * B<Authorization> I<(optional)>
+
+If a token is required, set it here in the form:
+
+  Authorization: Bearer <value>
+
+=back
+
+=item * Request body:
+
+JSON content with at least a "B<channel>" key
+I<(the channel where the message will be published)>
+
+=back
+
+=head3 Reader I<(websockets)>
+
+=over
+
+=item * URL: C</subscribe> I<(this opens the websocket)>
+
+=item * Method: GET
+
+=item * Query I<(GET parameters)>
+
+=over
+
+=item * B<channels> I<(required)>
+
+Comma separated list of channels to subscribe to.
+
+=back
 
 =back
 
