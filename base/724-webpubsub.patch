@@ -270,7 +270,7 @@ new file mode 100755
 +$maxRequestTime ||= $ENV{PUBSUB_MAX_REQUEST_TIME} || 5;
 +$_debug         ||= $ENV{PUBSUB_DEBUG};
 +$quiet          ||= $ENV{PUBSUB_QUIET};
-+$accessLog      ||= $ENV{PUBSUG_ACCESS_LOG};
++$accessLog      ||= $ENV{PUBSUB_ACCESS_LOG};
 +$daemon         ||= $ENV{PUBSUB_DAEMON};
 +$pidFile        ||= $ENV{PUBSUB_PID_FILE};
 +
