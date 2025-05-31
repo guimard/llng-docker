@@ -20,9 +20,14 @@ ENV \
 
 RUN apk update && \
     apk upgrade && \
-    apk add perl-io-socket-ssl perl-json perl-json-xs perl-protocol-websocket perl-uri && \
+    apk add perl-io-socket-ssl \
+            perl-json \
+	    perl-json-xs \
+	    perl-regexp-common \
+	    perl-uri \
+	    perl-protocol-websocket && \
     apk cache clean --purge
 
-COPY pubsubWebServer /usr/share/lemonldap-ng/bin/pubsubWebServer
+COPY llng-pubsub-server /usr/share/lemonldap-ng/bin/llng-pubsub-server
 
-CMD ["/usr/share/lemonldap-ng/bin/pubsubWebServer"]
+CMD ["/usr/share/lemonldap-ng/bin/llng-pubsub-server"]

@@ -195,7 +195,7 @@ jobs:
             yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-hiperf
             yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-hiperf
 
-  build-and-push-webpubsub:
+  build-and-push-pubsub-server:
     needs: test
     runs-on: ubuntu-latest
     steps:
@@ -217,25 +217,25 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: yadd/lemonldap-ng-webpubsub
-      - name: Build and push Docker image for webpubsub
+          images: yadd/lemonldap-ng-pubsub-server
+      - name: Build and push Docker image for llng pubsub server
         uses: docker/build-push-action@v4
         with:
           context: ./webpubsub
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
-            yadd/lemonldap-ng-webpubsub:latest
-            yadd/lemonldap-ng-webpubsub:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-webpubsub:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
-            yadd/lemonldap-ng-webpubsub:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
+            yadd/lemonldap-ng-pubsub-server:latest
+            yadd/lemonldap-ng-pubsub-server:${{ steps.date.outputs.date }}
+            yadd/lemonldap-ng-pubsub-server:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
+            yadd/lemonldap-ng-pubsub-server:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
       - name: push README to Dockerhub
         uses: christian-korneck/update-container-description-action@v1
         env:
           DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASS: ${{ secrets.DOCKER_PASSWORD }}
         with:
-          destination_container_repo: yadd/lemonldap-ng-webpubsub
+          destination_container_repo: yadd/lemonldap-ng-pubsub-server
           provider: dockerhub
           short_description: 'LemonLDAP::NG maintenance tasks runner'
           readme_file: 'webpubsub/README.md'

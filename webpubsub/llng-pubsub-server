@@ -7,20 +7,29 @@ use JSON;
 use POSIX qw(strftime setsid setuid setgid);
 use Protocol::WebSocket::Handshake::Server;
 use Protocol::WebSocket::Frame;
-use Socket;
+use Regexp::Common qw(net);
+use Socket
+  qw(AF_INET AF_INET6 inet_ntop unpack_sockaddr_in unpack_sockaddr_in6);
 use URI;
 
 # 1. Parse options
 
-my ( $accessLog, $addr, $cert, $daemon, $_debug, $group, $help, $key,
-    $maxRequestSize, $maxRequestTime, $quiet, $pidFile, $port, $token, $user );
+my (
+    $accessLog,      $addr,           $cert,          $daemon,
+    $_debug,         $group,          $help,          $key,
+    $maxRequestSize, $maxRequestTime, $maxRestarts,   $quiet,
+    $pidFile,        $port,           $restartWindow, $token,
+    $user,
+);
 
 # HTTP header separator
 use constant HS => qr/(?:\r?\n){2}/;
 
+my @CMDLINE = @ARGV;
+
 GetOptions(
     'access-log=s'       => \$accessLog,
-    'addr|a=s'           => \$addr,
+    'addr|a=s@'          => \$addr,
     'cert=s'             => \$cert,
     'daemon'             => \$daemon,
     'debug|d'            => \$_debug,
@@ -29,15 +38,17 @@ GetOptions(
     'key=s'              => \$key,
     'max-request-size=s' => \$maxRequestSize,
     'max-request-time=s' => \$maxRequestTime,
+    'max-restarts'       => \$maxRestarts,
     'quiet|q'            => \$quiet,
     'pid-file=s'         => \$pidFile,
     'port|p=s'           => \$port,
+    'restart-window'     => \$restartWindow,
     'token=s'            => \$token,
     'user|u=s'           => \$user,
 );
 
 $accessLog      ||= $ENV{PUBSUB_ACCESS_LOG};
-$addr           ||= $ENV{PUBSUB_ADDR};
+$addr           ||= [ split( /\s+/, $ENV{PUBSUB_ADDR} ) ];
 $cert           ||= $ENV{PUBSUB_CERT};
 $daemon         ||= $ENV{PUBSUB_DAEMON};
 $_debug         ||= $ENV{PUBSUB_DEBUG};
@@ -45,8 +56,10 @@ $group          ||= $ENV{PUBSUB_GROUP};
 $key            ||= $ENV{PUBSUB_KEY};
 $maxRequestSize ||= $ENV{PUBSUB_MAX_REQUEST_SIZE} || 8192;
 $maxRequestTime ||= $ENV{PUBSUB_MAX_REQUEST_TIME} || 5;
+$maxRestarts    ||= $ENV{PUBSUB_MAX_RESTARTS}     || 5;
 $pidFile        ||= $ENV{PUBSUB_PID_FILE};
 $quiet          ||= $ENV{PUBSUB_QUIET};
+$restartWindow  ||= $ENV{PUBSUB_RESTART_WINDOW} || 60;
 $token          ||= $ENV{PUBSUB_TOKEN};
 $user           ||= $ENV{PUBSUB_USER};
 
@@ -88,6 +101,7 @@ if ( $accessLog and $accessLog ne '-' and $accessLog ne 'STDERR' ) {
     open STDOUT, '>>', $accessLog or die "Unable to write logs: $!";
     if ($daemon) {
         open STDERR, '>&', fileno(STDOUT) or die "Can't dup STDERR: $!";
+        STDERR->autoflush(1);
     }
 }
 
@@ -100,35 +114,59 @@ unless ($token) {
       unless $quiet;
 }
 
-$port ||=
-  ( $addr and $addr =~ /:/ )
-  ? undef
-  : ( $ENV{PUBSUB_PORT} || ( $cert ? 8443 : 8080 ) );
-
 # 2. Create server
 
-my $server;
-my %args = (
-    ( $addr ? ( LocalAddr => $addr ) : () ),
-    ( $port ? ( LocalPort => $port ) : () ),
-    Listen => 10,
-    Reuse  => 1,
-);
-if ($cert) {
-    require IO::Socket::SSL;
-    $server = IO::Socket::SSL->new(
-        %args,
-        SSL_cert_file => $cert,
-        SSL_key_file  => $key,
-        SSL_server    => 1,
-    );
-}
-else {
-    require IO::Socket::INET;
-    $server = IO::Socket::INET->new( %args, Proto => 'tcp', );
-}
+my @servers;
+my $selector = IO::Select->new;
+$addr = [0] unless @$addr;
 
-die "Cannot create socket: $!" unless $server;
+foreach my $a (@$addr) {
+    my $server;
+    my $p;
+
+    # IPv6 addresses with port
+    if ( $a =~ s/^\s*\[($RE{net}{IPv6})\]:(\d+)\s*$/$1/ ) {
+        $p = $2;
+    }
+    elsif ( $a =~ s/^\s*($RE{net}{IPv4}):(\d+)\s*$/$1/ ) {
+        $p = $2;
+    }
+    elsif ( $a and $a !~ s/^\s*\[?($RE{net}{IPv4}|$RE{net}{IPv6})\]?\s*/$1/ ) {
+        die qq'Malformed IP address "$a"';
+    }
+    else {
+        $p = $port || ( $ENV{PUBSUB_PORT} || ( $cert ? 8443 : 8080 ) );
+    }
+
+    my %args = (
+        ( $a ? ( LocalAddr => $a ) : () ),
+        LocalPort => $p,
+        Listen    => 10,
+        ReuseAddr => 1,
+        ReusePort => 1,
+    );
+    if ($cert) {
+        require IO::Socket::SSL;
+        $server = IO::Socket::SSL->new(
+            %args,
+            SSL_cert_file => $cert,
+            SSL_key_file  => $key,
+            SSL_server    => 1,
+        );
+    }
+    else {
+        require IO::Socket::IP;
+        $server = IO::Socket::IP->new( %args, Proto => 'tcp', );
+    }
+
+    die "Cannot create socket ("
+      . ( $a ? "address: $a, " : '' )
+      . "port: $p): $!"
+      unless $server;
+
+    $selector->add($server);
+    push @servers, $server;
+}
 
 if ($group) {
     my $grp = getgrnam($group) or die "Can't change gid to $group";
@@ -140,10 +178,7 @@ if ($user) {
     setuid($uid)              or die "setuid: $!";
 }
 
-my $json     = JSON->new->utf8;
-my $selector = IO::Select->new;
-
-$selector->add($server);
+my $json = JSON->new->utf8;
 
 # 3. Manage requests
 
@@ -151,7 +186,8 @@ my %clients;
 
 while (1) {
     for my $sock ( $selector->can_read(0.1) ) {
-        if ( $sock == $server ) {
+        my ($server) = grep { $sock eq $_ } @servers;
+        if ($server) {
             my $client = $server->accept or next;
             $client->autoflush(1);
             $selector->add($client);
@@ -324,16 +360,27 @@ sub cleanupClient {
 }
 
 sub getIp {
-    my ($sock) = @_;
-    my $peer = getpeername($sock);
-    my ( $port, $iaddr ) = sockaddr_in($peer);
-    return inet_ntoa($iaddr);
+    my ($sock)   = @_;
+    my $peer     = getpeername($sock);
+    my ($family) = unpack( 'S', $peer );
+    if ( $family == AF_INET ) {
+        my ( $port, $addr ) = unpack_sockaddr_in($peer);
+        return inet_ntop( AF_INET, $addr );
+    }
+    else {
+        my ( $port, $addr ) = unpack_sockaddr_in6($peer);
+        return inet_ntop( AF_INET6, $addr );
+    }
 }
 
 sub daemonize {
-    open STDIN,  '<', '/dev/null' or die "Can't read /dev/null: $!";
-    open STDOUT, '>', '/dev/null' or die "Can't write to /dev/null: $!";
-    open STDERR, '>', '/dev/null' or die "Can't write to /dev/null: $!";
+    open STDIN, '<', '/dev/null' or die "Can't read /dev/null: $!";
+    unless ( $accessLog eq '-' ) {
+        open STDOUT, '>', '/dev/null' or die "Can't write to /dev/null: $!";
+    }
+    unless ( $accessLog eq 'STDERR' ) {
+        open STDERR, '>', '/dev/null' or die "Can't write to /dev/null: $!";
+    }
 
     defined( my $pid = fork ) or die "Can't fork: $!";
     exit if $pid;
@@ -349,12 +396,46 @@ sub daemonize {
         open my $fh, '>', $pidFile or die "Can't write $pidFile: $!";
         print $fh "$$\n";
         close $fh;
-        debug "Pid written ($$)";
-        debug `cat $pidFile`;
+        debug "Master pid written ($$)";
     }
     else {
-        debug "Pid is $$";
+        debug "Master pid is $$";
     }
+    system "echo $0 > /tmp/cmdline";
+    $0 = join ' ', $0, @CMDLINE;
+
+    my $cpid;
+
+    # Master process code (relaunch webserver in case of failure)
+    if ( $cpid = fork ) {
+        $| = 1;
+        my @restartTimes;
+        my $term;
+        $SIG{CHLD} = 'DEFAULT';
+        $SIG{TERM} = sub {
+            kill 'TERM', $cpid;
+            waitpid( $cpid, 0 );
+            exit 0;
+        };
+        while (1) {
+            my $endedPid   = waitpid( $cpid, 0 );
+            my $exitStatus = $? >> 8;
+            print STDERR "Server $endedPid ended with status $exitStatus\n";
+            @restartTimes = grep { time() - $_ < $restartWindow } @restartTimes;
+            print STDERR "@restartTimes >= $maxRestarts\n";
+            if ( @restartTimes >= $maxRestarts ) {
+                print STDERR "Too many failures in $restartWindow, aborting\n";
+                exit 1;
+            }
+            sleep 1;
+            last unless $cpid = fork;
+            push @restartTimes, time;
+        }
+    }
+    die $! unless defined $cpid;
+
+    # Don't propagate 'TERM' signal to master
+    setpgrp( 0, 0 );
 }
 
 __END__
@@ -363,11 +444,11 @@ __END__
 
 =head1 NAME
 
-pubsubWebServer - Pub/Sub server based on websockets
+llng-pubsub-server - Pub/Sub server based on websockets
 
 =head1 SYNOPSIS
 
-  pubsubWebServer <option>
+  llng-pubsub-server <option>
 
 Simple client using L<wscat|https://github.com/websockets/wscat>
 
@@ -381,7 +462,7 @@ Note that "channel" is required.
 
 =head1 DESCRIPTION
 
-B<pubsubWebServer> is a web-based pub/sub server designed for L<LemonLDAP::NG|https://lemonldap-ng.org>.
+B<llng-pubsub-server> is a web-based pub/sub server designed for L<LemonLDAP::NG|https://lemonldap-ng.org>.
 
 =head2 Options
 
@@ -405,7 +486,16 @@ Environment variable: B<PUBSUB_TOKEN>
 
 Port to listen to.
 
+See L</"IPv4-IPv6 SUPPORT">.
+
 Environment variable: B<PUBSUB_PORT>
+
+=item * B<--addr E<lt>valueE<gt>> I<(default: all IPv4 interfaces)>
+
+Adresse(s) to listen to, can be multi-valued and accept an optional port.
+See L</"IPv4-IPv6 SUPPORT">.
+
+Environment variable: B<PUBSUB_ADDR> I<(space-separated list)>
 
 =item * B<--cert E<lt>valueE<gt>>
 
@@ -418,12 +508,6 @@ Environment variable: B<PUBSUB_CERT>
 Optional server TLS key.
 
 Environment variable: B<PUBSUB_KEY>
-
-=item * B<--addr E<lt>valueE<gt>> I<(default: all interfaces)>
-
-Adresse to listen to. Accepts also port value: C<--addr localhost:7654>
-
-Environment variable: B<PUBSUB_ADDR>
 
 =item * B<--max-request-size E<lt>valueE<gt>> I<(default: 8192)>
 
@@ -466,6 +550,18 @@ Environment variable: B<PUBSUB_USER>
 Change gid to the given value after opening socket.
 
 Environment variable: B<PUBSUB_GROUP>
+
+=item * B<--max-restarts> E<lt>valueE<gt>> I<(default: 5)>
+
+Max failure accepted in the B<--restart-window> delay.
+
+Environment variable: B<PUBSUB_MAX_RESTARTS>
+
+=item * B<restart-window> E<lt>valueE<gt>> I<(default: 60)>
+
+Delay for B<--max-restarts>
+
+Environment variable: B<PUBSUB_RESTART_WINDOW>
 
 =back
 
@@ -550,6 +646,39 @@ I<(the channel where the message will be published)>
 Comma separated list of channels to subscribe to.
 
 =back
+
+=back
+
+=head1 IPv4-IPv6 SUPPORT
+
+By default this server listen to all IPv4 addresses. To listen in the same time
+to all IPv4/IPv6 addresses, use
+
+  --addr :: --addr 0.0.0.0
+
+The B<--addr> option accepts also a port value. If port is not set, the
+B<--port> will be used. Examples:
+
+=over
+
+=item * B<IPv4 address>: C<--addr 1.2.3.4>
+
+=item * B<IPv4 address with port 7654>: C<--addr 1.2.3.4:7654>
+
+=item * B<All IPv4 addresses>: C<--addr 0.0.0.0>
+
+=item * B<All IPv4 addresses with port 8080>: C<--addr 0.0.0.0:8080>
+
+=item * B<IPv6 address>: C<--addr fe80::1>
+
+=item * B<IPv6 address with port 8080>: C<--addr '[::1]:8080'>
+
+=item * B<All IPv6 addresses>: C<--addr ::>
+
+=item * B<All IPv6 addresses with port 7654>: C<--addr '[::]:7654'>
+
+=item * B<All IPv6 addresses with port 7654 and one IPv4 address with default port set to 8081>:
+C<--addr '[::]:7654' --addr 1.2.3.4 --port 8081>
 
 =back
 
