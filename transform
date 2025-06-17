@@ -8,6 +8,7 @@ my $ra = Regexp::Assemble->new(
 );
 
 our @ignore = qw(
+Makefile
 MANIFEST
 Common/Conf/Constants\.pm
 Common/Conf/ReConstants\.pm

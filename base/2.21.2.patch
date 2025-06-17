@@ -1,0 +1,12 @@
+--- a/usr/share/perl5/Lemonldap/NG/Common/Apache/Session.pm
++++ b/usr/share/perl5/Lemonldap/NG/Common/Apache/Session.pm
+@@ -242,7 +243,8 @@ sub _dbiGKFAS {
+     my $dbh =
+       DBI->connect( $args->{DataSource}, $args->{UserName}, $args->{Password} )
+       or die("$!$@");
+-    my $sth = $dbh->prepare('SELECT id,a_session from sessions');
++    my $sth = $dbh->prepare(
++        'SELECT id,a_session from ' . ( $args->{TableName} || 'sessions' ) );
+     $sth->execute;
+     my %res;
+     while ( my @row = $sth->fetchrow_array ) {
