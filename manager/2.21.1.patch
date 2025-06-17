@@ -1,0 +1,547 @@
+--- a/usr/share/lemonldap-ng/bin/lemonldap-ng-cli
++++ b/usr/share/lemonldap-ng/bin/lemonldap-ng-cli
+@@ -18,6 +18,8 @@ my $action;
+ eval {
+     POSIX::setgid( scalar( getgrnam($opt_group) ) );
+     POSIX::setuid( scalar( getpwnam($opt_user) ) );
++    my (undef, undef, undef, undef, undef, undef, undef, $homedir, undef) = getpwnam($opt_user);
++    $ENV{HOME} = $homedir if $homedir;
+ };
+ 
+ for ( my $i = 0 ; $i < @ARGV ; $i++ ) {
+--- a/usr/share/perl5/Lemonldap/NG/Manager.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager.pm
+@@ -17,7 +17,7 @@ use JSON;
+ use Lemonldap::NG::Common::Conf::Constants;
+ use Lemonldap::NG::Common::PSGI::Constants;
+ 
+-our $VERSION = '2.21.0';
++our $VERSION = '2.21.1';
+ 
+ extends qw(
+   Lemonldap::NG::Handler::PSGI::Router
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
+@@ -1463,7 +1463,7 @@ sub attributes {
+         },
+         lwpSslOpts => {
+             type          => 'keyTextContainer',
+-            documentation => 'SSL options passed to LWP::UserAgent',
++            documentation => 'TLS/SSL options passed to LWP::UserAgent',
+         },
+ 
+         # CrowdSec plugin
+@@ -3800,7 +3800,7 @@ sub attributes {
+                 { k => 'PAM',         v => 'PAM' },
+                 { k => 'Radius',      v => 'Radius' },
+                 { k => 'REST',        v => 'REST' },
+-                { k => 'SSL',         v => 'SSL' },
++                { k => 'SSL',         v => 'mTLS' },
+                 { k => 'Twitter',     v => 'Twitter' },
+                 { k => 'WebID',       v => 'WebID (deprecated)' },
+                 { k => 'WebAuthn',    v => 'WebAuthn' },
+@@ -4163,7 +4163,7 @@ m{^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
+         SSLAuthnLevel => {
+             type          => 'int',
+             default       => 5,
+-            documentation => 'SSL authentication level',
++            documentation => 'Mutual TLS authentication level',
+         },
+         SSLVar => {
+             type    => 'text',
+@@ -4181,11 +4181,11 @@ m{^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
+         sslByAjax => {
+             type          => 'bool',
+             default       => 0,
+-            documentation => 'Use Ajax request for SSL',
++            documentation => 'Use Ajax request for Mutual TLS Authentication',
+         },
+         sslHost => {
+             type          => 'url',
+-            documentation => 'URL for SSL Ajax request',
++            documentation => 'URL for Mutual TLS Authentication Ajax request',
+         },
+ 
+         # CAS
+@@ -4619,7 +4619,7 @@ m{^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
+                     { k => 'Remote',        v => 'Remote' },
+                     { k => 'SAML',          v => 'SAML v2' },
+                     { k => 'Slave',         v => 'Slave' },
+-                    { k => 'SSL',           v => 'SSL' },
++                    { k => 'SSL',           v => 'mTLS' },
+                     { k => 'Twitter',       v => 'Twitter' },
+                     { k => 'WebID',         v => 'WebID (deprecated)' },
+                     { k => 'WebAuthn',      v => 'WebAuthn' },
+@@ -4682,7 +4682,7 @@ m{^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
+                 { k => 'PAM',      v => 'PAM' },
+                 { k => 'Radius',   v => 'Radius' },
+                 { k => 'REST',     v => 'REST' },
+-                { k => 'SSL',      v => 'SSL' },
++                { k => 'SSL',      v => 'mTLS' },
+                 { k => 'Twitter',  v => 'Twitter' },
+                 { k => 'WebID',    v => 'WebID (deprecated)' },
+                 { k => 'WebAuthn', v => 'WebAuthn' },
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/CTrees.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/CTrees.pm
+@@ -347,6 +347,7 @@ sub cTrees {
+                     'casSrvMetaDataOptionsUrl',
+                     'casSrvMetaDataOptionsRenew',
+                     'casSrvMetaDataOptionsGateway',
++                    'casSrvMetaDataOptionsSamlValidate',
+                     'casSrvMetaDataOptionsComment'
+                 ]
+             },
+@@ -371,7 +372,6 @@ sub cTrees {
+                     'casAppMetaDataOptionsService',
+                     'casAppMetaDataOptionsUserAttribute',
+                     'casAppMetaDataOptionsAllowProxy',
+-                    'casSrvMetaDataOptionsSamlValidate',
+                     'casAppMetaDataOptionsLogout',
+                     'casAppMetaDataOptionsAuthnLevel',
+                     'casAppMetaDataOptionsRule',
+--- a/usr/share/lemonldap-ng/bin/lmConfigEditor
++++ b/usr/share/lemonldap-ng/bin/lmConfigEditor
+@@ -29,6 +29,8 @@ GetOptions(
+ eval {
+     setgid( ( getgrnam($opt_group) )[2] );
+     setuid( ( getpwnam($opt_user) )[2] );
++    my (undef, undef, undef, undef, undef, undef, undef, $homedir, undef) = getpwnam($opt_user);
++    $ENV{HOME} = $homedir if $homedir;
+     print STDERR "Running as uid $EUID and gid $EGID\n";
+ };
+ 
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json
+@@ -227,7 +227,7 @@
+ "checkUserIdRule":"Identities use rule",
+ "checkUserSearchAttributes":"Attributes used for searching sessions",
+ "checkUserUnrestrictedUsersRule":"Unrestricted users rule",
+-"checkUsers":"Check user SSO profile",
++"checkUsers":"التحقق من ملف تعريف SSO للمستخدم ",
+ "checkXSS":"تحقق من هجمات XSS",
+ "checkboxes":"Checkboxes",
+ "choiceParams":"اختيارالإعدادات",
+@@ -273,7 +273,7 @@
+ "create":"أحدث",
+ "crossOrigineResourceSharing":"Cross-Origin Resource Sharing",
+ "crowdsec":"تفعيل",
+-"crowdsecAction":"Action",
++"crowdsecAction":"إجراء",
+ "crowdsecIgnoreFailures":"Ignore Crowdsec failures",
+ "crowdsecKey":"مفتاح أل API",
+ "crowdsecUrl":"Base URL of local API",
+@@ -336,7 +336,7 @@
+ "demoParams":"إثبات المعايير",
+ "description":"التفاصيل",
+ "dest":"Recipient",
+-"devOpsCheck":"Check DevOps handler file",
++"devOpsCheck":"التحقق من ملف DevOps",
+ "diffViewer":"المشاهد المختلف",
+ "diffWithPrevious":"الفرق مع السابق",
+ "disablePersistentStorage":"Disable storage",
+@@ -405,7 +405,7 @@
+ "githubParams":"GitHub Parameters",
+ "githubScope":"نطاق",
+ "githubUserField":"Field containing user identifier",
+-"globalLogout":"Global logout",
++"globalLogout":"تسجيل خروج عالمي",
+ "globalLogoutCustomParam":"Custom parameter",
+ "globalLogoutRule":"تفعيل",
+ "globalLogoutTimer":"قبول تلقائي للوقت",
+@@ -572,7 +572,8 @@
+ "logout":"تسجيل الخروج",
+ "logoutServices":"تسجيل الخروج الأمامي",
+ "lwpOpts":"خيارات لطلبات الخادم",
+-"lwpSslOpts":"خيارات سسل لطلبات الخادم",
++"lwpSslOpts":"TLS/SSL options for server requests",
++"mTLS":"Mutual TLS authentication",
+ "macros":"ماكرو",
+ "mail2f":"Mail second factor",
+ "mail2fActivation":"تفعيل",
+@@ -689,7 +690,7 @@
+ "offlineSessions":"Offline sessions",
+ "oidcAttribute":"خاصيات OIDC",
+ "oidcAuthnLevel":"مستوى إثبات الهوية",
+-"oidcConsents":"OpenID Connect consents",
++"oidcConsents":"موافقات OpenID Connect",
+ "oidcDropCspHeaders":"Drop CSP headers from OIDC responses",
+ "oidcOP":" أوبين أيدي كونيكت بروفيدر",
+ "oidcOPMetaDataExportedVars":"السمات المصدرة",
+@@ -937,7 +938,7 @@
+ "portalDisplayGeneratePassword":"Display generate password box",
+ "portalDisplayLoginHistory":"سجل تسجيل الدخول",
+ "portalDisplayLogout":"تسجيل الخروج",
+-"portalDisplayOidcConsents":"OIDC consents",
++"portalDisplayOidcConsents":"موافقات OIDC",
+ "portalDisplayOrder":"Display order",
+ "portalDisplayPasswordPolicy":"Display policy in password form",
+ "portalDisplayRefreshMyRights":"Display rights refresh link",
+@@ -1281,8 +1282,8 @@
+ "soapSessionServer":"Session server",
+ "specialRule":"قاعدة خاصة",
+ "sslByAjax":"استخدام طلب أجاكس",
+-"sslHost":"أجاكس سسل يو آر إل",
+-"sslParams":"معايير س س ل ",
++"sslHost":"Ajax mTLS URL",
++"sslParams":"mTLS parameters",
+ "ssoSessions":"جلسات السسو",
+ "stateCheck":"Check state",
+ "stayConnect":"Trusted browser",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json
+@@ -572,7 +572,8 @@
+ "logout":"Logout",
+ "logoutServices":"Logout forward",
+ "lwpOpts":"Options for server requests",
+-"lwpSslOpts":"SSL options for server requests",
++"lwpSslOpts":"TLS/SSL options for server requests",
++"mTLS":"Mutual TLS authentication",
+ "macros":"Macros",
+ "mail2f":"Mail second factor",
+ "mail2fActivation":"Activation",
+@@ -1281,8 +1282,8 @@
+ "soapSessionServer":"Session server",
+ "specialRule":"Special rule",
+ "sslByAjax":"Use Ajax request",
+-"sslHost":"Ajax SSL URL",
+-"sslParams":"SSL parameters",
++"sslHost":"Ajax mTLS URL",
++"sslParams":"mTLS parameters",
+ "ssoSessions":"SSO sessions",
+ "stateCheck":"Check state",
+ "stayConnect":"Trusted browser",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json
+@@ -7,7 +7,7 @@
+ "AuthLDAPFilter":"Filtro de autentificación",
+ "Configuration":"Configuración",
+ "CrowdSecPlugin":"CrowdSec Bouncer",
+-"Entropycheck":"Check password entropy",
++"Entropycheck":"Verificar la entropía de la contraseña ",
+ "HIBPcheck":"Check HIBP API",
+ "LDAPFilter":"Filtro por defecto",
+ "OpenIDConnect":"OpenID Connect",
+@@ -48,25 +48,25 @@
+ "_user":"Conexión",
+ "_userDB":"Usuario",
+ "_utime":"Sello de tiempo de la sesión",
+-"activationrule":"Activation rule",
++"activationrule":"Regla de activación ",
+ "activeTimer":"Hora de autoaceptación",
+ "actives":"Habilitado",
+ "adParams":"Parámetros del Directorio Activo",
+-"adaptativeAuthenticationLevelRules":"Adaptative authentication rules",
++"adaptativeAuthenticationLevelRules":"Reglas de autentificación adaptativas ",
+ "addAppCasPartner":"Añadir aplicación CAS",
+ "addIDPSamlPartner":"Añadir IDP SAML",
+ "addOidcAttribute":"Añadir atributo",
+ "addOidcOp":"Añadir OpenID Connect Provider",
+-"addOidcRp":"Add OpenID Connect Relying Party",
+-"addSPSamlPartner":"Add SAML SP",
++"addOidcRp":"Agregar OpenID Connect Relying Party",
++"addSPSamlPartner":"Agregar SAML SP",
+ "addSamlAttribute":"Añadir atributo",
+ "addSrvCasPartner":"Añadir servidor CAS",
+ "addTOTPKey":"Añadir clave TOTP",
+ "addVhost":"Añadir virtualhost",
+ "advancedParams":"Parámetros avanzados",
+-"algorithms":"Algorithms",
++"algorithms":"Algoritmos ",
+ "allowedMarkups":"Marcas permitidas:",
+-"always":"Always",
++"always":"Siempre",
+ "apacheAuthnLevel":"Nivel de autentificación",
+ "apacheParams":"Parámetros Apache",
+ "api":"API",
+@@ -76,14 +76,14 @@
+ "applicationList":"Categorías y aplicaciones",
+ "applyResult":"Resultado de la solicitud",
+ "appsInThisCat":"Aplicaciones en esta categoría",
+-"array":"Array",
++"array":"Matriz",
+ "attributeName":"Attribute name",
+ "attributesAndMacros":"Atributos y Macros",
+ "authAndUserdb":"Authz and user DB",
+ "authChain":"Cadena de autentificación",
+ "authChoice":"Opción de autentificación",
+-"authChoiceAuthBasic":"Choice used for password authentication",
+-"authChoiceFindUser":"Choice used for searching user account",
++"authChoiceAuthBasic":"Opción utilizada para autentificarse vía la contraseña ",
++"authChoiceFindUser":"Opción utilizada para buscar la cuenta del usuario ",
+ "authChoiceModules":"Módulos permitidos",
+ "authChoiceParam":"Parámetro URL",
+ "authChoiceSelectOnly":"Auto-select only method",
+@@ -572,7 +572,8 @@
+ "logout":"Desconexión",
+ "logoutServices":"Logout forward",
+ "lwpOpts":"Opciones para solicitudes de servidor",
+-"lwpSslOpts":"Opciones SSL para solicitudes de servidor",
++"lwpSslOpts":"TLS/SSL options for server requests",
++"mTLS":"Mutual TLS authentication",
+ "macros":"Macros",
+ "mail2f":"Correo segundo factor",
+ "mail2fActivation":"Activación",
+@@ -1281,8 +1282,8 @@
+ "soapSessionServer":"Session server",
+ "specialRule":"Regla especial",
+ "sslByAjax":"Usar solicitud Ajax",
+-"sslHost":"URL SSL Ajax",
+-"sslParams":"Parámetros SSL",
++"sslHost":"Ajax mTLS URL",
++"sslParams":"mTLS parameters",
+ "ssoSessions":"Sesiones SSO",
+ "stateCheck":"Check state",
+ "stayConnect":"Trusted browser",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json
+@@ -572,7 +572,8 @@
+ "logout":"Déconnexion",
+ "logoutServices":"Transfert de la déconnexion",
+ "lwpOpts":"Options pour les requêtes serveur",
+-"lwpSslOpts":"Options SSL pour les requêtes serveur",
++"lwpSslOpts":"Options TLS/SSL pour les requêtes serveur",
++"mTLS":"Authentification mutuelle par TLS",
+ "macros":"Macros",
+ "mail2f":"Second facteur par mail",
+ "mail2fActivation":"Activation",
+@@ -1281,8 +1282,8 @@
+ "soapSessionServer":"Serveur de sessions",
+ "specialRule":"Règle spécifique",
+ "sslByAjax":"Utiliser une requête Ajax",
+-"sslHost":"URL SSL pour Ajax",
+-"sslParams":"Paramètres SSL",
++"sslHost":"URL mTLS pour Ajax",
++"sslParams":"Paramètres mTLS",
+ "ssoSessions":"Sessions SSO",
+ "stateCheck":"Vérification de l'état",
+ "stayConnect":"Navigateur de confiance",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json
+@@ -572,7 +572,8 @@
+ "logout":"יציאה",
+ "logoutServices":"Logout forward",
+ "lwpOpts":"אפשרויות לבקשות שרת",
+-"lwpSslOpts":"אפשרויות SSL לבקשות שרת",
++"lwpSslOpts":"TLS/SSL options for server requests",
++"mTLS":"Mutual TLS authentication",
+ "macros":"תסריטי מאקרו",
+ "mail2f":"Mail second factor",
+ "mail2fActivation":"הפעלה",
+@@ -1281,8 +1282,8 @@
+ "soapSessionServer":"שרת הפעלה",
+ "specialRule":"כלל מיוחד",
+ "sslByAjax":"להשתמש בבקשת Ajax",
+-"sslHost":"Ajax SSL URL",
+-"sslParams":"משתני SSL",
++"sslHost":"Ajax mTLS URL",
++"sslParams":"mTLS parameters",
+ "ssoSessions":"SSO sessions",
+ "stateCheck":"Check state",
+ "stayConnect":"Trusted browser",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json
+@@ -572,7 +572,8 @@
+ "logout":"Logout",
+ "logoutServices":"Trasmissione logout",
+ "lwpOpts":"Opzioni per le richieste del server",
+-"lwpSslOpts":"Opzioni SSL per le richieste del server",
++"lwpSslOpts":"TLS/SSL options for server requests",
++"mTLS":"Mutual TLS authentication",
+ "macros":"Macro",
+ "mail2f":"Mail secondo fattore",
+ "mail2fActivation":"Attivazione",
+@@ -1281,8 +1282,8 @@
+ "soapSessionServer":"Session server",
+ "specialRule":"Regola speciale",
+ "sslByAjax":"Utilizzare la richiesta Ajax",
+-"sslHost":"URL di Ajax SSL",
+-"sslParams":"Parametri SSL",
++"sslHost":"Ajax mTLS URL",
++"sslParams":"mTLS parameters",
+ "ssoSessions":"Sessioni SSO",
+ "stateCheck":"Check state",
+ "stayConnect":"Trusted browser",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json
+@@ -572,7 +572,8 @@
+ "logout":"Wyloguj",
+ "logoutServices":"Przekazywanie wylogowania",
+ "lwpOpts":"Opcje żądań serwera",
+-"lwpSslOpts":"Opcje SSL dla żądań serwera",
++"lwpSslOpts":"TLS/SSL options for server requests",
++"mTLS":"Mutual TLS authentication",
+ "macros":"Makra",
+ "mail2f":"Drugi czynnik e-mail",
+ "mail2fActivation":"Aktywacja",
+@@ -1281,8 +1282,8 @@
+ "soapSessionServer":"Serwer sesji",
+ "specialRule":"Reguła specjalna",
+ "sslByAjax":"Użyj żądania Ajax",
+-"sslHost":"Ajax SSL URL",
+-"sslParams":"Parametry SSL",
++"sslHost":"Ajax mTLS URL",
++"sslParams":"mTLS parameters",
+ "ssoSessions":"Sesje jednokrotnego logowania",
+ "stateCheck":"Sprawdź stan",
+ "stayConnect":"Zaufana przeglądarka",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json
+@@ -572,7 +572,8 @@
+ "logout":"Sair",
+ "logoutServices":"Encaminhamento do Logout",
+ "lwpOpts":"Opções para requisições ao servidor",
+-"lwpSslOpts":"Opções SSL para as requisições ao servidor",
++"lwpSslOpts":"TLS/SSL options for server requests",
++"mTLS":"Mutual TLS authentication",
+ "macros":"Macros",
+ "mail2f":"Segundo fator por correio",
+ "mail2fActivation":"Ativação",
+@@ -1281,8 +1282,8 @@
+ "soapSessionServer":"Servidor de sessão",
+ "specialRule":"Regra especial",
+ "sslByAjax":"Use requisição AJAX",
+-"sslHost":"Ajax SSL URL",
+-"sslParams":"Parâmetros SSL",
++"sslHost":"Ajax mTLS URL",
++"sslParams":"mTLS parameters",
+ "ssoSessions":"Sessões SSO",
+ "stateCheck":"Verificar situação",
+ "stayConnect":"Trusted browser",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json
+@@ -572,7 +572,8 @@
+ "logout":"Sair",
+ "logoutServices":"Encaminhamento do Logout",
+ "lwpOpts":"Opções para requisições ao servidor",
+-"lwpSslOpts":"Opções SSL para as requisições ao servidor",
++"lwpSslOpts":"TLS/SSL options for server requests",
++"mTLS":"Mutual TLS authentication",
+ "macros":"Macros",
+ "mail2f":"Segundo fator por correio",
+ "mail2fActivation":"Ativação",
+@@ -1281,8 +1282,8 @@
+ "soapSessionServer":"Servidor de sessão",
+ "specialRule":"Regra especial",
+ "sslByAjax":"Use requisição AJAX",
+-"sslHost":"Ajax SSL URL",
+-"sslParams":"Parâmetros SSL",
++"sslHost":"Ajax mTLS URL",
++"sslParams":"mTLS parameters",
+ "ssoSessions":"Sessões SSO",
+ "stateCheck":"Verificar situação",
+ "stayConnect":"Trusted browser",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json
+@@ -572,7 +572,8 @@
+ "logout":"Выход",
+ "logoutServices":"Выход из системы",
+ "lwpOpts":"Варианты запросов к серверу",
+-"lwpSslOpts":"Параметры SSL для запросов к серверу",
++"lwpSslOpts":"TLS/SSL options for server requests",
++"mTLS":"Mutual TLS authentication",
+ "macros":"Макросы",
+ "mail2f":"Второй фактор почты",
+ "mail2fActivation":"Активация",
+@@ -1281,8 +1282,8 @@
+ "soapSessionServer":"Сервер сеансов",
+ "specialRule":"Особое правило",
+ "sslByAjax":"Использовать запрос Ajax",
+-"sslHost":"Ajax SSL URL",
+-"sslParams":"Параметры SSL",
++"sslHost":"Ajax mTLS URL",
++"sslParams":"mTLS parameters",
+ "ssoSessions":"Сеансы SSO",
+ "stateCheck":"Проверить статус",
+ "stayConnect":"Trusted browser",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json
+@@ -572,7 +572,8 @@
+ "logout":"Çıkış Yap",
+ "logoutServices":"Çıkış yap",
+ "lwpOpts":"Sunucu istekleri için seçenekler",
+-"lwpSslOpts":"Sunucu istekleri için SSL seçenekleri",
++"lwpSslOpts":"TLS/SSL options for server requests",
++"mTLS":"Mutual TLS authentication",
+ "macros":"Makrolar",
+ "mail2f":"E-posta ile ikinci faktör",
+ "mail2fActivation":"Aktivasyon",
+@@ -1281,8 +1282,8 @@
+ "soapSessionServer":"Oturum sunucusu",
+ "specialRule":"Özel kural",
+ "sslByAjax":"Ajax isteği kullan",
+-"sslHost":"Ajax SSL URL",
+-"sslParams":"SSL parametreleri",
++"sslHost":"Ajax mTLS URL",
++"sslParams":"mTLS parameters",
+ "ssoSessions":"TOA oturumları",
+ "stateCheck":"Durum kontrolü",
+ "stayConnect":"Güvenilir tarayıcı",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json
+@@ -572,7 +572,8 @@
+ "logout":"Đăng xuất",
+ "logoutServices":"Chuyển tiếp đăng xuất",
+ "lwpOpts":"Tùy chọn cho yêu cầu máy chủ",
+-"lwpSslOpts":"Tùy chọn SSL cho yêu cầu máy chủ",
++"lwpSslOpts":"TLS/SSL options for server requests",
++"mTLS":"Mutual TLS authentication",
+ "macros":"Macros",
+ "mail2f":"Thư yếu tố thứ hai",
+ "mail2fActivation":"Kích hoạt",
+@@ -1281,8 +1282,8 @@
+ "soapSessionServer":"máy chủ phiên",
+ "specialRule":"Quy tắc đặc biệt",
+ "sslByAjax":"Sử dụng yêu cầu Ajax",
+-"sslHost":"URL của Ajax SSL",
+-"sslParams":"Tham số SSL",
++"sslHost":"Ajax mTLS URL",
++"sslParams":"mTLS parameters",
+ "ssoSessions":"Phiên SSO",
+ "stateCheck":"kiểm tra trạng thái",
+ "stayConnect":"Trusted browser",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json
+@@ -572,7 +572,8 @@
+ "logout":"注销登录",
+ "logoutServices":"登出轉發",
+ "lwpOpts":"伺服器請求的選項",
+-"lwpSslOpts":"伺服器請求的 SSL 選項",
++"lwpSslOpts":"TLS/SSL options for server requests",
++"mTLS":"Mutual TLS authentication",
+ "macros":"巨集",
+ "mail2f":"郵件第二因素",
+ "mail2fActivation":"激活",
+@@ -1281,8 +1282,8 @@
+ "soapSessionServer":"Session server",
+ "specialRule":"特殊規則",
+ "sslByAjax":"使用 Ajax 請求",
+-"sslHost":"Ajax SSL URL",
+-"sslParams":"SSL 參數",
++"sslHost":"Ajax mTLS URL",
++"sslParams":"mTLS parameters",
+ "ssoSessions":"SSO 工作階段",
+ "stateCheck":"Check state",
+ "stayConnect":"Trusted browser",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json
+@@ -572,7 +572,8 @@
+ "logout":"登出",
+ "logoutServices":"登出轉發",
+ "lwpOpts":"伺服器請求的選項",
+-"lwpSslOpts":"伺服器請求的 SSL 選項",
++"lwpSslOpts":"TLS/SSL options for server requests",
++"mTLS":"Mutual TLS authentication",
+ "macros":"巨集",
+ "mail2f":"郵件第二因素",
+ "mail2fActivation":"啟用",
+@@ -1281,8 +1282,8 @@
+ "soapSessionServer":"Session server",
+ "specialRule":"特殊規則",
+ "sslByAjax":"使用 Ajax 請求",
+-"sslHost":"Ajax SSL URL",
+-"sslParams":"SSL 參數",
++"sslHost":"Ajax mTLS URL",
++"sslParams":"mTLS parameters",
+ "ssoSessions":"SSO 工作階段",
+ "stateCheck":"Check state",
+ "stayConnect":"Trusted browser",

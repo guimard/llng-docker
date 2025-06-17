@@ -1,8 +1,9 @@
 # Changes
 
-## v2.21.0-3 _(dev)_
+## v2.21.1-1 _(2025-06-17)_
 * Fix introspection patch
 * Add llng pub/sub server
+* Switch to 2.21.1 (with patch due to freeze)
 
 ## v2.21.0-2 _(2025-04-26)_
 * Fix prompt=none

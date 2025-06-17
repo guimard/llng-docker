@@ -1,3 +1,14 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal.pm
+@@ -1,7 +1,7 @@
+ # Alias for Lemonldap::NG::Portal::Main
+ package Lemonldap::NG::Portal;
+ 
+-our $VERSION = '2.21.0';
++our $VERSION = '2.21.1';
+ use Lemonldap::NG::Portal::Main;
+ use base 'Lemonldap::NG::Portal::Main';
+ 
 --- a/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
 @@ -303,7 +303,7 @@ sub run {
@@ -108,5 +119,79 @@
  sub _hasScope {
      my ( $self, $scope, $scopelist ) = @_;
      return scalar grep { $_ eq $scope } ( split /\s+/, $scopelist );
-new file mode 100644
---- /dev/null
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/Code2F.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/Code2F.pm
+@@ -117,8 +117,7 @@ sub _resend {
+             type         => $self->prefix,
+         );
+ 
+-        eval { $self->setSecurity($req) };
+-        $req->mustRedirect(1);
++        $req->noLoginDisplay(1);
+         return $self->p->do( $req, [ sub { PE_NOTOKEN } ] );
+     }
+ 
+@@ -135,7 +134,7 @@ sub _resend {
+             portal_error => portalConsts->{PE_TOKENEXPIRED},
+             type         => $self->prefix,
+         );
+-        $self->setSecurity($req);
++        $req->noLoginDisplay(1);
+         return $self->p->do( $req, [ sub { PE_TOKENEXPIRED } ] );
+     }
+ 
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
+@@ -28,7 +28,7 @@ use URI;
+ use Lemonldap::NG::Portal::Main::Constants
+   qw(PE_OK PE_REDIRECT PE_ERROR portalConsts);
+ 
+-our $VERSION = '2.21.0';
++our $VERSION = '2.21.1';
+ 
+ use constant oidcErrorLevel => {
+     server_error     => 'error',
+@@ -453,11 +453,16 @@ sub buildAuthorizationCodeAuthnRequest {
+     };
+     my $authorize_request_params = {
+         %$authorize_request_oauth2_params,
+-        ( defined $display    ? ( display    => $display )    : () ),
+-        ( defined $prompt     ? ( prompt     => $prompt )     : () ),
+-        ( $max_age            ? ( max_age    => $max_age )    : () ),
+-        ( defined $ui_locales ? ( ui_locales => $ui_locales ) : () ),
+-        ( defined $acr_values ? ( acr_values => $acr_values ) : () )
++        ( $display    ? ( display    => $display )    : () ),
++        ( $prompt     ? ( prompt     => $prompt )     : () ),
++        ( $ui_locales ? ( ui_locales => $ui_locales ) : () ),
++        (
++            defined($max_age) && length($max_age) ? ( max_age => $max_age ) : ()
++        ),
++        (
++            defined($acr_values)
++              && length($acr_values) ? ( acr_values => $acr_values ) : ()
++        )
+     };
+ 
+     # Call oidcGenerateAuthenticationRequest
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Process.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Process.pm
+@@ -468,10 +468,7 @@ sub authenticate {
+     my ( $self, $req ) = @_;
+     my $ret = $req->authResult( $self->_authentication->authenticate($req) );
+     $self->logger->debug( " -> authResult = " . $req->authResult );
+-    if ( $ret == PE_OK ) {
+-        $req->{sessionInfo}->{_lastAuthnUTime} = time();
+-        return $ret;
+-    }
++    return $ret if $ret == PE_OK;
+ 
+     # Store failed login into history
+     $req->steps( [
+@@ -492,6 +489,7 @@ sub authenticate {
+ 
+ sub setAuthSessionInfo {
+     my ( $self, $req ) = @_;
++    $req->{sessionInfo}->{_lastAuthnUTime} = time();
+     my $ret = $self->_authentication->setAuthSessionInfo($req);
+     if ( $ret == PE_OK
+         and not( defined $req->sessionInfo->{authenticationLevel} ) )

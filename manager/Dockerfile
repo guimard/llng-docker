@@ -33,6 +33,7 @@ RUN \
 	fixedLogout.patch \
 	matrix-token-exchange.patch \
         664-admin-logout.patch \
+	2.21.1.patch \
     ; do echo patch $p && patch -p1 < $p; done && \
     rm -f *.patch && \
     LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini \
