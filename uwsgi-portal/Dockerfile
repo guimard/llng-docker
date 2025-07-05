@@ -38,7 +38,6 @@ RUN set -e && for p in appgrid.patch app-scope.patch ignorepollers.patch \
     664-admin-logout.patch \
     getreftoken.patch 708-sid-in-userinfo.patch \
     717-introspection.patch 718-iat-and-nbf-in-at.patch \
-    2.21.1.patch \
     ; do echo patch $p && patch -p1 < $p; done && \
     rm -f /*.patch && \
     echo "# Install nginx configuration files" && \
