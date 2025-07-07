@@ -11,6 +11,10 @@ RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
     echo "deb http://deb.debian.org/debian" ${DEBIAN_VERSION}"-backports main" > /etc/apt/sources.list.d/backports.list && \
     apt-get -y update
 
+FROM debian-backports-updated as llng-client
+ADD https://github.com/linagora/simple-oidc-client/archive/refs/heads/master.zip /tmp
+RUN apt-get install -y zip && cd /tmp && unzip master.zip
+
 FROM debian-backports-updated
 
 ENV DEBIAN_VERSION="bookworm"
@@ -67,9 +71,12 @@ ENV SSODOMAIN=example.com \
 
 COPY *.patch /
 
+COPY --from=llng-client /tmp/simple-oidc-client-master/sh/llng /usr/local/lib
+COPY --from=llng-client /tmp/simple-oidc-client-master/sh/llng-lib.sh /usr/local/lib
+
 RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     mkdir /over && \
-    apt-get -y --no-install-recommends install procps cron \
+    apt-get -y --no-install-recommends install procps cron curl openssl jq liburi-perl \
     liblemonldap-ng-common-perl${LLNGDIST} \
     liblemonldap-ng-handler-perl${LLNGDIST} \
     libapache-session-browseable-perl${LLNGDIST} libapache-session-ldap-perl \
@@ -88,7 +95,9 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     echo "# 2.21.2.patch" && patch -p1 <2.21.2.patch && \
     perl -000 -MJSON -i -ne '$_=JSON::from_json($_);$_->{reloadUrls}={};print JSON->new->pretty->canonical->encode($_)' /var/lib/lemonldap-ng/conf/lmConf-1.json && \
     perl -i -pe 's/\r//g' /usr/share/perl5/Lemonldap/NG/Common/Conf/DefaultValues.pm && \
-    echo rm -f *.patch
+    echo rm -f *.patch && \
+    cd /usr/bin && \
+    ln -s /usr/local/lib/llng
 
 #COPY syslogopt.patch .
 #

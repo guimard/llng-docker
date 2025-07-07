@@ -2,6 +2,7 @@
 
 ## v2.21.1-2 _(dev)_
 * Rebuild with 2.21.1
+* Install llng client
 
 ## v2.21.1-1 _(2025-06-17)_
 * Fix introspection patch
