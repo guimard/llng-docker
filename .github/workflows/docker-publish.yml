@@ -51,6 +51,7 @@ jobs:
             echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
           else
             echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
+          fi
       - name: Build and push Docker image for pg
         uses: docker/build-push-action@v4
         with:
@@ -103,6 +104,7 @@ jobs:
             echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
           else
             echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
+          fi
       - name: Build and push Docker image for base
         uses: docker/build-push-action@v4
         with:
@@ -155,6 +157,7 @@ jobs:
             echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
           else
             echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
+          fi
       - name: Build and push Docker image for portal
         uses: docker/build-push-action@v4
         with:
@@ -209,6 +212,7 @@ jobs:
             echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
           else
             echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
+          fi
       - name: Build and push Docker image for portal uWSGI
         uses: docker/build-push-action@v4
         with:
@@ -253,6 +257,7 @@ jobs:
             echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
           else
             echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
+          fi
       - name: Build and push Docker image for llng pubsub server
         uses: docker/build-push-action@v4
         with:
@@ -305,6 +310,7 @@ jobs:
             echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
           else
             echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
+          fi
       - name: Build and push Docker image for cron
         uses: docker/build-push-action@v4
         with:
@@ -359,6 +365,7 @@ jobs:
             echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
           else
             echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
+          fi
       - name: Build and push Docker image for cron task
         uses: docker/build-push-action@v4
         with:
@@ -413,6 +420,7 @@ jobs:
             echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
           else
             echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
+          fi
       - name: Build and push Docker image for sessions-backup task
         uses: docker/build-push-action@v4
         with:
@@ -467,6 +475,7 @@ jobs:
             echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
           else
             echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
+          fi
       - name: Build and push Docker image for manager
         uses: docker/build-push-action@v4
         with:
@@ -521,6 +530,7 @@ jobs:
             echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
           else
             echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
+          fi
       - name: Build and push Docker image for full
         uses: docker/build-push-action@v4
         with:
@@ -575,6 +585,7 @@ jobs:
             echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
           else
             echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
+          fi
       - name: Build and push Docker image for SSOaaS FastCGI Server
         uses: docker/build-push-action@v4
         with:
@@ -625,13 +636,7 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: yadd/lemonldap-ng-dev
-      - name: Define platforms
-        id: platforms
-        run: |
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
-          else
-            echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
+          fi
       - name: Build and push Docker image for dev
         uses: docker/build-push-action@v4
         with:
@@ -672,6 +677,7 @@ jobs:
             echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
           else
             echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
+          fi
       - name: Build and push Docker image for base
         uses: docker/build-push-action@v4
         with:
@@ -714,6 +720,7 @@ jobs:
             echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
           else
             echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
+          fi
       - name: Build and push Docker image for portal
         uses: docker/build-push-action@v4
         with:
@@ -758,6 +765,7 @@ jobs:
             echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
           else
             echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
+          fi
       - name: Build and push Docker image for portal uWSGI
         uses: docker/build-push-action@v4
         with:
@@ -802,6 +810,7 @@ jobs:
             echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
           else
             echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
+          fi
       - name: Build and push Docker image for cron
         uses: docker/build-push-action@v4
         with:
@@ -846,6 +855,7 @@ jobs:
             echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
           else
             echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
+          fi
       - name: Build and push Docker image for cron-task
         uses: docker/build-push-action@v4
         with:
@@ -890,6 +900,7 @@ jobs:
             echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
           else
             echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
+          fi
       - name: Build and push Docker image for sessions-backup
         uses: docker/build-push-action@v4
         with:
@@ -934,6 +945,7 @@ jobs:
             echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
           else
             echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
+          fi
       - name: Build and push Docker image for manager
         uses: docker/build-push-action@v4
         with:
@@ -978,6 +990,7 @@ jobs:
             echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
           else
             echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
+          fi
       - name: Build and push Docker image for full
         uses: docker/build-push-action@v4
         with:
@@ -1022,6 +1035,7 @@ jobs:
             echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
           else
             echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
+          fi
       - name: Build and push Docker image for SSOaaS FastCGI Server
         uses: docker/build-push-action@v4
         with:
