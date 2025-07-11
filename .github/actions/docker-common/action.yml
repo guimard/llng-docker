@@ -36,11 +36,6 @@ runs:
         with:
           username: ${{ inputs.DOCKER_USERNAME }}
           password: ${{ inputs.DOCKER_PASSWORD }}
-      - name: Define platforms
-        id: platforms
-        shell: bash
-        run: |
-          echo "platforms=linux/amd64,platforms=linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -53,7 +48,7 @@ runs:
           build-args: |
             BASE=yadd/lemonldap-ng-base:stable${{ inputs.IMAGE_SUFFIX }}
             PORTALBASE=yadd/lemonldap-ng-portal:stable${{ inputs.IMAGE_SUFFIX }}
-          platforms: ${{ steps.platforms.outputs.platforms }}
+          platforms: linux/amd64,platforms=linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
           push: true
           tags: |
             ${{ inputs.DOCKER_IMAGE }}:stable{{ inputs.IMAGE_SUFFIX }}{{ inputs.IMAGE_SUFFIX2 }}
