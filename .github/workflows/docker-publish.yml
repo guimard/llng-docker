@@ -636,7 +636,6 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: yadd/lemonldap-ng-dev
-          fi
       - name: Build and push Docker image for dev
         uses: docker/build-push-action@v4
         with:
