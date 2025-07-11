@@ -95,7 +95,7 @@ jobs:
         with:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-          DOCKER_IMAGE:yadd/lemonldap-ng-pubsub-server
+          DOCKER_IMAGE: yadd/lemonldap-ng-pubsub-server
           DIRNAME: ./webpubsub
           SHORT_DESCRIPTION: 'LemonLDAP::NG alternative pub/sub server'
 
