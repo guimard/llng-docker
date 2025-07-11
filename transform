@@ -1,6 +1,36 @@
 #!/usr/bin/perl
 
 use strict;
+use Regexp::Assemble;
+my $ra = Regexp::Assemble->new(
+    chomp            => 1,
+    dup_warn => 1,
+);
+
+our @ignore = qw(
+Makefile
+MANIFEST
+Common/Conf/Constants\.pm
+Common/Conf/ReConstants\.pm
+Manager/Attributes\.pm
+htdocs/static/js/conftree\.
+/doc/sources
+lemonldap-ng-\w+/t
+lemonldap-ng-common/lemonldap-ng\.ini
+usr/share/lemonldap-ng/manager/htdocs/static/struct\.json
+usr/share/lemonldap-ng/portal/htdocs/static/bwr/bootstrap/
+changelog
+codemeta.json
+/debian/
+/e2e-tests/
+/META\.json
+/META\.ya?ml
+/Makefile\.PL
+/rpm/
+);
+
+$ra->add(@ignore);
+my $re = $ra->re;
 
 my $ignore = 0;
 while (<>) {
@@ -8,7 +38,9 @@ while (<>) {
     if (m#^(?:(?:\-\-\- a|\+\+\+ b)/|diff )#) {
         s#([ab])/lemonldap-ng-(?:common|handler|portal|manager)/lib#$1/usr/share/perl5#g;
         s#([ab])/lemonldap-ng-(common|handler|portal|manager)/site#$1/usr/share/lemonldap-ng/$2#g;
-        $ignore = ( m#(?:MANIFEST|Common/Conf/Constants.pm|Common/Conf/ReConstants.pm|Manager/Attributes.pm|htdocs/static/js/conftree.|/doc/sources|lemonldap-ng-\w+/t)# );
+        s#([ab])/lemonldap-ng-(common|handler|portal|manager)/scripts#$1/usr/share/lemonldap-ng/bin#g;
+        $ignore = ( $_ =~ $re );
     }
     print unless $ignore;
 }
+__END__

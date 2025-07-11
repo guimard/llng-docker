@@ -1,0 +1,825 @@
+--- /dev/null
++++ b/usr/share/perl5/Lemonldap/NG/Common/MessageBroker/Web.pm
+@@ -0,0 +1,220 @@
++package Lemonldap::NG::Common::MessageBroker::Web;
++
++use strict;
++use IO::Socket::INET;
++use IO::Socket::SSL;
++use IO::Select;
++use Lemonldap::NG::Common::FormEncode;
++use Lemonldap::NG::Common::UserAgent;
++use JSON;
++use Protocol::WebSocket::Client;
++
++our $VERSION = '2.22.0';
++
++use constant DEFAULTWS => 'localhost:8080';
++our $pr = '::MessageBroker::Web:';
++
++sub new {
++    my ( $class, $conf, $logger ) = @_;
++    my $args = $conf->{messageBrokerOptions} // {};
++    my $ssl  = '';
++    unless ( $args->{server} ) {
++        $args->{server} = DEFAULTWS;
++        $logger->info("$pr no server given");
++    }
++    elsif ( $args->{server} =~ m#^(?:(?:http|ws)(s)?://)?([^/:]+:[^/:]+)/?$# ) {
++        $args->{server} = $2;
++        $ssl = 1 if $1;
++    }
++    else {
++        $logger->error("$pr unparsable server '$args->{server}'");
++        $args->{server} = DEFAULTWS;
++    }
++    $logger->debug("$pr using server $args->{server}");
++    my $self = bless {
++        logger   => $logger,
++        server   => $args->{server},
++        messages => {},
++        ssl      => $ssl,
++        token    => $args->{token},
++        ua       => $args->{ua} || Lemonldap::NG::Common::UserAgent->new($conf),
++    }, $class;
++    $self->{ua}->env_proxy();
++    return $self;
++}
++
++sub publish {
++    my ( $self, $channel, $msg ) = @_;
++    die 'Not a hash msg' unless ref $msg eq 'HASH';
++    $msg->{channel} = $channel;
++    my $j = eval { JSON::to_json($msg) };
++    if ($@) {
++        $self->logger->error("$pr message error: $@");
++        return;
++    }
++    my $req = HTTP::Request->new(
++        POST => "http$self->{ssl}://$self->{server}/publish",
++        [
++            'Content-Length' => length($j),
++            (
++                $self->{token}
++                ? ( Authorization => "Bearer $self->{token}" )
++                : ()
++            )
++        ],
++        $j
++    );
++    my $resp = $self->ua->request($req);
++    $resp->is_success
++      ? ( $self->logger->debug("$pr publish $msg->{action}") )
++      : ( $self->logger->error( "$pr publish error: " . $resp->status_line ) );
++}
++
++sub subscribe {
++    my ( $self, $channel ) = @_;
++    return
++      if $self->{channels}
++      and $self->{channels} =~ /^(?:.*,)?$channel(?:,.*)?$/;
++    $self->{channels} =
++      $self->{channels} ? "$self->{channels},$channel" : $channel;
++    $self->{messages}{$channel} = [];
++    $self->logger->debug("$pr subscribe to $self->{channels}");
++    my $sock = $self->_connect;
++}
++
++sub getNextMessage {
++    my ( $self, $channel ) = @_;
++    return undef
++      unless $self->{ws} and defined $self->{messages}{$channel};
++    return shift( @{ $self->{messages}{$channel} } )
++      if @{ $self->{messages}{$channel} };
++    $self->_read_socket;
++    return shift( @{ $self->{messages}{$channel} } )
++      if @{ $self->{messages}{$channel} };
++}
++
++sub waitForNextMessage {
++    my ( $self, $channel ) = @_;
++    return undef
++      unless $self->{messages}{$channel};
++    my $res;
++    do {
++        $res = $self->getNextMessage($channel);
++        sleep 1 unless $res;
++    } while ( !$res );
++    return $res;
++}
++
++sub _connect {
++    my ($self) = @_;
++    my ( $host, $port ) = split /:/, $self->{server};
++    my $sock = IO::Socket::INET->new(
++        PeerHost => $host,
++        PeerPort => $port,
++        Proto    => 'tcp',
++        Timeout  => 5,
++      )
++      or do {
++        $self->logger->error("$pr Failed to connect to $self->{server}: $!");
++        $self->{connected} = 0;
++        return;
++      };
++    $self->logger->debug("$pr connected");
++
++    if ( $self->{ssl} ) {
++        $sock = IO::Socket::SSL->start_SSL( $sock, SSL_verify_mode => 0 )
++          or do {
++            $self->logger->error("$pr SSL error: $!");
++            $self->{connected} = 0;
++            return;
++          };
++        $self->logger->debug("$pr connection upgraded to TLS");
++    }
++    my $url = "ws$self->{ssl}://$self->{server}/subscribe?"
++      . build_urlencoded( channels => $self->{channels} );
++    $self->logger->debug("$pr connects to $url");
++    my $client = Protocol::WebSocket::Client->new( url => $url );
++
++    $client->on(
++        read => sub {
++            my ( $c, $buf ) = @_;
++            if ( $buf =~ /^{.*}$/ ) {
++                eval {
++                    my $data = JSON::decode_json($buf);
++                    if ( $data->{channel}
++                        && defined $self->{messages}->{ $data->{channel} } )
++                    {
++                        push @{ $self->{messages}->{ $data->{channel} } },
++                          $data;
++                    }
++                    else {
++                        $self->logger->info(
++                            "$pr received a message for an unknown channel");
++                    }
++                };
++                $self->logger->error("$pr unable to read websocket: $@")
++                  if ($@);
++            }
++            else {
++                $self->logger->warn("$pr received an unreadable message: $buf");
++            }
++        }
++    );
++
++    $client->on(
++        write => sub {
++            my ( $c, $buf ) = @_;
++            print $sock $buf;
++        }
++    );
++
++    $client->on(
++        error => sub {
++            $self->logger->error("$pr websocket error: $_[1]");
++        }
++    );
++
++    $client->{hs}->{req}->{headers} =
++      [ Authorization => "Bearer $self->{token}", ]
++      if $self->{token};
++
++    $client->connect();
++
++    my $buf;
++    $sock->recv( $buf, 4096 );
++    $client->read($buf);
++
++    $self->{socket}    = $sock;
++    $self->{selector}  = IO::Select->new($sock);
++    $self->{ws}        = $client;
++    $self->{connected} = 1;
++}
++
++sub _read_socket {
++    my ($self) = @_;
++    return unless $self->{connected};
++    return unless $self->{selector}->can_read(0.01);
++    my $sock = $self->{socket};
++    my $buf;
++    my $n = sysread( $sock, $buf, 4096 );
++
++    if ( !defined $n || $n == 0 ) {
++        warn "Connection lost, trying to reconnect...\n";
++        $self->{connected} = 0;
++        $self->_connect;
++        return;
++    }
++
++    $self->{ws}->read($buf);
++}
++
++# Accessors
++sub logger {
++    return $_[0]->{logger};
++}
++
++sub ua {
++    return $_[0]->{ua};
++}
++
++1;
+diff --git a/usr/share/lemonldap-ng/bin/pubsubWebServer b/usr/share/lemonldap-ng/bin/pubsubWebServer
+new file mode 100755
+--- /dev/null
++++ b/usr/share/lemonldap-ng/bin/pubsubWebServer
+@@ -0,0 +1,597 @@
++#!/usr/bin/perl
++
++use strict;
++use Getopt::Long;
++use IO::Select;
++use JSON;
++use POSIX qw(strftime setsid setuid setgid);
++use Protocol::WebSocket::Handshake::Server;
++use Protocol::WebSocket::Frame;
++use Socket;
++use URI;
++
++# 1. Parse options
++
++my ( $accessLog, $addr, $cert, $daemon, $_debug, $group, $help, $key,
++    $maxRequestSize, $maxRequestTime, $quiet, $pidFile, $port, $token, $user );
++
++# HTTP header separator
++use constant HS => qr/(?:\r?\n){2}/;
++
++GetOptions(
++    'access-log=s'       => \$accessLog,
++    'addr|a=s'           => \$addr,
++    'cert=s'             => \$cert,
++    'daemon'             => \$daemon,
++    'debug|d'            => \$_debug,
++    'group|g=s'          => \$group,
++    'help|h'             => \$help,
++    'key=s'              => \$key,
++    'max-request-size=s' => \$maxRequestSize,
++    'max-request-time=s' => \$maxRequestTime,
++    'quiet|q'            => \$quiet,
++    'pid-file=s'         => \$pidFile,
++    'port|p=s'           => \$port,
++    'token=s'            => \$token,
++    'user|u=s'           => \$user,
++);
++
++$accessLog      ||= $ENV{PUBSUB_ACCESS_LOG};
++$addr           ||= $ENV{PUBSUB_ADDR};
++$cert           ||= $ENV{PUBSUB_CERT};
++$daemon         ||= $ENV{PUBSUB_DAEMON};
++$_debug         ||= $ENV{PUBSUB_DEBUG};
++$group          ||= $ENV{PUBSUB_GROUP};
++$key            ||= $ENV{PUBSUB_KEY};
++$maxRequestSize ||= $ENV{PUBSUB_MAX_REQUEST_SIZE} || 8192;
++$maxRequestTime ||= $ENV{PUBSUB_MAX_REQUEST_TIME} || 5;
++$pidFile        ||= $ENV{PUBSUB_PID_FILE};
++$quiet          ||= $ENV{PUBSUB_QUIET};
++$token          ||= $ENV{PUBSUB_TOKEN};
++$user           ||= $ENV{PUBSUB_USER};
++
++if ($help) {
++    require Pod::Usage;
++    Pod::Usage::pod2usage( -exitcode => 0, -verbose => 2 );
++}
++
++&daemonize if $daemon;
++
++sub debug {
++    print STDERR map { "$_\n" } @_ if $_debug;
++}
++
++sub warning {
++    print STDERR map { "$_\n" } @_ unless $quiet;
++}
++
++sub error {
++    print STDERR map { "$_\n" } @_;
++}
++
++sub printWebLog {
++    return if $quiet and !$accessLog;
++    my ( $msg, $ip ) = @_;
++    my $date = strftime( "[%d/%b/%Y:%H:%M:%S %z]", localtime );
++    my $log  = "$ip - - $date $msg -\n";
++    if ( $accessLog eq 'STDERR' ) {
++        print STDERR $log;
++    }
++    else {
++        print $log;
++    }
++    debug "Request: $msg";
++}
++
++if ( $accessLog and $accessLog ne '-' and $accessLog ne 'STDERR' ) {
++    debug "Access logs will be written into $accessLog\n";
++    open STDOUT, '>>', $accessLog or die "Unable to write logs: $!";
++    if ($daemon) {
++        open STDERR, '>&', fileno(STDOUT) or die "Can't dup STDERR: $!";
++    }
++}
++
++if ( $cert xor $key ) {
++    die '--cert and --key must be used together';
++}
++
++unless ($token) {
++    warning "No token given, this means that anybody can use this server"
++      unless $quiet;
++}
++
++$port ||=
++  ( $addr and $addr =~ /:/ )
++  ? undef
++  : ( $ENV{PUBSUB_PORT} || ( $cert ? 8443 : 8080 ) );
++
++# 2. Create server
++
++my $server;
++my %args = (
++    ( $addr ? ( LocalAddr => $addr ) : () ),
++    ( $port ? ( LocalPort => $port ) : () ),
++    Listen => 10,
++    Reuse  => 1,
++);
++if ($cert) {
++    require IO::Socket::SSL;
++    $server = IO::Socket::SSL->new(
++        %args,
++        SSL_cert_file => $cert,
++        SSL_key_file  => $key,
++        SSL_server    => 1,
++    );
++}
++else {
++    require IO::Socket::INET;
++    $server = IO::Socket::INET->new( %args, Proto => 'tcp', );
++}
++
++die "Cannot create socket: $!" unless $server;
++
++if ($group) {
++    my $grp = getgrnam($group) or die "Can't change gid to $group";
++    setgid($grp)               or die "setgid: $!";
++}
++
++if ($user) {
++    my $uid = getpwnam($user) or die "Can't change uid to $user";
++    setuid($uid)              or die "setuid: $!";
++}
++
++my $json     = JSON->new->utf8;
++my $selector = IO::Select->new;
++
++$selector->add($server);
++
++# 3. Manage requests
++
++my %clients;
++
++while (1) {
++    for my $sock ( $selector->can_read(0.1) ) {
++        if ( $sock == $server ) {
++            my $client = $server->accept or next;
++            $client->autoflush(1);
++            $selector->add($client);
++        }
++        else {
++            my $fileno = fileno($sock);
++            my $buf    = '';
++            my $n      = sysread( $sock, $buf, 4096 );
++            if ( !defined $n || $n == 0 ) {
++                cleanupClient($sock);
++                next;
++            }
++
++            # Known clients are subscribers, we can discard
++            if ( exists $clients{$fileno} ) {
++                my $frame = $clients{$fileno}->{frame};
++                $frame->append($buf);
++                while ( my $msg = $frame->next ) {
++
++                    # read-only client; we discard messages
++                }
++            }
++
++            else {
++                my $req   = $buf;
++                my $start = time;
++                while ( $req !~ HS ) {
++                    last if length($req) > $maxRequestSize;
++                    last if ( time - $start ) > $maxRequestTime;
++                    my $tmp;
++                    my $r = sysread( $sock, $tmp, 4096 );
++                    $req .= $tmp if $r;
++                }
++
++                # Get headers
++                my ( $headers, $body ) = split( HS, $req, 2 );
++                my @lines   = split /\r?\n/, $headers;
++                my $request = shift @lines;
++                my %hdr;
++                for (@lines) {
++                    if (/^([^:]+):\s*(.+)$/) {
++                        $hdr{ lc $1 } = $2;
++                    }
++                }
++
++                # Auth check
++                if ( $token and $hdr{authorization} ne "Bearer $token" ) {
++                    sendHttp( $sock, 401, "Unauthorized", "Bad token",
++                        $request );
++                    next;
++                }
++
++                # WebSocket GET
++                if ( $request =~ m{^GET\s+(/subscribe\S*)\s+HTTP/1.[01]$} ) {
++                    my %params = eval { URI->new($1)->query_form };
++                    warning "URI parse error: $@" if $@;
++                    my @channels = split /,/, ( $params{channels} // '' );
++
++                    unless (@channels) {
++                        warning "Missing channel(s)";
++                        sendHttp( $sock, 400, "Bad Request",
++                            "Missing channel(s)", $request );
++                    }
++
++                    my $hs = Protocol::WebSocket::Handshake::Server->new;
++                    $hs->parse($req);
++
++                    if ( $hs->is_done ) {
++                        my $ip  = getIp($sock);
++                        my $res = $hs->to_string;
++                        my $len = length($res);
++                        print $sock $res;
++                        $clients{$fileno} = {
++                            socket   => $sock,
++                            frame    => Protocol::WebSocket::Frame->new,
++                            channels => { map { $_ => 1 } @channels },
++                        };
++                        $request =~ s/[\r\n]//g;
++                        printWebLog( qq("$request" 200 $len), $ip );
++                    }
++                    else {
++                        warning "ERROR: " . $hs->error;
++                        sendHttp( $sock, 400, "Bad Request",
++                            "WebSocket handshake failed", $request );
++                    }
++                }
++
++                # Publish API
++                elsif ( $request =~ m{^POST\s+/publish\s+HTTP/1.[01]$} ) {
++                    my $len       = $hdr{'content-length'} // length($body);
++                    my $remaining = $len - length($body);
++                    while ( $remaining > 0 ) {
++                        last if length($req) > $maxRequestSize;
++                        last if ( time - $start ) > $maxRequestTime;
++                        my $tmp;
++                        my $r = sysread( $sock, $tmp, $remaining );
++                        last unless $r;
++                        $req  .= $tmp;
++                        $body .= $tmp;
++                        $remaining -= $r;
++                    }
++
++                    if ($remaining) {
++                        sendHttp( $sock, 408, 'Request timeout', $request );
++                        next;
++                    }
++
++                    my $data = eval { $json->decode($body) };
++                    if ( $@ || !defined $data ) {
++                        sendHttp( $sock, 400, "Bad Request",
++                            "Missing or invalid JSON", $request );
++                        next;
++                    }
++
++                    debug "Message to publish: $body";
++
++                    my $channel = $data->{channel};
++                    unless ($channel) {
++                        sendHttp( $sock, 400, "Bad Request",
++                            "Missing channel", $request );
++                        next;
++                    }
++
++                    my $msg   = $body;
++                    my $frame = Protocol::WebSocket::Frame->new;
++                    $frame->append($msg);
++                    my $bytes = $frame->to_bytes;
++
++                    for my $c ( values %clients ) {
++                        next unless $c->{channels}->{$channel};
++                        my $ws_sock = $c->{socket};
++                        print $ws_sock $bytes;
++                    }
++
++                    sendHttp( $sock, 200, "OK", "Message sent", $request );
++                }
++
++                else {
++                    sendHttp( $sock, 404, "Not Found", "Unknown endpoint",
++                        $request );
++                }
++            }
++        }
++    }
++}
++
++sub sendHttp {
++    my ( $sock, $code, $status, $body, $request ) = @_;
++    my $ip  = getIp($sock);
++    my $len = length($body);
++    my $resp =
++        "HTTP/1.1 $code $status\r\n"
++      . "Content-Type: text/plain\r\n"
++      . "Content-Length: $len\r\n"
++      . "Connection: close\r\n\r\n"
++      . $body;
++    print $sock $resp;
++    cleanupClient($sock);
++    $request =~ s/[\r\n]//g;
++    $len = length($resp);
++    printWebLog( qq("$request" $code $len), $ip );
++}
++
++sub cleanupClient {
++    my ($sock) = @_;
++    $selector->remove($sock);
++    my $fileno = fileno($sock);
++    delete $clients{$fileno};
++    close $sock;
++}
++
++sub getIp {
++    my ($sock) = @_;
++    my $peer = getpeername($sock);
++    my ( $port, $iaddr ) = sockaddr_in($peer);
++    return inet_ntoa($iaddr);
++}
++
++sub daemonize {
++    open STDIN,  '<', '/dev/null' or die "Can't read /dev/null: $!";
++    open STDOUT, '>', '/dev/null' or die "Can't write to /dev/null: $!";
++    open STDERR, '>', '/dev/null' or die "Can't write to /dev/null: $!";
++
++    defined( my $pid = fork ) or die "Can't fork: $!";
++    exit if $pid;
++
++    setsid() or die "Can't start a new session: $!";
++
++    defined( $pid = fork ) or die "Can't fork again: $!";
++    exit if $pid;
++
++    umask 0;
++
++    if ($pidFile) {
++        open my $fh, '>', $pidFile or die "Can't write $pidFile: $!";
++        print $fh "$$\n";
++        close $fh;
++        debug "Pid written ($$)";
++        debug `cat $pidFile`;
++    }
++    else {
++        debug "Pid is $$";
++    }
++}
++
++__END__
++
++=encoding UTF-8
++
++=head1 NAME
++
++pubsubWebServer - Pub/Sub server based on websockets
++
++=head1 SYNOPSIS
++
++  pubsubWebServer <option>
++
++Simple client using L<wscat|https://github.com/websockets/wscat>
++
++  wscat --connect ws://localhost:8080/subscribe?channels=chan1,chan2
++
++Simple publisher
++
++  curl -XPOST -d '{"foo":"bar","bar":"baz","baz":"foo","channel":"chan1"}' http://localhost:8080/publish
++
++Note that "channel" is required.
++
++=head1 DESCRIPTION
++
++B<pubsubWebServer> is a web-based pub/sub server designed for L<LemonLDAP::NG|https://lemonldap-ng.org>.
++
++=head2 Options
++
++All options except B<--help> can have default value overriden by an
++environment variable.
++
++=head3 HTTP options
++
++=over
++
++=item * B<--token E<lt>valueE<gt>>
++
++Optional token required to communicate with this server. When enabled, all
++requests must contains an "Authorization" header:
++
++  Authorization: Bearer token-value
++
++Environment variable: B<PUBSUB_TOKEN>
++
++=item * B<--port E<lt>valueE<gt>> I<(default: 8080, or 8443 when B<--cert> is set)>
++
++Port to listen to.
++
++Environment variable: B<PUBSUB_PORT>
++
++=item * B<--cert E<lt>valueE<gt>>
++
++Optional server TLS certificate.
++
++Environment variable: B<PUBSUB_CERT>
++
++=item * B<--key E<lt>valueE<gt>>
++
++Optional server TLS key.
++
++Environment variable: B<PUBSUB_KEY>
++
++=item * B<--addr E<lt>valueE<gt>> I<(default: all interfaces)>
++
++Adresse to listen to. Accepts also port value: C<--addr localhost:7654>
++
++Environment variable: B<PUBSUB_ADDR>
++
++=item * B<--max-request-size E<lt>valueE<gt>> I<(default: 8192)>
++
++Maximum authorized size for a request.
++
++Environment variable: B<PUBSUB_MAX_REQUEST_SIZE>
++
++=item * B<--max-request-time E<lt>valueE<gt>> I<(default: 5)>
++
++Maximum allowed delay for a request I<(in seconds)>.
++
++Environment variable: B<PUBSUB_MAX_REQUEST_TIME>
++
++=back
++
++=head3 Server options
++
++=over
++
++=item * B<--daemon>
++
++Daemonize the server.
++
++Environment variable: B<PUBSUB_DAEMON>
++
++=item * B<--pid-file E<lt>valueE<gt>>
++
++When B<--daemon> is set, write the processus number into the given file.
++
++Environment variable: B<PUBSUB_PID_FILE>
++
++=item * B<--user> E<lt>valueE<gt>>
++
++Change uid to the given value after opening socket.
++
++Environment variable: B<PUBSUB_USER>
++
++=item * B<--group> E<lt>valueE<gt>>
++
++Change gid to the given value after opening socket.
++
++Environment variable: B<PUBSUB_GROUP>
++
++=back
++
++=head3 Logging options
++
++=over
++
++=item * B<--quiet>
++
++Don't display warnings and access logs unless an explicit B<--access-log> is set.
++
++Environment variable: B<PUBSUB_QUIET>
++
++=item * B<--debug>
++
++Display additional information.
++
++Environment variable: B<PUBSUB_DEBUG>
++
++=item * B<--access-log E<lt>valueE<gt>>
++
++Files to store access logs. "B<->" means standard output. Useful to have access
++logs on STDOUT when B<--quiet> is set.
++
++Environment variable: B<PUBSUG_ACCESS_LOG>
++
++=back
++
++=head3 Other
++
++=over
++
++=item * B<--help>
++
++Display this.
++
++=back
++
++=head2 API
++
++=head3 Publisher
++
++=over
++
++=item * URL: C</publish>
++
++=item * Method: POST
++
++=item * Headers:
++
++=over
++
++=item * B<Authorization> I<(optional)>
++
++If a token is required, set it here in the form:
++
++  Authorization: Bearer <value>
++
++=back
++
++=item * Request body:
++
++JSON content with at least a "B<channel>" key
++I<(the channel where the message will be published)>
++
++=back
++
++=head3 Reader I<(websockets)>
++
++=over
++
++=item * URL: C</subscribe> I<(this opens the websocket)>
++
++=item * Method: GET
++
++=item * Query I<(GET parameters)>
++
++=over
++
++=item * B<channels> I<(required)>
++
++Comma separated list of channels to subscribe to.
++
++=back
++
++=back
++
++=head1 SEE ALSO
++
++=over
++
++=item * L<Lemonldap::NG event management|https://lemonldap-ng.org/documentation/latest/eventsmanagement.html>
++
++=item * L<http://lemonldap-ng.org/>
++
++=back
++
++=head1 BUG REPORT
++
++Use OW2 system to report bug or ask for features:
++L<https://gitlab.ow2.org/lemonldap-ng/lemonldap-ng/issues>
++
++
++=head1 AUTHORS
++
++=over
++
++=item Xavier Guimard, E<lt>yadd@debian.orgE<gt>
++
++=back
++
++=head1 COPYRIGHT AND LICENSE
++
++See COPYING file for details.
++
++This library is free software; you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation; either version 2, or (at your option)
++any later version.
++
++This program is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with this program.  If not, see L<http://www.gnu.org/licenses/>.
++
++=cut

@@ -1,740 +1,309 @@
 name: Build and Publish Docker Images
 
 env:
-  VERSION: 2.21.0
+  VERSION: 2.21.2
   PGVERSION: 15
   DEBIANRELEASE: bookworm
-  DOCKERREVISION: 2
+  DOCKERREVISION: 1
 
 on:
   push:
-    branches: [master,stable,experimental]
+    branches: [stable]
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: build_and_test
+        run: ./build-all
+        env:
+          VERSION: ${{ env.VERSION }}-${{ env.DOCKERREVISION }}
 
   build-and-push-pg:
     runs-on: ubuntu-latest
     steps:
-      - name: Get current date
-        id: date
-        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
+      - name: Common setup
+        uses: ./.github/actions/docker-common
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-pg-database
-      - name: Build and push Docker image for pg
-        uses: docker/build-push-action@v4
-        with:
-          context: ./pg
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
-          push: true
-          tags: |
-            yadd/lemonldap-ng-pg-database:stable
-      - name: push README to Dockerhub
-        uses: christian-korneck/update-container-description-action@v1
-        env:
-          DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASS: ${{ secrets.DOCKER_PASSWORD }}
-        with:
-          destination_container_repo: yadd/lemonldap-ng-pg-database
-          provider: dockerhub
-          short_description: 'PostgreSQL database ready to use for LemonLDAP::NG'
-          readme_file: 'pg/README.md'
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DOCKER_IMAGE: yadd/lemonldap-ng-pg-database
+          DIRNAME: ./pg
 
   build-and-push-base:
     runs-on: ubuntu-latest
     steps:
-      - name: Get current date
-        id: date
-        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
+      - name: Common setup
+        uses: ./.github/actions/docker-common
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-base
-      - name: Build and push Docker image for base
-        uses: docker/build-push-action@v4
-        with:
-          context: ./base
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
-          push: true
-          tags: |
-            yadd/lemonldap-ng-base:stable
-      - name: push README to Dockerhub
-        uses: christian-korneck/update-container-description-action@v1
-        env:
-          DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASS: ${{ secrets.DOCKER_PASSWORD }}
-        with:
-          destination_container_repo: yadd/lemonldap-ng-base
-          provider: dockerhub
-          short_description: 'Base image for lemonldap-ng dockers'
-          readme_file: 'base/README.md'
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DOCKER_IMAGE: yadd/lemonldap-ng-base
+          DIRNAME: ./base
 
   build-and-push-portal:
     needs: build-and-push-base
     runs-on: ubuntu-latest
     steps:
-      - name: Get current date
-        id: date
-        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
+      - name: Common setup
+        uses: ./.github/actions/docker-common
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-portal
-      - name: Build and push Docker image for portal
-        uses: docker/build-push-action@v4
-        with:
-          context: ./portal
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:stable
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
-          push: true
-          tags: |
-            yadd/lemonldap-ng-portal:stable
-      - name: push README to Dockerhub
-        uses: christian-korneck/update-container-description-action@v1
-        env:
-          DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASS: ${{ secrets.DOCKER_PASSWORD }}
-        with:
-          destination_container_repo: yadd/lemonldap-ng-portal
-          provider: dockerhub
-          short_description: 'LemonLDAP::NG Portal'
-          readme_file: 'portal/README.md'
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DOCKER_IMAGE: yadd/lemonldap-ng-portal
+          DIRNAME: ./portal
 
   build-and-push-portal-hiperf:
     needs: build-and-push-base
     runs-on: ubuntu-latest
     steps:
-      - name: Get current date
-        id: date
-        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
+      - name: Common setup
+        uses: ./.github/actions/docker-common
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DOCKER_IMAGE: yadd/lemonldap-ng-portal
+          DIRNAME: ./uwsgi-portal
+          IMAGE_SUFFIX2: "-hiperf"
+
+  build-and-push-pubsub-server:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Common setup
+        uses: ./.github/actions/docker-common
         with:
-          images: yadd/lemonldap-ng-portal
-      - name: Build and push Docker image for portal uWSGI
-        uses: docker/build-push-action@v4
-        with:
-          context: ./uwsgi-portal
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:stable
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
-          push: true
-          tags: |
-            yadd/lemonldap-ng-portal:stable-hiperf
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DOCKER_IMAGE: yadd/lemonldap-ng-pubsub-server
+          DIRNAME: ./webpubsub
 
   build-and-push-cron:
     needs: build-and-push-base
     runs-on: ubuntu-latest
     steps:
-      - name: Get current date
-        id: date
-        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
+      - name: Common setup
+        uses: ./.github/actions/docker-common
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-cron
-      - name: Build and push Docker image for cron
-        uses: docker/build-push-action@v4
-        with:
-          context: ./cron
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:stable
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
-          push: true
-          tags: |
-            yadd/lemonldap-ng-cron:stable
-      - name: push README to Dockerhub
-        uses: christian-korneck/update-container-description-action@v1
-        env:
-          DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASS: ${{ secrets.DOCKER_PASSWORD }}
-        with:
-          destination_container_repo: yadd/lemonldap-ng-cron
-          provider: dockerhub
-          short_description: 'LemonLDAP::NG maintenance tasks runner'
-          readme_file: 'cron/README.md'
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DOCKER_IMAGE: yadd/lemonldap-ng-cron
+          DIRNAME: ./cron
 
   build-and-push-cron-task:
     needs: build-and-push-base
     runs-on: ubuntu-latest
     steps:
-      - name: Get current date
-        id: date
-        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
+      - name: Common setup
+        uses: ./.github/actions/docker-common
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-cron-task
-      - name: Build and push Docker image for cron task
-        uses: docker/build-push-action@v4
-        with:
-          context: ./cron-task
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:stable
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
-          push: true
-          tags: |
-            yadd/lemonldap-ng-cron-task:stable
-      - name: push README to Dockerhub
-        uses: christian-korneck/update-container-description-action@v1
-        env:
-          DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASS: ${{ secrets.DOCKER_PASSWORD }}
-        with:
-          destination_container_repo: yadd/lemonldap-ng-cron-task
-          provider: dockerhub
-          short_description: 'LemonLDAP::NG maintenance tasks runner'
-          readme_file: 'cron-task/README.md'
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DOCKER_IMAGE: yadd/lemonldap-ng-cron-task
+          DIRNAME: ./cron-task
 
   build-and-push-sessions-backup:
     needs: build-and-push-base
     runs-on: ubuntu-latest
     steps:
-      - name: Get current date
-        id: date
-        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
+      - name: Common setup
+        uses: ./.github/actions/docker-common
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-sessions-backup
-      - name: Build and push Docker image for sessions-backup task
-        uses: docker/build-push-action@v4
-        with:
-          context: ./sessions-backup
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:stable
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
-          push: true
-          tags: |
-            yadd/lemonldap-ng-sessions-backup:stable
-      - name: push README to Dockerhub
-        uses: christian-korneck/update-container-description-action@v1
-        env:
-          DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASS: ${{ secrets.DOCKER_PASSWORD }}
-        with:
-          destination_container_repo: yadd/lemonldap-ng-sessions-backup
-          provider: dockerhub
-          short_description: 'LemonLDAP::NG maintenance tasks runner'
-          readme_file: 'sessions-backup/README.md'
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DOCKER_IMAGE: yadd/lemonldap-ng-sessions-backup
+          DIRNAME: ./sessions-backup
 
   build-and-push-manager:
     needs: build-and-push-base
     runs-on: ubuntu-latest
     steps:
-      - name: Get current date
-        id: date
-        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
+      - name: Common setup
+        uses: ./.github/actions/docker-common
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-manager
-      - name: Build and push Docker image for manager
-        uses: docker/build-push-action@v4
-        with:
-          context: ./manager
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:stable
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
-          push: true
-          tags: |
-            yadd/lemonldap-ng-manager:stable
-      - name: push README to Dockerhub
-        uses: christian-korneck/update-container-description-action@v1
-        env:
-          DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASS: ${{ secrets.DOCKER_PASSWORD }}
-        with:
-          destination_container_repo: yadd/lemonldap-ng-manager
-          provider: dockerhub
-          short_description: 'LemonLDAP::NG Manager'
-          readme_file: 'manager/README.md'
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DOCKER_IMAGE: yadd/lemonldap-ng-manager
+          DIRNAME: ./manager
 
   build-and-push-full:
     needs: build-and-push-portal
     runs-on: ubuntu-latest
     steps:
-      - name: Get current date
-        id: date
-        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
+      - name: Common setup
+        uses: ./.github/actions/docker-common
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-full
-      - name: Build and push Docker image for full
-        uses: docker/build-push-action@v4
-        with:
-          context: ./full
-          build-args: |
-            PORTALBASE=yadd/lemonldap-ng-portal:stable
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
-          push: true
-          tags: |
-            yadd/lemonldap-ng-full:stable
-      - name: push README to Dockerhub
-        uses: christian-korneck/update-container-description-action@v1
-        env:
-          DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASS: ${{ secrets.DOCKER_PASSWORD }}
-        with:
-          destination_container_repo: yadd/lemonldap-ng-full
-          provider: dockerhub
-          short_description: 'LemonLDAP::NG Portal and Manager'
-          readme_file: 'full/README.md'
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DOCKER_IMAGE: yadd/lemonldap-ng-full
+          DIRNAME: ./full
 
   build-and-push-ssoaas-fastcgi-server:
     needs: build-and-push-base
     runs-on: ubuntu-latest
     steps:
-      - name: Get current date
-        id: date
-        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
+      - name: Common setup
+        uses: ./.github/actions/docker-common
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-ssoaas-fastcgi-server
-      - name: Build and push Docker image for SSOaaS FastCGI Server
-        uses: docker/build-push-action@v4
-        with:
-          context: ./ssoaas-fastcgi-server
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:stable
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
-          push: true
-          tags: |
-            yadd/lemonldap-ng-ssoaas-fastcgi-server:stable
-      - name: push README to Dockerhub
-        uses: christian-korneck/update-container-description-action@v1
-        env:
-          DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASS: ${{ secrets.DOCKER_PASSWORD }}
-        with:
-          destination_container_repo: yadd/lemonldap-ng-ssoaas-fastcgi-server
-          provider: dockerhub
-          short_description: 'LemonLDAP::NG SSOaaS FastCGI Server'
-          readme_file: 'ssoaas-fastcgi-server/README.md'
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DOCKER_IMAGE: yadd/lemonldap-ng-ssoaas-fastcgi-server
+          DIRNAME: ./ssoaas-fastcgi-server
 
   build-and-push-base-no-s6:
     runs-on: ubuntu-latest
     steps:
-      - name: Get current date
-        id: date
-        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
+      - name: Common setup
+        uses: ./.github/actions/docker-common
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-base
-      - name: Build and push Docker image for base
-        uses: docker/build-push-action@v4
-        with:
-          context: ./base-no-s6
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
-          push: true
-          tags: |
-            yadd/lemonldap-ng-base:stable-no-s6
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DOCKER_IMAGE: yadd/lemonldap-ng-base
+          DIRNAME: ./base-no-s6
+          IMAGE_SUFFIX: "-no-s6"
 
   build-and-push-portal-no-s6:
     needs: build-and-push-base-no-s6
     runs-on: ubuntu-latest
     steps:
-      - name: Get current date
-        id: date
-        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
+      - name: Common setup
+        uses: ./.github/actions/docker-common
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-portal
-      - name: Build and push Docker image for portal
-        uses: docker/build-push-action@v4
-        with:
-          context: ./portal
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:stable-no-s6
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
-          push: true
-          tags: |
-            yadd/lemonldap-ng-portal:stable-no-s6
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DOCKER_IMAGE: yadd/lemonldap-ng-portal
+          DIRNAME: ./portal
+          IMAGE_SUFFIX: "-no-s6"
 
   build-and-push-portal-hiperf-no-s6:
     needs: build-and-push-base-no-s6
     runs-on: ubuntu-latest
     steps:
-      - name: Get current date
-        id: date
-        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
+      - name: Common setup
+        uses: ./.github/actions/docker-common
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-portal
-      - name: Build and push Docker image for portal uWSGI
-        uses: docker/build-push-action@v4
-        with:
-          context: ./uwsgi-portal
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:stable-no-s6
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
-          push: true
-          tags: |
-            yadd/lemonldap-ng-portal:stable-no-s6-hiperf
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DOCKER_IMAGE: yadd/lemonldap-ng-portal
+          DIRNAME: ./uwsgi-portal
+          IMAGE_SUFFIX: "-no-s6"
+          IMAGE_SUFFIX2: "-hiperf"
 
   build-and-push-cron-no-s6:
     needs: build-and-push-base-no-s6
     runs-on: ubuntu-latest
     steps:
-      - name: Get current date
-        id: date
-        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
+      - name: Common setup
+        uses: ./.github/actions/docker-common
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-cron
-      - name: Build and push Docker image for cron
-        uses: docker/build-push-action@v4
-        with:
-          context: ./cron
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:stable-no-s6
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
-          push: true
-          tags: |
-            yadd/lemonldap-ng-cron:stable-no-s6
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DOCKER_IMAGE: yadd/lemonldap-ng-cron
+          DIRNAME: ./cron
+          IMAGE_SUFFIX: "-no-s6"
 
   build-and-push-cron-task-no-s6:
     needs: build-and-push-base-no-s6
     runs-on: ubuntu-latest
     steps:
-      - name: Get current date
-        id: date
-        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
+      - name: Common setup
+        uses: ./.github/actions/docker-common
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-cron-task
-      - name: Build and push Docker image for cron-task
-        uses: docker/build-push-action@v4
-        with:
-          context: ./cron-task
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:stable-no-s6
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
-          push: true
-          tags: |
-            yadd/lemonldap-ng-cron-task:stable-no-s6
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DOCKER_IMAGE: yadd/lemonldap-ng-cron-task
+          DIRNAME: ./cron-task
+          IMAGE_SUFFIX: "-no-s6"
 
   build-and-push-sessions-backup-no-s6:
     needs: build-and-push-base-no-s6
     runs-on: ubuntu-latest
     steps:
-      - name: Get current date
-        id: date
-        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
+      - name: Common setup
+        uses: ./.github/actions/docker-common
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-sessions-backup
-      - name: Build and push Docker image for sessions-backup
-        uses: docker/build-push-action@v4
-        with:
-          context: ./sessions-backup
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:stable-no-s6
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
-          push: true
-          tags: |
-            yadd/lemonldap-ng-sessions-backup:stable-no-s6
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DOCKER_IMAGE: yadd/lemonldap-ng-sessions-backup
+          DIRNAME: ./sessions-backup
+          IMAGE_SUFFIX: "-no-s6"
 
   build-and-push-manager-no-s6:
     needs: build-and-push-base-no-s6
     runs-on: ubuntu-latest
     steps:
-      - name: Get current date
-        id: date
-        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
+      - name: Common setup
+        uses: ./.github/actions/docker-common
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-manager
-      - name: Build and push Docker image for manager
-        uses: docker/build-push-action@v4
-        with:
-          context: ./manager
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:stable-no-s6
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
-          push: true
-          tags: |
-            yadd/lemonldap-ng-manager:stable-no-s6
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DOCKER_IMAGE: yadd/lemonldap-ng-manager
+          DIRNAME: ./manager
+          IMAGE_SUFFIX: "-no-s6"
 
   build-and-push-full-no-s6:
     needs: build-and-push-portal-no-s6
     runs-on: ubuntu-latest
     steps:
-      - name: Get current date
-        id: date
-        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
+      - name: Common setup
+        uses: ./.github/actions/docker-common
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-full
-      - name: Build and push Docker image for full
-        uses: docker/build-push-action@v4
-        with:
-          context: ./full
-          build-args: |
-            PORTALBASE=yadd/lemonldap-ng-portal:stable-no-s6
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
-          push: true
-          tags: |
-            yadd/lemonldap-ng-full:stable-no-s6
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DOCKER_IMAGE: yadd/lemonldap-ng-full
+          DIRNAME: ./full
+          IMAGE_SUFFIX: "-no-s6"
 
   build-and-push-ssoaas-fastcgi-server-no-s6:
     needs: build-and-push-base-no-s6
     runs-on: ubuntu-latest
     steps:
-      - name: Get current date
-        id: date
-        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
+      - name: Common setup
+        uses: ./.github/actions/docker-common
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-ssoaas-fastcgi-server
-      - name: Build and push Docker image for SSOaaS FastCGI Server
-        uses: docker/build-push-action@v4
-        with:
-          context: ./ssoaas-fastcgi-server
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:stable-no-s6
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
-          push: true
-          tags: |
-            yadd/lemonldap-ng-ssoaas-fastcgi-server:stable-no-s6
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DOCKER_IMAGE: yadd/lemonldap-ng-ssoaas-fastcgi-server
+          DIRNAME: ./ssoaas-fastcgi-server
+          IMAGE_SUFFIX: "-no-s6"

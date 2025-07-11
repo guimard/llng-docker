@@ -1,0 +1,59 @@
+name: Common docker publish setup
+description: common steps for docker-publish jobs
+inputs:
+  DOCKER_USERNAME:
+    required: true
+    description: Docker username
+  DOCKER_PASSWORD:
+    required: true
+    description: Docker password
+  DOCKER_IMAGE:
+    required: true
+    description: Image name
+  DIRNAME:
+    required: true
+    description: Working directory
+  IMAGE_SUFFIX:
+    required: false
+    description: Optional image suffix
+  IMAGE_SUFFIX2:
+    required: false
+    description: Optional image suffix
+
+runs:
+  using: "composite"
+  steps:
+      - name: Get current date
+        id: date
+        shell: bash
+        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ inputs.DOCKER_USERNAME }}
+          password: ${{ inputs.DOCKER_PASSWORD }}
+      - name: Define platforms
+        id: platforms
+        shell: bash
+        run: |
+          echo "platforms=linux/amd64,platforms=linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ inputs.DOCKER_IMAGE }}
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: ${{ inputs.DIRNAME }}
+          build-args: |
+            BASE=yadd/lemonldap-ng-base:stable${{ inputs.IMAGE_SUFFIX }}
+            PORTALBASE=yadd/lemonldap-ng-portal:stable${{ inputs.IMAGE_SUFFIX }}
+          platforms: ${{ steps.platforms.outputs.platforms }}
+          push: true
+          tags: |
+            ${{ inputs.DOCKER_IMAGE }}:stable{{ inputs.IMAGE_SUFFIX }}{{ inputs.IMAGE_SUFFIX2 }}

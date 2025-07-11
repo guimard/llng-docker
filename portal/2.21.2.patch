@@ -1,0 +1,141 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Auth/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Auth/OpenIDConnect.pm
+@@ -121,7 +121,13 @@ sub extractFormInfo {
+     }
+ 
+     # Check callback
+-    if ( $self->isCallback($req) ) {
++    if ( $self->isCallback($req)
++        and not $req->param('oidc_callback_processed') )
++    {
++        # This makes sure we don't go through the callback code when re-posting
++        # a login form
++        $self->p->setHiddenFormValue( $req, "oidc_callback_processed", "1", "",
++            0 );
+ 
+         $self->logger->debug(
+             'OpenIDConnect callback URI detected: ' . $req->uri );
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
+@@ -2037,6 +2037,14 @@ sub _handleRefreshTokenGrant {
+     # Else, we are in an offline session
+     else {
+ 
++        unless ( $self->rpOptions->{$rp}->{oidcRPMetaDataOptionsAllowOffline} )
++        {
++            $self->logger->error(
++                'Got a offline refresh_token for an application no more allowed'
++            );
++            return $self->sendOIDCError( $req, 'invalid_grant', 400 );
++        }
++
+         # Lookup attributes and macros for user
+         $self->getAttributesForUser( $req, $refreshSession )
+           or return $self->sendOIDCError( $req, 'invalid_grant', 400 );
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
+@@ -453,11 +453,14 @@ sub buildAuthorizationCodeAuthnRequest {
+     };
+     my $authorize_request_params = {
+         %$authorize_request_oauth2_params,
+-        ( $display    ? ( display    => $display )    : () ),
+-        ( $prompt     ? ( prompt     => $prompt )     : () ),
+-        ( $ui_locales ? ( ui_locales => $ui_locales ) : () ),
++        ( $display ? ( display => $display ) : () ),
++        ( $prompt  ? ( prompt  => $prompt )  : () ),
++        # MaxAge is defined as an int type in LLNG config,
++        # so 0 means undefined
++        ( $max_age    ? ( max_age    => $max_age )    : () ),
+         (
+-            defined($max_age) && length($max_age) ? ( max_age => $max_age ) : ()
++            defined($ui_locales)
++              && length($ui_locales) ? ( ui_locales => $ui_locales ) : ()
+         ),
+         (
+             defined($acr_values)
+@@ -1950,10 +1953,7 @@ sub getEndPointAuthenticationCredentials {
+                 and $payload->{iss} eq $_clientId )
+             {
+                 # client_id must match to a known relying party
+-                my ($rp) = grep {
+-                    $self->rpOptions->{$_}->{oidcRPMetaDataOptionsClientID} eq
+-                      $_clientId
+-                } keys %{ $self->rpOptions || {} };
++                my $rp = $self->getRP($_clientId);
+                 if ($rp) {
+ 
+                     # RP must have a signature key registered
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm
+@@ -1465,9 +1465,7 @@ sub sendJSONresponse {
+     # If this is a cross-domain request from the portal itself
+     # (Ajax SSL to a different VHost)
+     # we allow CORS
+-    if ( $req->origin
+-        and index( $req->portal, $req->origin ) == 0 )
+-    {
++    if ( $self->_checkSelfCors($req) ) {
+         $self->logger->debug('AJAX request from portal, allowing CORS');
+         push @{ $res->[1] },
+           "Access-Control-Allow-Origin"      => $req->origin,
+@@ -1481,6 +1479,21 @@ sub sendJSONresponse {
+     return $res;
+ }
+ 
++sub _checkSelfCors {
++    my ( $self, $req ) = @_;
++
++    if ( $req->origin ) {
++        my $origin = URI->new( $req->origin );
++        my $portal = URI->new( $req->portal );
++
++        return (  $origin->scheme
++              and $portal->scheme eq $origin->scheme
++              and $origin->host_port
++              and $origin->host_port eq $portal->host_port );
++    }
++    return;
++}
++
+ sub sendRawHtml {
+     my ($self) = $_[0];
+     my $res = Lemonldap::NG::Common::PSGI::sendRawHtml(@_);
+--- a/usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.js
++++ b/usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.js
+@@ -25,8 +25,34 @@
+         error: function error(xhr, status, _error) {
+           e = jQuery.Event("kerberosFailure");
+           $(document).trigger(e, [xhr, status, _error]);
+-          if (!e.isDefaultPrevented()) {
+-            return $('#lformKerberos').submit();
++
++          // Check if we are in a choice menu
++          var authMenu = $('#authMenu');
++
++          // If this is a choice menu, don't submit form
++          if (authMenu.length) {
++            var msgBox = $('#errormsg');
++            var msgBoxContent = '<div class="message message-negative' + ' alert alert-danger" role="alert">';
++            // If this is a regular Kerberos authentication error,
++            // display the appropriate error message
++            if (_error.match(/Unauthorized/i)) {
++              msgBoxContent += '<span trmsg="5">' + translate('PE5') + '</span>';
++            }
++            // Display generic error message
++            else {
++              msgBoxContent += '<span trmsg="24">' + translate('PE24') + '</span>';
++              // If this is an unexpected Kerberos error,
++              // display the error in console
++              console.error("Error while trying Kerberos authentication: " + _error);
++            }
++            msgBoxContent += '</div>';
++            msgBox.html(msgBoxContent);
++          }
++          // If this is NOT a choice menu, submit form
++          else {
++            if (!e.isDefaultPrevented()) {
++              return $('#lformKerberos').submit();
++            }
+           }
+         }
+       });

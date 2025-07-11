@@ -14,6 +14,9 @@ List:
  - [yadd/lemonldap-ng-pg-database](./pg): a ready to use PostgreSQL database
  - [yadd/lemonldap-ng-cron](./cron): a simple LLNG maintenance tasks runner,
    to be used if tasks are disabled on portals. See examples.
+   * [yadd/lemonldap-ng-crontask](./cron-task): simply launch portal cron task and exit
+ - [yadd/lemonldap-ng-sessions-backup](./sessions-backup): backup sessions and exit
+ - [yadd/lemonldap-ng-webpubsub](./webpubsub): a Pub/Sub server based on HTTP
 
 The [yadd/lemonldap-ng-base](./base) isn't directly usable, just a base
 to build Lemonldap::NG components.

@@ -1,5 +1,15 @@
 # Changes
 
+## v2.21.2-1 _(2025-07-11)_
+* Install llng client
+* Launch automatically lokiSender when a loki logger is configured
+* Switch to 2.21.2 (with patch due to freeze)
+
+## v2.21.1-1 _(2025-06-17)_
+* Fix introspection patch
+* Add llng pub/sub server
+* Switch to 2.21.1 (with patch due to freeze)
+
 ## v2.21.0-2 _(2025-04-26)_
 * Fix prompt=none
 * Add "aud", "iat" and "nbf" into introspection

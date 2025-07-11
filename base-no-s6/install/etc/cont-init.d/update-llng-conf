@@ -39,6 +39,10 @@ elif test "$USERLOGGER" = "loki"; then
     LOKI=1
 fi
 
+if test "$LOKI" != ""; then
+    mv /etc/services.disabled/loki-buffer /etc/services.d/
+fi
+
 if test "$LOKI" != "" -a "$AUDITLOGGER" = ""; then
     AUDITLOGGER='Lemonldap::NG::Common::AuditLogger::UserLoggerJSON'
 
