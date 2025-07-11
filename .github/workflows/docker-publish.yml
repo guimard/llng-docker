@@ -192,6 +192,7 @@ jobs:
 
   build-and-push-dev:
     needs: build-and-push-full
+    if: startsWith(github.ref, 'refs/tags/') == false
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
