@@ -26,7 +26,7 @@ if test "$LOGGER" = "stderr"; then
     perl -i -ne 'print unless /^logger\s*=/;print "logger = Lemonldap::NG::Common::Logger::Std\n" if/^\[\s*all\s*\]/;' $INI
 elif test "$LOGGER" = "loki"; then
     echo "Set logger to Lemonldap::NG::Common::Logger::Loki"
-    perl -i -ne 'print unless /^logger\s*=/;print "logger = Lemonldap::NG::Common::Logger::Loki\nlokiUrl = '"$LOKIURL"'\n" if/^\[\s*all\s*\]/;' $INI
+    perl -i -ne 'print unless /^logger\s*=/;print "logger = Lemonldap::NG::Common::Logger::Loki\nlokiUrl = '"$LOKIURL"'\nlokiDeferDir = /var/cache/lemonldap-ng/loki\n" if/^\[\s*all\s*\]/;' $INI
     LOKI=1
 fi
 
@@ -35,8 +35,12 @@ if test "$USERLOGGER" = "stderr"; then
     perl -i -ne 'print unless /^userLogger\s*=/;print "userLogger = Lemonldap::NG::Common::Logger::Std\n" if/^\[\s*all\s*\]/;' $INI
 elif test "$USERLOGGER" = "loki"; then
     echo "Set userLogger to Lemonldap::NG::Common::Logger::Loki"
-    perl -i -ne 'print unless /^(?:userLogger|lokiUrl)\s*=/;print "userLogger = Lemonldap::NG::Common::Logger::Loki\nlokiUrl = '"$LOKIURL"'\n" if/^\[\s*all\s*\]/;' $INI
+    perl -i -ne 'print unless /^(?:userLogger|lokiUrl)\s*=/;print "userLogger = Lemonldap::NG::Common::Logger::Loki\nlokiUrl = '"$LOKIURL"'\nlokiDeferDir = /var/cache/lemonldap-ng/loki\n" if/^\[\s*all\s*\]/;' $INI
     LOKI=1
+fi
+
+if test "$LOKI" != ""; then
+    mv /etc/services.disabled/loki-buffer /etc/services.d/
 fi
 
 if test "$LOKI" != "" -a "$AUDITLOGGER" = ""; then

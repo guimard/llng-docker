@@ -125,5 +125,6 @@ COPY install /
 #CMD ["cat","/var/lib/lemonldap-ng/conf/lmConf-1.json"]
 
 CMD ["echo", "This is a base image, not usable directly"]
+#CMD ["/bin/bash" ]
 
 ENTRYPOINT ["/init"]

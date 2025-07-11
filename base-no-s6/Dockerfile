@@ -112,5 +112,6 @@ COPY install /
 COPY start /
 
 CMD ["echo", "This is a base image, not usable directly"]
+#CMD ["/bin/bash" ]
 
 ENTRYPOINT ["./start"]
