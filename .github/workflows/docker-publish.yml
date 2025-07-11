@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Common setup
-        uses: ./actions/setup-common
+        uses: ./actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -61,7 +61,7 @@ jobs:
     needs: test
     steps:
       - name: Common setup
-        uses: ./actions/setup-common
+        uses: ./actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -94,7 +94,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Common setup
-        uses: ./actions/setup-common
+        uses: ./actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -129,7 +129,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Common setup
-        uses: ./actions/setup-common
+        uses: ./actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -154,7 +154,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Common setup
-        uses: ./actions/setup-common
+        uses: ./actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -187,7 +187,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Common setup
-        uses: ./actions/setup-common
+        uses: ./actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -222,7 +222,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Common setup
-        uses: ./actions/setup-common
+        uses: ./actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -257,7 +257,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Common setup
-        uses: ./actions/setup-common
+        uses: ./actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -292,7 +292,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Common setup
-        uses: ./actions/setup-common
+        uses: ./actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -327,7 +327,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Common setup
-        uses: ./actions/setup-common
+        uses: ./actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -362,7 +362,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Common setup
-        uses: ./actions/setup-common
+        uses: ./actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -397,7 +397,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Common setup
-        uses: ./actions/setup-common
+        uses: ./actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -418,7 +418,7 @@ jobs:
     needs: test
     steps:
       - name: Common setup
-        uses: ./actions/setup-common
+        uses: ./actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -441,7 +441,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Common setup
-        uses: ./actions/setup-common
+        uses: ./actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -466,7 +466,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Common setup
-        uses: ./actions/setup-common
+        uses: ./actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -491,7 +491,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Common setup
-        uses: ./actions/setup-common
+        uses: ./actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -516,7 +516,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Common setup
-        uses: ./actions/setup-common
+        uses: ./actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -541,7 +541,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Common setup
-        uses: ./actions/setup-common
+        uses: ./actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -566,7 +566,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Common setup
-        uses: ./actions/setup-common
+        uses: ./actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -591,7 +591,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Common setup
-        uses: ./actions/setup-common
+        uses: ./actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -616,7 +616,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Common setup
-        uses: ./actions/setup-common
+        uses: ./actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
