@@ -34,32 +34,9 @@ jobs:
         with:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-pg-database
-      - name: Build and push Docker image for pg
-        uses: docker/build-push-action@v4
-        with:
-          context: ./pg
-          platforms: ${{ steps.platforms.outputs.platforms }}
-          push: true
-          tags: |
-            yadd/lemonldap-ng-pg-database:latest
-            yadd/lemonldap-ng-pg-database:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-pg-database:${{ env.PGVERSION }}
-            yadd/lemonldap-ng-pg-database:${{ env.PGVERSION }}-${{ env.DEBIANRELEASE }}
-      - name: push README to Dockerhub
-        uses: christian-korneck/update-container-description-action@v1
-        env:
-          DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASS: ${{ secrets.DOCKER_PASSWORD }}
-        with:
-          destination_container_repo: yadd/lemonldap-ng-pg-database
-          provider: dockerhub
-          short_description: 'PostgreSQL database ready to use for LemonLDAP::NG'
-          readme_file: 'pg/README.md'
+          DOCKER_IMAGE: yadd/lemonldap-ng-pg-database
+          DIRNAME: ./pg
+          SHORT_DESCRIPTION: 'PostgreSQL database ready to use for LemonLDAP::NG'
 
   build-and-push-base:
     runs-on: ubuntu-latest
@@ -72,32 +49,9 @@ jobs:
         with:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-base
-      - name: Build and push Docker image for base
-        uses: docker/build-push-action@v4
-        with:
-          context: ./base
-          platforms: ${{ steps.platforms.outputs.platforms }}
-          push: true
-          tags: |
-            yadd/lemonldap-ng-base:latest
-            yadd/lemonldap-ng-base:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-base:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
-            yadd/lemonldap-ng-base:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
-      - name: push README to Dockerhub
-        uses: christian-korneck/update-container-description-action@v1
-        env:
-          DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASS: ${{ secrets.DOCKER_PASSWORD }}
-        with:
-          destination_container_repo: yadd/lemonldap-ng-base
-          provider: dockerhub
-          short_description: 'Base image for lemonldap-ng dockers'
-          readme_file: 'base/README.md'
+          DOCKER_IMAGE: yadd/lemonldap-ng-base
+          DIRNAME: ./base
+          SHORT_DESCRIPTION: 'Base image for lemonldap-ng dockers'
 
   build-and-push-portal:
     needs: build-and-push-base
@@ -110,34 +64,9 @@ jobs:
         with:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-portal
-      - name: Build and push Docker image for portal
-        uses: docker/build-push-action@v4
-        with:
-          context: ./portal
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:latest
-          platforms: ${{ steps.platforms.outputs.platforms }}
-          push: true
-          tags: |
-            yadd/lemonldap-ng-portal:latest
-            yadd/lemonldap-ng-portal:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
-            yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
-      - name: push README to Dockerhub
-        uses: christian-korneck/update-container-description-action@v1
-        env:
-          DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASS: ${{ secrets.DOCKER_PASSWORD }}
-        with:
-          destination_container_repo: yadd/lemonldap-ng-portal
-          provider: dockerhub
-          short_description: 'LemonLDAP::NG Portal'
-          readme_file: 'portal/README.md'
+          DOCKER_IMAGE: yadd/lemonldap-ng-portal
+          DIRNAME: ./portal
+          SHORT_DESCRIPTION: 'LemonLDAP::NG Portal'
 
   build-and-push-portal-hiperf:
     needs: build-and-push-base
@@ -150,24 +79,10 @@ jobs:
         with:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-portal
-      - name: Build and push Docker image for portal uWSGI
-        uses: docker/build-push-action@v4
-        with:
-          context: ./uwsgi-portal
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:latest
-          platforms: ${{ steps.platforms.outputs.platforms }}
-          push: true
-          tags: |
-            yadd/lemonldap-ng-portal:latest-hiperf
-            yadd/lemonldap-ng-portal:${{ steps.date.outputs.date }}-hiperf
-            yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-hiperf
-            yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-hiperf
+          DOCKER_IMAGE: yadd/lemonldap-ng-portal
+          DIRNAME: ./uwsgi-portal
+          IMAGE_SUFFIX2: "-hiperf"
+          SHORT_DESCRIPTION: no
 
   build-and-push-pubsub-server:
     needs: test
@@ -180,32 +95,9 @@ jobs:
         with:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-pubsub-server
-      - name: Build and push Docker image for llng pubsub server
-        uses: docker/build-push-action@v4
-        with:
-          context: ./webpubsub
-          platforms: ${{ steps.platforms.outputs.platforms }}
-          push: true
-          tags: |
-            yadd/lemonldap-ng-pubsub-server:latest
-            yadd/lemonldap-ng-pubsub-server:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-pubsub-server:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
-            yadd/lemonldap-ng-pubsub-server:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
-      - name: push README to Dockerhub
-        uses: christian-korneck/update-container-description-action@v1
-        env:
-          DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASS: ${{ secrets.DOCKER_PASSWORD }}
-        with:
-          destination_container_repo: yadd/lemonldap-ng-pubsub-server
-          provider: dockerhub
-          short_description: 'LemonLDAP::NG maintenance tasks runner'
-          readme_file: 'webpubsub/README.md'
+          DOCKER_IMAGE:yadd/lemonldap-ng-pubsub-server
+          DIRNAME: ./webpubsub
+          SHORT_DESCRIPTION: 'LemonLDAP::NG alternative pub/sub server'
 
   build-and-push-cron:
     needs: build-and-push-base
@@ -218,34 +110,9 @@ jobs:
         with:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-cron
-      - name: Build and push Docker image for cron
-        uses: docker/build-push-action@v4
-        with:
-          context: ./cron
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:latest
-          platforms: ${{ steps.platforms.outputs.platforms }}
-          push: true
-          tags: |
-            yadd/lemonldap-ng-cron:latest
-            yadd/lemonldap-ng-cron:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-cron:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
-            yadd/lemonldap-ng-cron:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
-      - name: push README to Dockerhub
-        uses: christian-korneck/update-container-description-action@v1
-        env:
-          DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASS: ${{ secrets.DOCKER_PASSWORD }}
-        with:
-          destination_container_repo: yadd/lemonldap-ng-cron
-          provider: dockerhub
-          short_description: 'LemonLDAP::NG maintenance tasks runner'
-          readme_file: 'cron/README.md'
+          DOCKER_IMAGE: yadd/lemonldap-ng-cron
+          DIRNAME: ./cron
+          SHORT_DESCRIPTION: 'LemonLDAP::NG maintenance tasks runner'
 
   build-and-push-cron-task:
     needs: build-and-push-base
@@ -258,34 +125,9 @@ jobs:
         with:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-cron-task
-      - name: Build and push Docker image for cron task
-        uses: docker/build-push-action@v4
-        with:
-          context: ./cron-task
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:latest
-          platforms: ${{ steps.platforms.outputs.platforms }}
-          push: true
-          tags: |
-            yadd/lemonldap-ng-cron-task:latest
-            yadd/lemonldap-ng-cron-task:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-cron-task:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
-            yadd/lemonldap-ng-cron-task:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
-      - name: push README to Dockerhub
-        uses: christian-korneck/update-container-description-action@v1
-        env:
-          DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASS: ${{ secrets.DOCKER_PASSWORD }}
-        with:
-          destination_container_repo: yadd/lemonldap-ng-cron-task
-          provider: dockerhub
-          short_description: 'LemonLDAP::NG maintenance tasks runner'
-          readme_file: 'cron-task/README.md'
+          DOCKER_IMAGE: yadd/lemonldap-ng-cron-task
+          DIRNAME: ./cron-task
+          SHORT_DESCRIPTION: 'LemonLDAP::NG maintenance tasks'
 
   build-and-push-sessions-backup:
     needs: build-and-push-base
@@ -298,34 +140,9 @@ jobs:
         with:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-sessions-backup
-      - name: Build and push Docker image for sessions-backup task
-        uses: docker/build-push-action@v4
-        with:
-          context: ./sessions-backup
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:latest
-          platforms: ${{ steps.platforms.outputs.platforms }}
-          push: true
-          tags: |
-            yadd/lemonldap-ng-sessions-backup:latest
-            yadd/lemonldap-ng-sessions-backup:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-sessions-backup:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
-            yadd/lemonldap-ng-sessions-backup:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
-      - name: push README to Dockerhub
-        uses: christian-korneck/update-container-description-action@v1
-        env:
-          DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASS: ${{ secrets.DOCKER_PASSWORD }}
-        with:
-          destination_container_repo: yadd/lemonldap-ng-sessions-backup
-          provider: dockerhub
-          short_description: 'LemonLDAP::NG maintenance tasks runner'
-          readme_file: 'sessions-backup/README.md'
+          DOCKER_IMAGE: yadd/lemonldap-ng-sessions-backup
+          DIRNAME: ./sessions-backup
+          SHORT_DESCRIPTION: 'LemonLDAP::NG sessions backup task'
 
   build-and-push-manager:
     needs: build-and-push-base
@@ -338,34 +155,9 @@ jobs:
         with:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-manager
-      - name: Build and push Docker image for manager
-        uses: docker/build-push-action@v4
-        with:
-          context: ./manager
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:latest
-          platforms: ${{ steps.platforms.outputs.platforms }}
-          push: true
-          tags: |
-            yadd/lemonldap-ng-manager:latest
-            yadd/lemonldap-ng-manager:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-manager:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
-            yadd/lemonldap-ng-manager:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
-      - name: push README to Dockerhub
-        uses: christian-korneck/update-container-description-action@v1
-        env:
-          DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASS: ${{ secrets.DOCKER_PASSWORD }}
-        with:
-          destination_container_repo: yadd/lemonldap-ng-manager
-          provider: dockerhub
-          short_description: 'LemonLDAP::NG Manager'
-          readme_file: 'manager/README.md'
+          DOCKER_IMAGE: yadd/lemonldap-ng-manager
+          DIRNAME: ./manager
+          SHORT_DESCRIPTION: 'LemonLDAP::NG Manager'
 
   build-and-push-full:
     needs: build-and-push-portal
@@ -378,34 +170,9 @@ jobs:
         with:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-full
-      - name: Build and push Docker image for full
-        uses: docker/build-push-action@v4
-        with:
-          context: ./full
-          build-args: |
-            PORTALBASE=yadd/lemonldap-ng-portal:latest
-          platforms: ${{ steps.platforms.outputs.platforms }}
-          push: true
-          tags: |
-            yadd/lemonldap-ng-full:latest
-            yadd/lemonldap-ng-full:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-full:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
-            yadd/lemonldap-ng-full:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
-      - name: push README to Dockerhub
-        uses: christian-korneck/update-container-description-action@v1
-        env:
-          DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASS: ${{ secrets.DOCKER_PASSWORD }}
-        with:
-          destination_container_repo: yadd/lemonldap-ng-full
-          provider: dockerhub
-          short_description: 'LemonLDAP::NG Portal and Manager'
-          readme_file: 'full/README.md'
+          DOCKER_IMAGE: yadd/lemonldap-ng-full
+          DIRNAME: ./full
+          SHORT_DESCRIPTION: LemonLDAP::NG Portal and Manager'
 
   build-and-push-ssoaas-fastcgi-server:
     needs: build-and-push-base
@@ -418,34 +185,9 @@ jobs:
         with:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-ssoaas-fastcgi-server
-      - name: Build and push Docker image for SSOaaS FastCGI Server
-        uses: docker/build-push-action@v4
-        with:
-          context: ./ssoaas-fastcgi-server
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:latest
-          platforms: ${{ steps.platforms.outputs.platforms }}
-          push: true
-          tags: |
-            yadd/lemonldap-ng-ssoaas-fastcgi-server:latest
-            yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ env.VERSION }}-${{ env.DOCKERREVISION }}
-            yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}
-      - name: push README to Dockerhub
-        uses: christian-korneck/update-container-description-action@v1
-        env:
-          DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASS: ${{ secrets.DOCKER_PASSWORD }}
-        with:
-          destination_container_repo: yadd/lemonldap-ng-ssoaas-fastcgi-server
-          provider: dockerhub
-          short_description: 'LemonLDAP::NG SSOaaS FastCGI Server'
-          readme_file: 'ssoaas-fastcgi-server/README.md'
+          DOCKER_IMAGE: yadd/lemonldap-ng-ssoaas-fastcgi-server
+          DIRNAME: ./ssoaas-fastcgi-server
+          SHORT_DESCRIPTION: 'LemonLDAP::NG SSOaaS FastCGI Server'
 
   build-and-push-dev:
     needs: build-and-push-full
@@ -458,20 +200,9 @@ jobs:
         with:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-dev
-      - name: Build and push Docker image for dev
-        uses: docker/build-push-action@v4
-        with:
-          context: ./dev
-          push: true
-          tags: |
-            yadd/lemonldap-ng-dev:latest
-            yadd/lemonldap-ng-dev:${{ steps.date.outputs.date }}
-            yadd/lemonldap-ng-dev:${{ env.DEBIANRELEASE }}
+          DOCKER_IMAGE: yadd/lemonldap-ng-dev
+          DIRNAME: ./dev
+          SHORT_DESCRIPTION: no
 
   build-and-push-base-no-s6:
     runs-on: ubuntu-latest
@@ -484,22 +215,10 @@ jobs:
         with:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-base
-      - name: Build and push Docker image for base
-        uses: docker/build-push-action@v4
-        with:
-          context: ./base-no-s6
-          platforms: ${{ steps.platforms.outputs.platforms }}
-          push: true
-          tags: |
-            yadd/lemonldap-ng-base:latest-no-s6
-            yadd/lemonldap-ng-base:${{ steps.date.outputs.date }}-no-s6
-            yadd/lemonldap-ng-base:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
-            yadd/lemonldap-ng-base:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
+          DOCKER_IMAGE: yadd/lemonldap-ng-base
+          DIRNAME: ./base-no-s6
+          IMAGE_SUFFIX: "-no-s6"
+          SHORT_DESCRIPTION: no
 
   build-and-push-portal-no-s6:
     needs: build-and-push-base-no-s6
@@ -512,24 +231,10 @@ jobs:
         with:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-portal
-      - name: Build and push Docker image for portal
-        uses: docker/build-push-action@v4
-        with:
-          context: ./portal
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:latest-no-s6
-          platforms: ${{ steps.platforms.outputs.platforms }}
-          push: true
-          tags: |
-            yadd/lemonldap-ng-portal:latest-no-s6
-            yadd/lemonldap-ng-portal:${{ steps.date.outputs.date }}-no-s6
-            yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
-            yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
+          DOCKER_IMAGE: yadd/lemonldap-ng-portal
+          DIRNAME: ./portal
+          IMAGE_SUFFIX: "-no-s6"
+          SHORT_DESCRIPTION: no
 
   build-and-push-portal-hiperf-no-s6:
     needs: build-and-push-base-no-s6
@@ -542,24 +247,11 @@ jobs:
         with:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-portal
-      - name: Build and push Docker image for portal uWSGI
-        uses: docker/build-push-action@v4
-        with:
-          context: ./uwsgi-portal
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:latest-no-s6
-          platforms: ${{ steps.platforms.outputs.platforms }}
-          push: true
-          tags: |
-            yadd/lemonldap-ng-portal:latest-no-s6-hiperf
-            yadd/lemonldap-ng-portal:${{ steps.date.outputs.date }}-no-s6-hiperf
-            yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6-hiperf
-            yadd/lemonldap-ng-portal:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6-hiperf
+          DOCKER_IMAGE: yadd/lemonldap-ng-portal
+          DIRNAME: ./uwsgi-portal
+          IMAGE_SUFFIX: "-no-s6"
+          IMAGE_SUFFIX2: "-hiperf"
+          SHORT_DESCRIPTION: no
 
   build-and-push-cron-no-s6:
     needs: build-and-push-base-no-s6
@@ -572,24 +264,10 @@ jobs:
         with:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-cron
-      - name: Build and push Docker image for cron
-        uses: docker/build-push-action@v4
-        with:
-          context: ./cron
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:latest-no-s6
-          platforms: ${{ steps.platforms.outputs.platforms }}
-          push: true
-          tags: |
-            yadd/lemonldap-ng-cron:latest-no-s6
-            yadd/lemonldap-ng-cron:${{ steps.date.outputs.date }}-no-s6
-            yadd/lemonldap-ng-cron:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
-            yadd/lemonldap-ng-cron:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
+          DOCKER_IMAGE: yadd/lemonldap-ng-cron
+          DIRNAME: ./cron
+          IMAGE_SUFFIX: "-no-s6"
+          SHORT_DESCRIPTION: no
 
   build-and-push-cron-task-no-s6:
     needs: build-and-push-base-no-s6
@@ -602,24 +280,10 @@ jobs:
         with:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-cron-task
-      - name: Build and push Docker image for cron-task
-        uses: docker/build-push-action@v4
-        with:
-          context: ./cron-task
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:latest-no-s6
-          platforms: ${{ steps.platforms.outputs.platforms }}
-          push: true
-          tags: |
-            yadd/lemonldap-ng-cron-task:latest-no-s6
-            yadd/lemonldap-ng-cron-task:${{ steps.date.outputs.date }}-no-s6
-            yadd/lemonldap-ng-cron-task:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
-            yadd/lemonldap-ng-cron-task:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
+          DOCKER_IMAGE: yadd/lemonldap-ng-cron-task
+          DIRNAME: ./cron-task
+          IMAGE_SUFFIX: "-no-s6"
+          SHORT_DESCRIPTION: no
 
   build-and-push-sessions-backup-no-s6:
     needs: build-and-push-base-no-s6
@@ -632,24 +296,10 @@ jobs:
         with:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-sessions-backup
-      - name: Build and push Docker image for sessions-backup
-        uses: docker/build-push-action@v4
-        with:
-          context: ./sessions-backup
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:latest-no-s6
-          platforms: ${{ steps.platforms.outputs.platforms }}
-          push: true
-          tags: |
-            yadd/lemonldap-ng-sessions-backup:latest-no-s6
-            yadd/lemonldap-ng-sessions-backup:${{ steps.date.outputs.date }}-no-s6
-            yadd/lemonldap-ng-sessions-backup:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
-            yadd/lemonldap-ng-sessions-backup:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
+          DOCKER_IMAGE: yadd/lemonldap-ng-sessions-backup
+          DIRNAME: ./sessions-backup
+          IMAGE_SUFFIX: "-no-s6"
+          SHORT_DESCRIPTION: no
 
   build-and-push-manager-no-s6:
     needs: build-and-push-base-no-s6
@@ -662,24 +312,10 @@ jobs:
         with:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-manager
-      - name: Build and push Docker image for manager
-        uses: docker/build-push-action@v4
-        with:
-          context: ./manager
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:latest-no-s6
-          platforms: ${{ steps.platforms.outputs.platforms }}
-          push: true
-          tags: |
-            yadd/lemonldap-ng-manager:latest-no-s6
-            yadd/lemonldap-ng-manager:${{ steps.date.outputs.date }}-no-s6
-            yadd/lemonldap-ng-manager:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
-            yadd/lemonldap-ng-manager:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
+          DOCKER_IMAGE: yadd/lemonldap-ng-manager
+          DIRNAME: ./manager
+          IMAGE_SUFFIX: "-no-s6"
+          SHORT_DESCRIPTION: no
 
   build-and-push-full-no-s6:
     needs: build-and-push-portal-no-s6
@@ -692,24 +328,10 @@ jobs:
         with:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-full
-      - name: Build and push Docker image for full
-        uses: docker/build-push-action@v4
-        with:
-          context: ./full
-          build-args: |
-            PORTALBASE=yadd/lemonldap-ng-portal:latest-no-s6
-          platforms: ${{ steps.platforms.outputs.platforms }}
-          push: true
-          tags: |
-            yadd/lemonldap-ng-full:latest-no-s6
-            yadd/lemonldap-ng-full:${{ steps.date.outputs.date }}-no-s6
-            yadd/lemonldap-ng-full:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
-            yadd/lemonldap-ng-full:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
+          DOCKER_IMAGE: yadd/lemonldap-ng-full
+          DIRNAME: ./full
+          IMAGE_SUFFIX: "-no-s6"
+          SHORT_DESCRIPTION: no
 
   build-and-push-ssoaas-fastcgi-server-no-s6:
     needs: build-and-push-base-no-s6
@@ -722,21 +344,7 @@ jobs:
         with:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: yadd/lemonldap-ng-ssoaas-fastcgi-server
-      - name: Build and push Docker image for SSOaaS FastCGI Server
-        uses: docker/build-push-action@v4
-        with:
-          context: ./ssoaas-fastcgi-server
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:latest-no-s6
-          platforms: ${{ steps.platforms.outputs.platforms }}
-          push: true
-          tags: |
-            yadd/lemonldap-ng-ssoaas-fastcgi-server:latest-no-s6
-            yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ steps.date.outputs.date }}-no-s6
-            yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-no-s6
-            yadd/lemonldap-ng-ssoaas-fastcgi-server:${{ env.VERSION }}-${{ env.DOCKERREVISION }}-${{ env.DEBIANRELEASE }}-no-s6
+          DOCKER_IMAGE: yadd/lemonldap-ng-ssoaas-fastcgi-server
+          DIRNAME: ./ssoaas-fastcgi-server
+          IMAGE_SUFFIX: "-no-s6"
+          SHORT_DESCRIPTION: no

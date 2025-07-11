@@ -3,10 +3,25 @@ description: common steps for docker-publish jobs
 inputs:
   DOCKER_USERNAME:
     required: true
-    description: Utilisateur Docker
+    description: Docker username
   DOCKER_PASSWORD:
     required: true
-    description: Mot de passe Docker
+    description: Docker password
+  DOCKER_IMAGE:
+    required: true
+    description: Image name
+  DIRNAME:
+    required: true
+    description: Working directory
+  IMAGE_SUFFIX:
+    required: false
+    description: Optional image suffix
+  IMAGE_SUFFIX2:
+    required: false
+    description: Optional image suffix
+  SHORT_DESCRIPTION:
+    required: true
+    description: Short description
 
 runs:
   using: "composite"
@@ -33,3 +48,32 @@ runs:
           else
             echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
           fi
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ inputs.DOCKER_IMAGE }}
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: ${{ inputs.DIRNAME }}
+          build-args: |
+            BASE=yadd/lemonldap-ng-base:latest${{ inputs.IMAGE_SUFFIX }}
+          platforms: ${{ steps.platforms.outputs.platforms }}
+          push: true
+          tags: |
+            ${{ inputs.DOCKER_IMAGE }}:latest
+            ${{ inputs.DOCKER_IMAGE }}:${{ steps.date.outputs.date }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}
+            ${{ inputs.DOCKER_IMAGE }}:${{ env.PGVERSION }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}
+            ${{ inputs.DOCKER_IMAGE }}:${{ env.PGVERSION }}-${{ env.DEBIANRELEASE }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}
+      - name: push README to Dockerhub
+        if: inputs.SHORT_DESCRIPTION != 'no'
+        uses: christian-korneck/update-container-description-action@v1
+        env:
+          DOCKER_USER: ${{ inputs.DOCKER_USERNAME }}
+          DOCKER_PASS: ${{ inputs.DOCKER_PASSWORD }}
+        with:
+          destination_container_repo: ${{ inputs.DOCKER_IMAGE }}
+          provider: dockerhub
+          short_description: ${{ inputs.SHORT_DESCRIPTION }}
+          readme_file: ${{ inputs.DIRNAME }}/README.md
