@@ -2,6 +2,5 @@
 
 lokiSender --defer-dir /var/cache/lemonldap-ng/loki \
 	--delay 60 \
-	--debug \
 	--user www-data \
 	--group www-data
