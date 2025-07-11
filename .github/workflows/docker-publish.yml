@@ -30,7 +30,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Common setup
-        uses: ./actions/docker-common
+        uses: ./.github/actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -65,7 +65,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Common setup
-        uses: ./actions/docker-common
+        uses: ./.github/actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -100,7 +100,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Common setup
-        uses: ./actions/docker-common
+        uses: ./.github/actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -137,7 +137,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Common setup
-        uses: ./actions/docker-common
+        uses: ./.github/actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -164,7 +164,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Common setup
-        uses: ./actions/docker-common
+        uses: ./.github/actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -199,7 +199,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Common setup
-        uses: ./actions/docker-common
+        uses: ./.github/actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -236,7 +236,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Common setup
-        uses: ./actions/docker-common
+        uses: ./.github/actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -273,7 +273,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Common setup
-        uses: ./actions/docker-common
+        uses: ./.github/actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -310,7 +310,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Common setup
-        uses: ./actions/docker-common
+        uses: ./.github/actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -347,7 +347,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Common setup
-        uses: ./actions/docker-common
+        uses: ./.github/actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -384,7 +384,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Common setup
-        uses: ./actions/docker-common
+        uses: ./.github/actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -421,7 +421,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Common setup
-        uses: ./actions/docker-common
+        uses: ./.github/actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -444,7 +444,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Common setup
-        uses: ./actions/docker-common
+        uses: ./.github/actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -469,7 +469,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Common setup
-        uses: ./actions/docker-common
+        uses: ./.github/actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -496,7 +496,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Common setup
-        uses: ./actions/docker-common
+        uses: ./.github/actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -523,7 +523,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Common setup
-        uses: ./actions/docker-common
+        uses: ./.github/actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -550,7 +550,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Common setup
-        uses: ./actions/docker-common
+        uses: ./.github/actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -577,7 +577,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Common setup
-        uses: ./actions/docker-common
+        uses: ./.github/actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -604,7 +604,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Common setup
-        uses: ./actions/docker-common
+        uses: ./.github/actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -631,7 +631,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Common setup
-        uses: ./actions/docker-common
+        uses: ./.github/actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -658,7 +658,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Common setup
-        uses: ./actions/docker-common
+        uses: ./.github/actions/docker-common
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
