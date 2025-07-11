@@ -22,6 +22,9 @@ inputs:
   SHORT_DESCRIPTION:
     required: true
     description: Short description
+  VERSION:
+    required: valse
+    default: no
 
 runs:
   using: "composite"
@@ -39,6 +42,15 @@ runs:
         with:
           username: ${{ inputs.DOCKER_USERNAME }}
           password: ${{ inputs.DOCKER_PASSWORD }}
+      - name: Set main version
+        shell: bash
+        run: |
+          VERSION="${{ inputs.VERSION }}"
+          if [[ "$VERSION" == "no" ]]; then
+            VERSION="${{ env.VERSION }}"
+          fi
+          echo "✅ Using VERSION: $VERSION"
+          if [[ "$VERSION" == "no" ]]; then exit 1; fi
       - name: Define platforms
         id: platforms
         shell: bash
@@ -59,6 +71,7 @@ runs:
           context: ${{ inputs.DIRNAME }}
           build-args: |
             BASE=yadd/lemonldap-ng-base:latest${{ inputs.IMAGE_SUFFIX }}
+            PORTALBASE=yadd/lemonldap-ng-portal:latest${{ inputs.IMAGE_SUFFIX }}
           platforms: ${{ steps.platforms.outputs.platforms }}
           push: true
           tags: |

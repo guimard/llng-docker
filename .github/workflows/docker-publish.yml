@@ -37,6 +37,7 @@ jobs:
           DOCKER_IMAGE: yadd/lemonldap-ng-pg-database
           DIRNAME: ./pg
           SHORT_DESCRIPTION: 'PostgreSQL database ready to use for LemonLDAP::NG'
+          VERSION: ${{ env.PGVERSION }}
 
   build-and-push-base:
     runs-on: ubuntu-latest
