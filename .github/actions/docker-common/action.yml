@@ -77,8 +77,8 @@ runs:
           tags: |
             ${{ inputs.DOCKER_IMAGE }}:latest
             ${{ inputs.DOCKER_IMAGE }}:${{ steps.date.outputs.date }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}
-            ${{ inputs.DOCKER_IMAGE }}:${{ env.PGVERSION }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}
-            ${{ inputs.DOCKER_IMAGE }}:${{ env.PGVERSION }}-${{ env.DEBIANRELEASE }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}
+            ${{ inputs.DOCKER_IMAGE }}:${{ env.VERSION }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}
+            ${{ inputs.DOCKER_IMAGE }}:${{ env.VERSION }}-${{ env.DEBIANRELEASE }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}
       - name: push README to Dockerhub
         if: inputs.SHORT_DESCRIPTION != 'no'
         uses: christian-korneck/update-container-description-action@v1
