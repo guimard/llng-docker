@@ -1,10 +1,10 @@
 name: Build and Publish Docker Images
 
 env:
-  VERSION: 2.21.1
+  VERSION: 2.21.2
   PGVERSION: 15
   DEBIANRELEASE: bookworm
-  DOCKERREVISION: 2
+  DOCKERREVISION: 1
 
 on:
   push:
@@ -44,11 +44,18 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: yadd/lemonldap-ng-pg-database
+      - name: Define platforms
+        id: platforms
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
+          else
+            echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
       - name: Build and push Docker image for pg
         uses: docker/build-push-action@v4
         with:
           context: ./pg
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
+          platforms: ${{ steps.platforms.outputs.platforms }}
           push: true
           tags: |
             yadd/lemonldap-ng-pg-database:latest
@@ -89,11 +96,18 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: yadd/lemonldap-ng-base
+      - name: Define platforms
+        id: platforms
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
+          else
+            echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
       - name: Build and push Docker image for base
         uses: docker/build-push-action@v4
         with:
           context: ./base
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
+          platforms: ${{ steps.platforms.outputs.platforms }}
           push: true
           tags: |
             yadd/lemonldap-ng-base:latest
@@ -134,13 +148,20 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: yadd/lemonldap-ng-portal
+      - name: Define platforms
+        id: platforms
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
+          else
+            echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
       - name: Build and push Docker image for portal
         uses: docker/build-push-action@v4
         with:
           context: ./portal
           build-args: |
             BASE=yadd/lemonldap-ng-base:latest
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
+          platforms: ${{ steps.platforms.outputs.platforms }}
           push: true
           tags: |
             yadd/lemonldap-ng-portal:latest
@@ -181,13 +202,20 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: yadd/lemonldap-ng-portal
+      - name: Define platforms
+        id: platforms
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
+          else
+            echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
       - name: Build and push Docker image for portal uWSGI
         uses: docker/build-push-action@v4
         with:
           context: ./uwsgi-portal
           build-args: |
             BASE=yadd/lemonldap-ng-base:latest
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
+          platforms: ${{ steps.platforms.outputs.platforms }}
           push: true
           tags: |
             yadd/lemonldap-ng-portal:latest-hiperf
@@ -218,11 +246,18 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: yadd/lemonldap-ng-pubsub-server
+      - name: Define platforms
+        id: platforms
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
+          else
+            echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
       - name: Build and push Docker image for llng pubsub server
         uses: docker/build-push-action@v4
         with:
           context: ./webpubsub
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
+          platforms: ${{ steps.platforms.outputs.platforms }}
           push: true
           tags: |
             yadd/lemonldap-ng-pubsub-server:latest
@@ -263,13 +298,20 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: yadd/lemonldap-ng-cron
+      - name: Define platforms
+        id: platforms
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
+          else
+            echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
       - name: Build and push Docker image for cron
         uses: docker/build-push-action@v4
         with:
           context: ./cron
           build-args: |
             BASE=yadd/lemonldap-ng-base:latest
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
+          platforms: ${{ steps.platforms.outputs.platforms }}
           push: true
           tags: |
             yadd/lemonldap-ng-cron:latest
@@ -310,13 +352,20 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: yadd/lemonldap-ng-cron-task
+      - name: Define platforms
+        id: platforms
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
+          else
+            echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
       - name: Build and push Docker image for cron task
         uses: docker/build-push-action@v4
         with:
           context: ./cron-task
           build-args: |
             BASE=yadd/lemonldap-ng-base:latest
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
+          platforms: ${{ steps.platforms.outputs.platforms }}
           push: true
           tags: |
             yadd/lemonldap-ng-cron-task:latest
@@ -357,13 +406,20 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: yadd/lemonldap-ng-sessions-backup
+      - name: Define platforms
+        id: platforms
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
+          else
+            echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
       - name: Build and push Docker image for sessions-backup task
         uses: docker/build-push-action@v4
         with:
           context: ./sessions-backup
           build-args: |
             BASE=yadd/lemonldap-ng-base:latest
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
+          platforms: ${{ steps.platforms.outputs.platforms }}
           push: true
           tags: |
             yadd/lemonldap-ng-sessions-backup:latest
@@ -404,13 +460,20 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: yadd/lemonldap-ng-manager
+      - name: Define platforms
+        id: platforms
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
+          else
+            echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
       - name: Build and push Docker image for manager
         uses: docker/build-push-action@v4
         with:
           context: ./manager
           build-args: |
             BASE=yadd/lemonldap-ng-base:latest
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
+          platforms: ${{ steps.platforms.outputs.platforms }}
           push: true
           tags: |
             yadd/lemonldap-ng-manager:latest
@@ -451,13 +514,20 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: yadd/lemonldap-ng-full
+      - name: Define platforms
+        id: platforms
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
+          else
+            echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
       - name: Build and push Docker image for full
         uses: docker/build-push-action@v4
         with:
           context: ./full
           build-args: |
             PORTALBASE=yadd/lemonldap-ng-portal:latest
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
+          platforms: ${{ steps.platforms.outputs.platforms }}
           push: true
           tags: |
             yadd/lemonldap-ng-full:latest
@@ -498,13 +568,20 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: yadd/lemonldap-ng-ssoaas-fastcgi-server
+      - name: Define platforms
+        id: platforms
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
+          else
+            echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
       - name: Build and push Docker image for SSOaaS FastCGI Server
         uses: docker/build-push-action@v4
         with:
           context: ./ssoaas-fastcgi-server
           build-args: |
             BASE=yadd/lemonldap-ng-base:latest
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
+          platforms: ${{ steps.platforms.outputs.platforms }}
           push: true
           tags: |
             yadd/lemonldap-ng-ssoaas-fastcgi-server:latest
@@ -548,6 +625,13 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: yadd/lemonldap-ng-dev
+      - name: Define platforms
+        id: platforms
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
+          else
+            echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
       - name: Build and push Docker image for dev
         uses: docker/build-push-action@v4
         with:
@@ -581,11 +665,18 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: yadd/lemonldap-ng-base
+      - name: Define platforms
+        id: platforms
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
+          else
+            echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
       - name: Build and push Docker image for base
         uses: docker/build-push-action@v4
         with:
           context: ./base-no-s6
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
+          platforms: ${{ steps.platforms.outputs.platforms }}
           push: true
           tags: |
             yadd/lemonldap-ng-base:latest-no-s6
@@ -616,13 +707,20 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: yadd/lemonldap-ng-portal
+      - name: Define platforms
+        id: platforms
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
+          else
+            echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
       - name: Build and push Docker image for portal
         uses: docker/build-push-action@v4
         with:
           context: ./portal
           build-args: |
             BASE=yadd/lemonldap-ng-base:latest-no-s6
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
+          platforms: ${{ steps.platforms.outputs.platforms }}
           push: true
           tags: |
             yadd/lemonldap-ng-portal:latest-no-s6
@@ -653,13 +751,20 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: yadd/lemonldap-ng-portal
+      - name: Define platforms
+        id: platforms
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
+          else
+            echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
       - name: Build and push Docker image for portal uWSGI
         uses: docker/build-push-action@v4
         with:
           context: ./uwsgi-portal
           build-args: |
             BASE=yadd/lemonldap-ng-base:latest-no-s6
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
+          platforms: ${{ steps.platforms.outputs.platforms }}
           push: true
           tags: |
             yadd/lemonldap-ng-portal:latest-no-s6-hiperf
@@ -690,13 +795,20 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: yadd/lemonldap-ng-cron
+      - name: Define platforms
+        id: platforms
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
+          else
+            echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
       - name: Build and push Docker image for cron
         uses: docker/build-push-action@v4
         with:
           context: ./cron
           build-args: |
             BASE=yadd/lemonldap-ng-base:latest-no-s6
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
+          platforms: ${{ steps.platforms.outputs.platforms }}
           push: true
           tags: |
             yadd/lemonldap-ng-cron:latest-no-s6
@@ -727,13 +839,20 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: yadd/lemonldap-ng-cron-task
+      - name: Define platforms
+        id: platforms
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
+          else
+            echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
       - name: Build and push Docker image for cron-task
         uses: docker/build-push-action@v4
         with:
           context: ./cron-task
           build-args: |
             BASE=yadd/lemonldap-ng-base:latest-no-s6
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
+          platforms: ${{ steps.platforms.outputs.platforms }}
           push: true
           tags: |
             yadd/lemonldap-ng-cron-task:latest-no-s6
@@ -764,13 +883,20 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: yadd/lemonldap-ng-sessions-backup
+      - name: Define platforms
+        id: platforms
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
+          else
+            echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
       - name: Build and push Docker image for sessions-backup
         uses: docker/build-push-action@v4
         with:
           context: ./sessions-backup
           build-args: |
             BASE=yadd/lemonldap-ng-base:latest-no-s6
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
+          platforms: ${{ steps.platforms.outputs.platforms }}
           push: true
           tags: |
             yadd/lemonldap-ng-sessions-backup:latest-no-s6
@@ -801,13 +927,20 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: yadd/lemonldap-ng-manager
+      - name: Define platforms
+        id: platforms
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
+          else
+            echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
       - name: Build and push Docker image for manager
         uses: docker/build-push-action@v4
         with:
           context: ./manager
           build-args: |
             BASE=yadd/lemonldap-ng-base:latest-no-s6
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
+          platforms: ${{ steps.platforms.outputs.platforms }}
           push: true
           tags: |
             yadd/lemonldap-ng-manager:latest-no-s6
@@ -838,13 +971,20 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: yadd/lemonldap-ng-full
+      - name: Define platforms
+        id: platforms
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
+          else
+            echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
       - name: Build and push Docker image for full
         uses: docker/build-push-action@v4
         with:
           context: ./full
           build-args: |
             PORTALBASE=yadd/lemonldap-ng-portal:latest-no-s6
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
+          platforms: ${{ steps.platforms.outputs.platforms }}
           push: true
           tags: |
             yadd/lemonldap-ng-full:latest-no-s6
@@ -875,13 +1015,20 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: yadd/lemonldap-ng-ssoaas-fastcgi-server
+      - name: Define platforms
+        id: platforms
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
+          else
+            echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
       - name: Build and push Docker image for SSOaaS FastCGI Server
         uses: docker/build-push-action@v4
         with:
           context: ./ssoaas-fastcgi-server
           build-args: |
             BASE=yadd/lemonldap-ng-base:latest-no-s6
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x
+          platforms: ${{ steps.platforms.outputs.platforms }}
           push: true
           tags: |
             yadd/lemonldap-ng-ssoaas-fastcgi-server:latest-no-s6
