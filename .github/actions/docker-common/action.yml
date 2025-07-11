@@ -1,0 +1,27 @@
+name: Common docker publish setup
+description: common steps for docker-publish jobs
+runs:
+  using: "composite"
+  steps:
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Define platforms
+        id: platforms
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "platforms=linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
+          else
+            echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
+          fi
