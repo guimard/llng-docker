@@ -1,10 +1,19 @@
 name: Common docker publish setup
 description: common steps for docker-publish jobs
+inputs:
+  DOCKER_USERNAME:
+    required: true
+    description: Utilisateur Docker
+  DOCKER_PASSWORD:
+    required: true
+    description: Mot de passe Docker
+
 runs:
   using: "composite"
   steps:
       - name: Get current date
         id: date
+        shell: bash
         run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -17,6 +26,7 @@ runs:
           password: ${{ secrets.DOCKER_PASSWORD }}
       - name: Define platforms
         id: platforms
+        shell: bash
         run: |
           if [[ "$GITHUB_REF" == refs/tags/* ]]; then
             echo "platforms=linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT

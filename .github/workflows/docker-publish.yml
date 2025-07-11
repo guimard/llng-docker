@@ -31,6 +31,9 @@ jobs:
         uses: actions/checkout@v3
       - name: Common setup
         uses: ./.github/actions/docker-common
+        with:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -66,6 +69,9 @@ jobs:
         uses: actions/checkout@v3
       - name: Common setup
         uses: ./.github/actions/docker-common
+        with:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -101,6 +107,9 @@ jobs:
         uses: actions/checkout@v3
       - name: Common setup
         uses: ./.github/actions/docker-common
+        with:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -138,6 +147,9 @@ jobs:
         uses: actions/checkout@v3
       - name: Common setup
         uses: ./.github/actions/docker-common
+        with:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -165,6 +177,9 @@ jobs:
         uses: actions/checkout@v3
       - name: Common setup
         uses: ./.github/actions/docker-common
+        with:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -200,6 +215,9 @@ jobs:
         uses: actions/checkout@v3
       - name: Common setup
         uses: ./.github/actions/docker-common
+        with:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -237,6 +255,9 @@ jobs:
         uses: actions/checkout@v3
       - name: Common setup
         uses: ./.github/actions/docker-common
+        with:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -274,6 +295,9 @@ jobs:
         uses: actions/checkout@v3
       - name: Common setup
         uses: ./.github/actions/docker-common
+        with:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -311,6 +335,9 @@ jobs:
         uses: actions/checkout@v3
       - name: Common setup
         uses: ./.github/actions/docker-common
+        with:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -348,6 +375,9 @@ jobs:
         uses: actions/checkout@v3
       - name: Common setup
         uses: ./.github/actions/docker-common
+        with:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -385,6 +415,9 @@ jobs:
         uses: actions/checkout@v3
       - name: Common setup
         uses: ./.github/actions/docker-common
+        with:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -422,6 +455,9 @@ jobs:
         uses: actions/checkout@v3
       - name: Common setup
         uses: ./.github/actions/docker-common
+        with:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -445,6 +481,9 @@ jobs:
         uses: actions/checkout@v3
       - name: Common setup
         uses: ./.github/actions/docker-common
+        with:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -470,6 +509,9 @@ jobs:
         uses: actions/checkout@v3
       - name: Common setup
         uses: ./.github/actions/docker-common
+        with:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -497,6 +539,9 @@ jobs:
         uses: actions/checkout@v3
       - name: Common setup
         uses: ./.github/actions/docker-common
+        with:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -524,6 +569,9 @@ jobs:
         uses: actions/checkout@v3
       - name: Common setup
         uses: ./.github/actions/docker-common
+        with:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -551,6 +599,9 @@ jobs:
         uses: actions/checkout@v3
       - name: Common setup
         uses: ./.github/actions/docker-common
+        with:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -578,6 +629,9 @@ jobs:
         uses: actions/checkout@v3
       - name: Common setup
         uses: ./.github/actions/docker-common
+        with:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -605,6 +659,9 @@ jobs:
         uses: actions/checkout@v3
       - name: Common setup
         uses: ./.github/actions/docker-common
+        with:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -632,6 +689,9 @@ jobs:
         uses: actions/checkout@v3
       - name: Common setup
         uses: ./.github/actions/docker-common
+        with:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -659,6 +719,9 @@ jobs:
         uses: actions/checkout@v3
       - name: Common setup
         uses: ./.github/actions/docker-common
+        with:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
