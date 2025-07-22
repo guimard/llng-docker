@@ -1,5 +1,8 @@
 # Changes
 
+## v2.21.2-2 _(dev)_
+* Render mail2f accessible via API
+
 ## v2.21.2-1 _(2025-07-11)_
 * Install llng client
 * Launch automatically lokiSender when a loki logger is configured
