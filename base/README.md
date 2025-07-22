@@ -5,10 +5,12 @@ LemonLDAP::NG.
 
 ## Tags
 
-* `stable`: latest lemonldap-ng\* packages from Debian backports
+* `stable`: latest lemonldap-ng\* packages from Debian backports with stable patches
 * `stable-no-s6`: the same without [S6-overlay](https://github.com/just-containers/s6-overlay)
-* `2.x.x`: versioned lemonldap-ng\* packages from Debian backports
-* `2.x.x-no-s6`: the same without [S6-overlay](https://github.com/just-containers/s6-overlay)
+* `2.x.x-y`: versioned lemonldap-ng\* packages from Debian backports with patches version "y"
+* `2.x.x-y-no-s6`: the same without [S6-overlay](https://github.com/just-containers/s6-overlay)
+
+There are also date-based tags.
 
 ## Features
 
