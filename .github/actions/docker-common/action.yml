@@ -47,7 +47,7 @@ runs:
         run: |
           VERSION="${{ inputs.VERSION }}"
           if [[ "$VERSION" == "no" ]]; then
-            VERSION="${{ env.VERSION }}"
+            VERSION="${{ env.VERSION }}-${{ env.DOCKERREVISION }}"
           fi
           echo "✅ Using VERSION: $VERSION"
           if [[ "$VERSION" == "no" ]]; then exit 1; fi
