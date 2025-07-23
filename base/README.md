@@ -47,6 +47,7 @@ There are also date-based tags.
 * `LOGGER` = `syslog` _(possible values: stderr, syslog, loki)_
 * `USERLOGGER` = `syslog` _(possible values: stderr, syslog, loki)_
 * `AUDITLOGGER` =
+* `NGINX_LOG_JSON` = _(if a value is set, then default llng format is changed into JSON)_
 * `LOKIURL` = `http://localhost:3100/loki/api/v1/push`
 * `LOKITENANT` =
 * `FORCE_KEY_REGENERATION` = `no`

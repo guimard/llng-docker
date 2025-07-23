@@ -26,7 +26,7 @@ if test "$LOGGER" = "stderr"; then
     perl -i -ne 'print unless /^logger\s*=/;print "logger = Lemonldap::NG::Common::Logger::Std\n" if/^\[\s*all\s*\]/;' $INI
 elif test "$LOGGER" = "loki"; then
     echo "Set logger to Lemonldap::NG::Common::Logger::Loki"
-    perl -i -ne 'print unless /^logger\s*=/;print "logger = Lemonldap::NG::Common::Logger::Loki\nlokiUrl = '"$LOKIURL"'\n" if/^\[\s*all\s*\]/;' $INI
+    perl -i -ne 'print unless /^logger\s*=/;print "logger = Lemonldap::NG::Common::Logger::Loki\nlokiUrl = '"$LOKIURL"'\nlokiDeferDir = /var/cache/lemonldap-ng/loki\n" if/^\[\s*all\s*\]/;' $INI
     LOKI=1
 fi
 
@@ -35,7 +35,7 @@ if test "$USERLOGGER" = "stderr"; then
     perl -i -ne 'print unless /^userLogger\s*=/;print "userLogger = Lemonldap::NG::Common::Logger::Std\n" if/^\[\s*all\s*\]/;' $INI
 elif test "$USERLOGGER" = "loki"; then
     echo "Set userLogger to Lemonldap::NG::Common::Logger::Loki"
-    perl -i -ne 'print unless /^(?:userLogger|lokiUrl)\s*=/;print "userLogger = Lemonldap::NG::Common::Logger::Loki\nlokiUrl = '"$LOKIURL"'\n" if/^\[\s*all\s*\]/;' $INI
+    perl -i -ne 'print unless /^(?:userLogger|lokiUrl)\s*=/;print "userLogger = Lemonldap::NG::Common::Logger::Loki\nlokiUrl = '"$LOKIURL"'\nlokiDeferDir = /var/cache/lemonldap-ng/loki\n" if/^\[\s*all\s*\]/;' $INI
     LOKI=1
 fi
 
@@ -200,4 +200,9 @@ done
 
 if test "$LANGUAGES" != ''; then
 	perl -i -pe "s/^(languages\s*=\s*).*\$/\$1$LANGUAGES/" /etc/lemonldap-ng/lemonldap-ng.ini
+fi
+
+if test "$NGINX_LOG_JSON" != ""; then
+    echo "Configuring Nginx log in JSON format"
+    perl -i -pe 's/access_log\s+(.*)\s+llng\s*;/access_log $1 llng_json;/' $(find /etc/nginx/sites-* /etc/lemonldap-ng/ -type f -name *.conf)
 fi

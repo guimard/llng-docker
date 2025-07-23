@@ -1,7 +1,8 @@
 # Changes
 
-## v2.21.2-2 _(dev)_
+## v2.21.2-2 _(2025-07-23)_
 * Render mail2f accessible via API
+* Fix Loki export in hiperf
 
 ## v2.21.2-1 _(2025-07-11)_
 * Install llng client
