@@ -1,0 +1,13 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/Code2F.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/Code2F.pm
+@@ -218,7 +218,9 @@ sub sendCodeForm {
+ 
+     # Prepare form
+     my $prefix = $self->prefix;
+-    return $self->p->sendHtml(
++    return
++      $req->wantJSON ? $self->p->sendJSONresponse( $req, \%params )
++      : $self->p->sendHtml(
+         $req,
+         'ext2fcheck',
+         params => {

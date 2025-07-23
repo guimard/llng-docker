@@ -50,6 +50,7 @@ ENV SSODOMAIN=example.com \
     LOGGER=stderr \
     LOKITENANT= \
     USERLOGGER=stderr \
+    NGINX_LOG_JSON= \
     LOKIURL= \
     AUDITLOGGER= \
     REDIS_SERVER="" \

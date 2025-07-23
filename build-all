@@ -2,7 +2,7 @@
 
 set -e
 
-LIST=${LIST:-pg base portal uwsgi-portal manager full ssoaas-fastcgi-server cron cron-task sessions-backup webpubsub}
+LIST=${LIST:-pg base manager portal uwsgi-portal full ssoaas-fastcgi-server cron cron-task sessions-backup webpubsub}
 #LIST=${LIST:-pg base portal uwsgi-portal manager full ssoaas-fastcgi-server cron dev}
 
 if test "$(cd base && md5sum *.patch|sort)" != "$(cd base-no-s6 && md5sum *.patch|sort)"; then
