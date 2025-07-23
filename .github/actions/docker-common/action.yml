@@ -43,6 +43,7 @@ runs:
           username: ${{ inputs.DOCKER_USERNAME }}
           password: ${{ inputs.DOCKER_PASSWORD }}
       - name: Set main version
+        id: setversion
         shell: bash
         run: |
           VERSION="${{ inputs.VERSION }}"
@@ -51,6 +52,7 @@ runs:
           fi
           echo "✅ Using VERSION: $VERSION"
           if [[ "$VERSION" == "no" ]]; then exit 1; fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
       - name: Define platforms
         id: platforms
         shell: bash
@@ -77,8 +79,8 @@ runs:
           tags: |
             ${{ inputs.DOCKER_IMAGE }}:latest${{ inputs.IMAGE_SUFFIX }}
             ${{ inputs.DOCKER_IMAGE }}:${{ steps.date.outputs.date }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}
-            ${{ inputs.DOCKER_IMAGE }}:${{ env.VERSION }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}
-            ${{ inputs.DOCKER_IMAGE }}:${{ env.VERSION }}-${{ env.DEBIANRELEASE }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}
+            ${{ inputs.DOCKER_IMAGE }}:${{ steps.setversion.outputs.version }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}
+            ${{ inputs.DOCKER_IMAGE }}:${{ steps.setversion.outputs.version }}-${{ env.DEBIANRELEASE }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}
       - name: push README to Dockerhub
         if: inputs.SHORT_DESCRIPTION != 'no'
         uses: christian-korneck/update-container-description-action@v1
