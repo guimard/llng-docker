@@ -77,7 +77,7 @@ runs:
           platforms: ${{ steps.platforms.outputs.platforms }}
           push: true
           tags: |
-            ${{ inputs.DOCKER_IMAGE }}:latest${{ inputs.IMAGE_SUFFIX }}
+            ${{ inputs.DOCKER_IMAGE }}:latest${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}
             ${{ inputs.DOCKER_IMAGE }}:${{ steps.date.outputs.date }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}
             ${{ inputs.DOCKER_IMAGE }}:${{ steps.setversion.outputs.version }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}
             ${{ inputs.DOCKER_IMAGE }}:${{ steps.setversion.outputs.version }}-${{ env.DEBIANRELEASE }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}
