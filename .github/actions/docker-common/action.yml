@@ -67,8 +67,21 @@ runs:
         uses: docker/metadata-action@v4
         with:
           images: ${{ inputs.DOCKER_IMAGE }}
+      - name: Generate tags
+        id: gentags
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            TAGS="${{ inputs.DOCKER_IMAGE }}:${{ steps.setversion.outputs.version }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}"
+            TAGS+=$'\n'"${{ inputs.DOCKER_IMAGE }}:${{ steps.setversion.outputs.version }}-${{ env.DEBIANRELEASE }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}"
+          else
+            TAGS="${{ inputs.DOCKER_IMAGE }}:latest${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}"
+            TAGS+=$'\n'"${{ inputs.DOCKER_IMAGE }}:${{ steps.date.outputs.date }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}"
+          fi
+      
+          echo "tags<<EOF" >> $GITHUB_OUTPUT
+          echo "$TAGS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
       - name: Build and push Docker latest image
-        if: ! startsWith(github.ref, "refs/tags/")
         uses: docker/build-push-action@v4
         with:
           context: ${{ inputs.DIRNAME }}
@@ -77,22 +90,7 @@ runs:
             PORTALBASE=yadd/lemonldap-ng-portal:latest${{ inputs.IMAGE_SUFFIX }}
           platforms: ${{ steps.platforms.outputs.platforms }}
           push: true
-          tags: |
-            ${{ inputs.DOCKER_IMAGE }}:latest${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}
-            ${{ inputs.DOCKER_IMAGE }}:${{ steps.date.outputs.date }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}
-      - name: Build and push Docker tagged image
-        if: startsWith(github.ref, "refs/tags/")
-        uses: docker/build-push-action@v4
-        with:
-          context: ${{ inputs.DIRNAME }}
-          build-args: |
-            BASE=yadd/lemonldap-ng-base:latest${{ inputs.IMAGE_SUFFIX }}
-            PORTALBASE=yadd/lemonldap-ng-portal:latest${{ inputs.IMAGE_SUFFIX }}
-          platforms: ${{ steps.platforms.outputs.platforms }}
-          push: true
-          tags: |
-            ${{ inputs.DOCKER_IMAGE }}:${{ steps.setversion.outputs.version }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}
-            ${{ inputs.DOCKER_IMAGE }}:${{ steps.setversion.outputs.version }}-${{ env.DEBIANRELEASE }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}
+          tags: ${{ steps.gentags.outputs.tags }}
       - name: push README to Dockerhub
         if: inputs.SHORT_DESCRIPTION != 'no'
         uses: christian-korneck/update-container-description-action@v1
