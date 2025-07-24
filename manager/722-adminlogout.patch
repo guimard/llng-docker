@@ -224,6 +224,15 @@
  
      my $uidKey = Lemonldap::NG::Handler::Main->tsv->{whatToTrace};
      my $uid    = $session->data->{$uidKey};
+@@ -91,7 +91,7 @@ sub userLogout {
+     my $uid    = $session->data->{$uidKey};
+ 
+     my $count = 0;
+-    foreach my $storage (qw(oidcStorage sessionStorage)) {
++    foreach my $storage (qw(oidcStorage globalStorage)) {
+         my $storageModule =
+           Lemonldap::NG::Handler::Main->tsv->{"${storage}Module"};
+         if ( defined $storageModule ) {
 @@ -98,6 +105,48 @@ sub userLogout {
              if ( $sessions and %$sessions ) {
                  @keys = keys %$sessions;
