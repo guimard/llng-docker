@@ -58,7 +58,7 @@ runs:
         shell: bash
         run: |
           if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            echo "platforms=linux/linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
+            echo "platforms=linux/amd64,linux/linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x" >> $GITHUB_OUTPUT
           else
             echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
           fi
@@ -68,7 +68,7 @@ runs:
         with:
           images: ${{ inputs.DOCKER_IMAGE }}
       - name: Build and push Docker latest image
-        if: !startsWith(github.ref, 'refs/tags/')
+        if: ! startsWith(github.ref, "refs/tags/")
         uses: docker/build-push-action@v4
         with:
           context: ${{ inputs.DIRNAME }}
@@ -81,7 +81,7 @@ runs:
             ${{ inputs.DOCKER_IMAGE }}:latest${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}
             ${{ inputs.DOCKER_IMAGE }}:${{ steps.date.outputs.date }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}
       - name: Build and push Docker tagged image
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, "refs/tags/")
         uses: docker/build-push-action@v4
         with:
           context: ${{ inputs.DIRNAME }}
