@@ -69,6 +69,7 @@ runs:
           images: ${{ inputs.DOCKER_IMAGE }}
       - name: Generate tags
         id: gentags
+        shell: bash
         run: |
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             TAGS="${{ inputs.DOCKER_IMAGE }}:${{ steps.setversion.outputs.version }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}"
