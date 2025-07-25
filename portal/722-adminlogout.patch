@@ -16,7 +16,74 @@
      );
  
      # Metadata (.well-known/openid-configuration)
-@@ -2194,7 +2196,11 @@ sub userInfo {
+@@ -1644,12 +1646,13 @@ sub _handlePasswordGrant {
+         }
+     }
+ 
++    my $user = $req->sessionInfo->{ $self->conf->{whatToTrace} };
++
+     # Resolve scopes
+     my $scope = $self->getScope( $req, $rp, $req_scope );
+     unless ($scope) {
+-        $self->userLogger->warn( 'User '
+-              . $req->sessionInfo->{ $self->conf->{whatToTrace} }
+-              . " was not granted any requested scopes ($req_scope) for $rp" );
++        $self->userLogger->warn( "User $user was not granted"
++              . "  any requested scopes ($req_scope) for $rp" );
+         return $self->sendOIDCError( $req, 'invalid_scope', 400 );
+     }
+ 
+@@ -1685,10 +1688,11 @@ sub _handlePasswordGrant {
+         my $refreshTokenSession = $self->_generateRefreshToken(
+             $req, $rp,
+             {
+-                scope           => $scope,
+-                client_id       => $client_id,
+-                user_session_id => $req->id,
+-                grant_type      => "password",
++                scope                      => $scope,
++                client_id                  => $client_id,
++                user_session_id            => $req->id,
++                grant_type                 => "password",
++                $self->conf->{whatToTrace} => $user,
+             },
+             0,
+         );
+@@ -1828,7 +1832,8 @@ sub _handleAuthorizationCodeGrant {
+     # Generate refresh_token
+     my $refresh_token = undef;
+ 
+-    my $sid = $self->getSidFromSession( $rp, $apacheSession->data );
++    my $sid  = $self->getSidFromSession( $rp, $apacheSession->data );
++    my $user = $apacheSession->data->{ $self->conf->{whatToTrace} };
+ 
+     # For offline access, the refresh token isn't tied to the session ID
+     if ( $codeSession->{data}->{offline} ) {
+@@ -1851,11 +1856,10 @@ sub _handleAuthorizationCodeGrant {
+                 redirect_uri => $codeSession->data->{redirect_uri},
+                 scope        => $scope,
+                 client_id    => $client_id,
+-                _session_uid =>
+-                  $apacheSession->data->{ $self->conf->{whatToTrace} },
+-                auth_time  => $apacheSession->data->{_lastAuthnUTime},
+-                grant_type => "authorizationcode",
+-                _oidc_sid  => $sid,
++                _session_uid => $user,
++                auth_time    => $apacheSession->data->{_lastAuthnUTime},
++                grant_type   => "authorizationcode",
++                _oidc_sid    => $sid,
+             },
+             1,
+         );
+@@ -1886,6 +1890,7 @@ sub _handleAuthorizationCodeGrant {
+                 user_session_id => $codeSession->data->{user_session_id},
+                 grant_type      => "authorizationcode",
+                 _oidc_sid       => $sid,
++                $self->conf->{whatToTrace} => $user,
+             },
+             0,
+         );
+@@ -2194,7 +2199,11 @@ sub userInfo {
      my ( $access_token, $authMethod ) = $self->getEndPointAccessToken($req);
  
      unless ($access_token) {
@@ -29,7 +96,7 @@
          return $self->returnBearerError( 'invalid_request',
              "Access token not found in request", 401 );
      }
-@@ -2204,8 +2210,11 @@ sub userInfo {
+@@ -2204,8 +2213,11 @@ sub userInfo {
      my $accessTokenSession = $self->getAccessToken($access_token);
  
      unless ($accessTokenSession) {
@@ -43,7 +110,7 @@
          return $self->returnBearerError( 'invalid_request',
              'Invalid request', 401 );
      }
-@@ -2223,8 +2232,11 @@ sub userInfo {
+@@ -2223,8 +2235,11 @@ sub userInfo {
          ->{oidcRPMetaDataOptionsUserinfoRequireHeaderToken}
          and $authMethod ne 'header' )
      {
@@ -57,7 +124,7 @@
          return $self->returnBearerError( 'invalid_request',
              'Invalid request', 400 );
      }
-@@ -2237,6 +2249,11 @@ sub userInfo {
+@@ -2237,6 +2252,11 @@ sub userInfo {
      my $session =
        $self->_getSessionFromAccessTokenData( $accessTokenSession->data );
      unless ($session) {
@@ -69,7 +136,7 @@
          return $self->returnBearerError( 'invalid_request',
              'Invalid request', 401 );
      }
-@@ -2368,6 +2385,126 @@ sub introspection {
+@@ -2368,6 +2388,126 @@ sub introspection {
      return $self->p->sendJSONresponse( $req, $response );
  }
  
@@ -196,7 +263,7 @@
  # Endpoint JWKS is implemented in Lib/OpenIDConnect
  
  # Handle register endpoint
-@@ -2653,90 +2790,9 @@ sub logout {
+@@ -2653,90 +2793,9 @@ sub logout {
  
                  # BACK CHANNEL
                  elsif ( $rpConf->{oidcRPMetaDataOptionsLogoutType} eq 'back' ) {
@@ -290,7 +357,7 @@
                  }
              }
          }
-@@ -2745,6 +2801,76 @@ sub logout {
+@@ -2745,6 +2804,76 @@ sub logout {
  }
  
  # Internal methods
