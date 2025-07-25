@@ -161,7 +161,7 @@
 +        if ( my ( $_rp, $_uid ) = $checkRight->( $oidcSession, $rp ) ) {
 +            my $bck =
 +              $self->rpOptions->{$_rp}->{oidcRPMetaDataOptionsLogoutType};
-+            if ( $tokenHint eq 'refresh_token' and $bck and $bck eq 'back' ) {
++            if ( $bck and $bck eq 'back' ) {
 +                $self->_backChannelLogout( $req, $_rp, $oidcSession->data );
 +            }
 +            $self->auditLog(
@@ -380,7 +380,15 @@
  
      my $jwt = $self->createJWT( $access_token_payload, $alg, $rp, "at+JWT" );
  
-@@ -1360,9 +1358,13 @@ sub newRefreshToken {
+@@ -1347,6 +1346,7 @@ sub newRefreshToken {
+         $self->rpOptions->{$rp}->{oidcRPMetaDataOptionsOfflineSessionExpiration}
+           || $self->conf->{oidcServiceOfflineSessionExpiration} )
+       : $self->conf->{timeout};
++    $info->{_oidcRtUpdate} = time;
+ 
+     return $self->getOpenIDConnectSession(
+         undef, "refresh_token",
+@@ -1360,14 +1360,19 @@ sub newRefreshToken {
  # @return new Lemonldap::NG::Common::Session object
  
  sub getRefreshToken {
@@ -396,7 +404,15 @@
  }
  
  sub updateRefreshToken {
-@@ -1479,6 +1481,14 @@ sub getOpenIDConnectSession {
+-    my $self = shift;
+-    return $self->updateToken(@_);
++    my ( $self, $id, $infos ) = @_;
++    $infos->{_oidcRtUpdate} = time;
++    return $self->updateToken( $id, $infos );
+ }
+ 
+ sub updateToken {
+@@ -1479,6 +1484,14 @@ sub getOpenIDConnectSession {
      return $oidcSession;
  }
  
