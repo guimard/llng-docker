@@ -214,7 +214,7 @@
      return 1;
  }
  
-@@ -78,13 +84,14 @@ sub userLogout {
+@@ -78,10 +84,11 @@ sub userLogout {
        or return $self->sendError( $req, undef, 400 );
      my $id = $req->params('sessionId')
        or return $self->sendError( $req, 'sessionId is missing', 400 );
@@ -227,11 +227,7 @@
 +    my $uid    = $session->data->{$uidKey} || $session->data->{_session_uid};
  
      my $count = 0;
--    foreach my $storage (qw(oidcStorage sessionStorage)) {
-+    foreach my $storage (qw(oidcStorage globalStorage)) {
-         my $storageModule =
-           Lemonldap::NG::Handler::Main->tsv->{"${storage}Module"};
-         if ( defined $storageModule ) {
+     foreach my $storage (qw(oidcStorage sessionStorage)) {
 @@ -98,6 +105,48 @@ sub userLogout {
              if ( $sessions and %$sessions ) {
                  @keys = keys %$sessions;
