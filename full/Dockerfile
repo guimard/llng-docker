@@ -26,6 +26,7 @@ RUN \
         fixedLogout.patch \
         matrix-token-exchange.patch \
         722-adminlogout.patch \
+	3452-sessionexplorer.patch \
     ; do echo patch $p && patch -p1 < $p; done && \
     rm -f *.patch && \
     LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini \

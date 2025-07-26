@@ -1,0 +1,35 @@
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Sessions.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Sessions.pm
+@@ -380,11 +380,28 @@ sub sessions {
+             my ( $field, $length, $start ) = ( $1, $2, $3 );
+             $start ||= 0;
+             $length = 1 if ( $length < 1 );
+-            foreach my $k ( keys %$res ) {
+-                $r->{ substr $res->{$k}->{$field}, $start, $length }++
+-                  if ( $res->{$k}->{$field} );
++            while (1) {
++                my $next = {};
++                my $stop;
++                foreach my $k ( keys %$res ) {
++                    my $subk = substr $res->{$k}->{$field}, $start, $length + 1;
++                    $next->{$subk}++
++                      if ( $res->{$k}->{$field} );
++                    $stop++
++                      if $start + $length >= length( $res->{$k}->{$field} );
++                }
++                my @k = keys %$next;
++                if ( @k == 1 and !$stop ) {
++                    $length++;
++                    next;
++                }
++                foreach my $k ( keys %$res ) {
++                    $r->{ substr $res->{$k}->{$field}, $start, $length }++
++                      if ( $res->{$k}->{$field} );
++                }
++                $group = $field;
++                last;
+             }
+-            $group = $field;
+         }
+ 
+         # Subnets IPv4
