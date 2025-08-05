@@ -3,6 +3,7 @@
 ## v2.21.2-3 _(dev)_
 * Replace adminLogout (MR 644) by MR 722
 * Patch SessionExplorer for nodes with only one dest
+* Import path to fiw Google authentication (mr 777)
 
 ## v2.21.2-2 _(2025-07-23)_
 * Render mail2f accessible via API
