@@ -262,6 +262,16 @@ new file mode 100644
 +}
 +
 +1;
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm
+@@ -45,6 +45,7 @@
+       '::Plugins::AdaptativeAuthenticationLevel',
+     refreshSessions         => '::Plugins::Refresh',
+     crowdsec                => '::Plugins::CrowdSec',
++    crowdsecAgent           => '::Plugins::CrowdSecAgent',
+     locationDetect          => '::Plugins::LocationDetect',
+     globalLogoutRule        => '::Plugins::GlobalLogout',
+     samlFederationFiles     => '::Plugins::SamlFederation',
 --- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CrowdSec.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CrowdSec.pm
 @@ -2,101 +2,71 @@ package Lemonldap::NG::Portal::Plugins::CrowdSec;
