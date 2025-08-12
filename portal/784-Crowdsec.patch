@@ -419,7 +419,7 @@ new file mode 100644
 new file mode 100644
 --- /dev/null
 +++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CrowdSecAgent.pm
-@@ -0,0 +1,79 @@
+@@ -0,0 +1,114 @@
 +package Lemonldap::NG::Portal::Plugins::CrowdSecAgent;
 +
 +use strict;
@@ -451,8 +451,11 @@ new file mode 100644
 +has rule => ( is => 'rw', default => sub { 0 } );
 +
 +# Entrypoint
-+use constant aroundSub =>
-+  { getUser => 'sendIpAlerts', authenticate => 'sendIpAlerts' };
++use constant aroundSub => {
++    controlUrl   => 'controlUrl',
++    getUser      => 'sendIpAlerts',
++    authenticate => 'sendIpAlerts'
++};
 +
 +sub init {
 +    my ($self) = @_;
@@ -495,6 +498,38 @@ new file mode 100644
 +      )
 +      : $self->logger->error(
 +        "Unable to send alert to Crowdsec (was '$msg' for " . $req->address );
++    return $ret;
++}
++
++my $badUrl =
++qr#(?:\$(?:%7B(?:\$%7B(?:(?:lower:(?:j(?:%7D\$%7B(?:upper:n%7D\$%7Blower:d%7D\$%7Bupper:i%7D|lower:n%7D\$%7Blower:d%7Di)|ndi%7D)|\$%7Blower:jndi%7D%7D)|(?:date:'j'%7D\$%7Bdate:'n'%7D\$%7Bdate:'d'%7D\$%7Bdate:'i'|upper:j%7D\$%7Bupper:n%7D\$%7Bupper:d%7D\$%7Bupper:i)%7D):|:(?::-j%7D(?:\$%7B::-n%7D\$%7B::-d%7D\$%7B::-i%7D:|ndi)|-j%7D\$%7B:-n%7D\$%7B:-d%7D\$%7B:-i%7D:))|j(?:\$%7B\$%7B:-l%7D\$%7B:-o%7D\$%7B:-w%7D\$%7B:-e%7D\$%7B:-r%7D:n%7Ddi|nd(?:\$%7Bsys:SYS_NAME:-i%7D|i)):)|\{(?:\$\{(?:(?:lower:(?:j(?:\}\$\{(?:upper:n\}\$\{lower:d\}\$\{upper:i\}|lower:n\}\$\{lower:d\}i)|ndi\})|\$\{lower:jndi\}\})|(?:date:'j'\}\$\{date:'n'\}\$\{date:'d'\}\$\{date:'i'|upper:j\}\$\{upper:n\}\$\{upper:d\}\$\{upper:i)\}):|::-j\}(?:\$\{::-n\}\$\{::-d\}\$\{::-i\}:|ndi))|j(?:\$\{\$\{:-l\}\$\{:-o\}\$\{:-w\}\$\{:-e\}\$\{:-r\}:n\}di|nd(?:\$\{(?:sys:SYS_NAME:-i|upper:ı)\}|i)):))|%(?:2(?:4%7B(?:%24%7B(?:(?:lower:(?:j(?:%7D%24%7B(?:upper:n%7D%24%7Blower:d%7D%24%7Bupper:i%7D|lower:n%7D%24%7Blower:d%7Di)|ndi%7D)|%24%7Blower:jndi%7D%7D)|(?:date:'j'%7D%24%7Bdate:'n'%7D%24%7Bdate:'d'%7D%24%7Bdate:'i'|upper:j%7D%24%7Bupper:n%7D%24%7Bupper:d%7D%24%7Bupper:i)%7D):|::-j%7D(?:%24%7B::-n%7D%24%7B::-d%7D%24%7B::-i%7D:|ndi))|j(?:%24%7B%24%7B:-l%7D%24%7B:-o%7D%24%7B:-w%7D%24%7B:-e%7D%24%7B:-r%7D:n%7Ddi|nd(?:%24%7Bsys:SYS_NAME:-i%7D|i)):)|5(?:2(?:E%252E%252F|e%252e%252f)|SYSTEMROOT%25%5Cwin\.ini)|Fetc%2F(?:(?:group|host)s|passwd|shadow)|fetc%2f(?:(?:group|host)s|passwd|shadow)|0union(?:%20all)?%20select%20|cnull%2cnull|E%2E%2F|e%2e%2f)|3C(?:(?:framese|objec)t|s(?:cript|tyle|vg)|i(?:nput|mg)|b(?:ody|r)|(?:met)?a|embed|table|div|p )|40%40version|7c%7cchr%28)|i(?:n(?:dex\/(?:\\\\(?:x(?:5Cthink\\\\x5C(?:(?:Container|app)\/invokefunction&function=call_user_func_array&vars|view\\\\x5Cdriver\\\\x5CPhp\/display&content=<\\\?php)|09hink\\\\x07pp\/invokefunction&function=call_user_func_array&vars)|\\\\(?:think\\\\\\\\(?:Container|app)\/invokefunction&function=call_user_func_array&vars|x5Cthink\\\\\\\\x5Cview\\\\\\\\x5Cdriver\\\\\\\\x5CPhp\/display&content=<\\\?php)|think\\\\(?:(?:Container|app)\/invokefunction&function=call_user_func_array&vars|view\\\\driver\\\\Php\/display&content=<\\\?php))|%5Cthink%5C(?:(?:Container|app)\/invokefunction&function=call_user_func_array&vars|view%5Cdriver%5CPhp\/display&content=%3C\\\?php))|formation_schema\.tables)|(?:tsecteam_shell|sko(?:rpitx)?)\.php|r(?:onshell\.php|c\.pl))|\.(?:e(?:nv(?:[s~]|\.(?:d(?:ev(?:elopment\.local)?|ocker\.dev|ist)|p(?:rod(?:uction\.local)?|hp)|s(?:a(?:mple\.php|ve)|tage)|backup|local|test)|ironment|rc)?|xe)|s(?:ql(?:\.(?:bz(?:ip)?2|[rt]ar|[7g]z|zip))?|vn(?:\/entries)?|h_history|ubversion|3cfg|sh)|c(?:o(?:nfig(?:\/gatsby\/config\.json)?|rdova\/config\.json)|vs(?:ignore)?|ache)|d(?:ocker\/(?:(?:config|daemon)\.json|\.env)|eployment-config\.json|ll)|(?:jupyter\/jupyter_notebook_config|vscode\/sftp)\.json|p(?:r(?:inter|ofile)|a(?:sswd|c)|erf|wd)|git(?:\/(?:config|HEAD)|lab-ci\/\.env)?|h(?:t(?:a(?:ccess)?|passwd)|istory)|l(?:anproxy\/config\.json|istings?)|\.(?:xp_cmdshell|\\(?:\/)?|\/)|ba(?:[kt]|sh(?:_history|rc))|m(?:ysql_history|smtprc)|aws(?:(?:\/confi|cf)g)?|forward|rhosts)|(?:(?:S(?:i(?:m(?:ple_PHP_backdoor|Shell)|ncap_1\.0)|afe(?:_Mode_Bypass|0ver_Shell)|(?:mall_Web_|nIpEr_SA )Shell|TNC_WebShell_v0\.8)|N(?:etworkFileManagerPHP|on-alphanumeric|TDaddy_v1\.9|CC-Shell|GH)|M(?:(?:ackers_Private_|y)Shell|oroccan_Spamers)|r(?:u24_post_sh|(?:00|oo)t|5[78])|G(?:(?:amma_Web_|RP_Web)Shell|5)|Lo(?:aderz_WEB_Shell|cus7s)|D(?:ive_Shell|Tool_Pro|x)|g00n(?:shell-v1\.|v1)3|obfuscated-punknopass|(?:ZyklonShel|kra)l|KA_uShell_0\.1\.6|xleet(?:-shell)?|FaTaLisTiCz_Fx|qsd-backdoor|150)\.ph|A(?:(?:(?:jax_PHP_Command_|n(?:tichat_|i-))Shell|yyildiz_Tim|K-74)\.ph|Spy\.as)|R(?:ootshell\.v\.1\.0\.ph|emExp\.as)|JspWebshell(?: 1\.2\.js|_1\.2\.ph)|E(?:kin0x\.ph|FSO\.as)|(?:ntdaddy|3fexe)\.as)p|\/(?:_\/(?:%3B\/(?:META-INF\/maven\/com\.atlassian\.jira\/(?:atlassian-jira-webapp\/pom\.(?:properties|xml)|jira-webapp-dist\/pom\.(?:properties|xml))|WEB-INF\/(?:classes\/seraph-config|decorators|web)\.xml)|;\/(?:META-INF\/maven\/com\.atlassian\.jira\/(?:atlassian-jira-webapp\/pom\.(?:properties|xml)|jira-webapp-dist\/pom\.(?:properties|xml))|WEB-INF\/(?:classes\/seraph-config|decorators|web)\.xml))|etc\/(?:(?:group|host)s|passwd|shadow)|(?:proc\/self|var\/log)\/)|c(?:(?:99(?:_(?:locus7s|w4cking|PSych0|madnet)|-(?:shadows-mod|Ultimate)|u(?:nlimite)?d|(?:mad)?shell|v2)?|(?:pg_143_incl_xp|ybershel)l|(?:bfphp|tt_)sh|ihshell_fix|100|37|66)\.php|o(?:n(?:fig(?:killerionkros\.php|\/aws\.yml)|nect-back\.php)|mposer\.(?:json|lock)|\.php)|md(?:\.(?:p(?:hp|l)|aspx?|jsp)|_win32\.jsp|exec\.aspx)|gitelnet\.p(?:hp|l))|s(?:(?:im(?:ple(?:-backdoor|_cmd)|attacker)|o(?:ldierofallah|syete)|(?:afe0v|nip)er|h(?:3llx|ell)|72_Shell|mevk|tres)\.php|e(?:crets\.(?:json|yml)|lectchar%28)|p(?:y(?:shell|grup)\.php|exec\.aspx)|(?:ubstr(?:ing)?|leep)%28|ql\.aspx)|a(?:(?:n(?:tichat|dela|gel)|ZRaiLPhp_v1\.0|cid)\.php|sp(?:x(?:shell\.aspx|SH\.asp)|ydrv\.(?:as|ph)p)|ws(?:\/credentials|-key\.yml)|l(?:ert(?:%28|\()|fa3\.php))|C(?::(?:\/(?:inetpub\/wwwroot\/global\.asa|boot\.ini)|\\(?:inetpub\\wwwroot\\global\.asa|boot\.ini))|(?:rysta(?:lShel)?l|WShellDumper|asuS-1\.5)\.php)|P(?:(?:H(?:P(?:(?:Jacka|_Shel)l|RemoteView|SPY)|ANTASMA|Vayv)|hp(?:_Backdoor\.txt|Spy)|r(?:ivate-i3lue|edator))\.php|erlWebShellbyRST-GHC\.pl)|e(?:nv\.(?:(?:production|test|dev)\.js|ba(?:ckup|k)|json)|(?:(?:val-stdin|x0shell|rne|gy)\.ph|lmaliseker\.as)p)|<(?:(?:framese|objec)t|s(?:cript|tyle|vg)|i(?:nput|mg)|b(?:ody|r)|(?:met)?a|embed|table|div|p )|p(?:(?:unk(?:-nopass|holic)|hp-backdoor|HpINJ)\.php|rompt(?:%28|\()|ws\.p(?:hp|l)|g_sleep%28)|l(?:o(?:(?:lipop|stDC|cus|g)\.php|ad_file%28)|i(?:(?:z0zim|fkaS)\.php|st\.(?:jsp|pl)))|b(?:(?:(?:(?:dotw44shel|ackupsq)l|loodsecv4|37|ug)\.ph|rowser\.js)p|enchmark%28)|u(?:p(?:(?:_win32\.js|l0ader\.ph)p|\.(?:[aj]sp|pl)|per%28)|dp\.php)|d(?:(?:C3_Security|dos|ra|q)\.php|istinct%28|ebug\.log|c\.pl)|W(?:in(?:dows\/win\.ini|X_Shell\.php)|orse_Linux_Shell\.php)|w(?:e(?:evely\.php|wo\.pl)|indows\/win\.ini|so2\.8\.5\.php)|file(?:s(?:ystembrowser\.aspx|man\.php)|upload\.aspx)|t(?:(?:oo(?:laspshel)?l\.as|ryag\.ph)p|est-env\.json)|z(?:ehir(?:4\.(?:aspx?|php)|\.aspx?)|acosmall\.php)|j(?:sp(?:[Ss]hell|bd)\.jsp|avascript(?:%3A|:))|=(?:(?:ph|zi)p|expect|data|file):\/\/|m(?:(?:egabor|atamu|ma)\.php|d5%28)|h(?:(?:acker|krkoz)\.php|ex%28)|_wpeprivate\/config\.json)#;
++
++sub controlUrl {
++    my ( $self, $sub, $req ) = @_;
++    my $ret = $sub->($req);
++    return $ret if $ret;
++
++    if ( !$self->rule->( $req, $req->sessionInfo ) ) {
++        $self->logger->debug('Crowdsec-agent disabled for this env');
++        return $ret;
++    }
++
++    return $ret unless $self->conf->{crowdsecCheckUrls};
++    if ( $req->env->{REQUEST_URI} =~ $badUrl ) {
++        my $msg = 'Bad URI detected: ' . $req->env->{REQUEST_URI};
++        $self->alert( $req->address, $msg, { reason => "LLNG bad URL" } )
++          ? $self->auditLog(
++            $req,
++            code    => 200,
++            message => "Alert sent to Crowdsec: $msg",
++            ip      => $req->address,
++            uri     => $req->env->{REQUEST_URI},
++            regexp  => $&,
++          )
++          : $self->logger->error(
++            "Unable to send alert to Crowdsec (was '$msg' for "
++              . $req->address );
++    }
 +    return $ret;
 +}
 +
