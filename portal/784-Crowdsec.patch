@@ -388,6 +388,8 @@ new file mode 100644
 +          : $self->logger->error(
 +            "Unable to send alert to Crowdsec (was '$msg' for "
 +              . $req->address );
++        $req->response( [ 404, [], ['Not found'] ] );
++        return PE_SENDRESPONSE;
 +    }
 +    return $ret;
 +}
