@@ -1,267 +1,3 @@
-new file mode 100644
---- /dev/null
-+++ b/usr/share/perl5/Lemonldap/NG/Common/CrowdSec.pm
-@@ -0,0 +1,260 @@
-+package Lemonldap::NG::Common::CrowdSec;
-+
-+use strict;
-+use Date::Parse;
-+use JSON qw(from_json to_json);
-+use Mouse::Role;
-+use POSIX qw(strftime);
-+use Lemonldap::NG::Common::UserAgent;
-+use Lemonldap::NG::Portal::Main::Constants qw(
-+  PE_OK
-+  PE_ERROR
-+  PE_SESSIONNOTGRANTED
-+);
-+
-+our $VERSION = '2.22.0';
-+
-+our $defaultBanValues = {
-+    events_count     => 1,
-+    scenario         => 'llng',
-+    scenario_hash    => 'llng',
-+    scenario_version => $VERSION,
-+    leakspeed        => '1s',
-+    remediation      => JSON::true,
-+    simulated        => JSON::false,
-+    capacity         => 1,
-+};
-+
-+has ua => (
-+    is      => 'rw',
-+    lazy    => 1,
-+    builder => sub {
-+        my $ua = Lemonldap::NG::Common::UserAgent->new( $_[0]->{conf} );
-+        $ua->agent( 'LLNG-CrowdsecAgent/' . $VERSION );
-+        $ua->default_headers->header( 'Accept'       => 'application/json' );
-+        $ua->default_headers->header( 'Content-Type' => 'application/json' );
-+        return $ua;
-+    }
-+);
-+
-+has token    => ( is => 'rw' );
-+has tokenExp => ( is => 'rw', default => 0 );
-+
-+has crowdsecUrl => ( is => 'rw' );
-+
-+has scenario => ( is => 'rw', default => 'llng' );
-+has scenarioHash => (
-+    is      => 'rw',
-+    lazy    => 1,
-+    default => sub { $_[0]->scenario }
-+);
-+
-+sub _init {
-+    my ($self) = @_;
-+    if ( $self->conf->{crowdsecUrl} ) {
-+        my $tmp = $self->conf->{crowdsecUrl};
-+        $tmp =~ s#/+$##;
-+        $self->crowdsecUrl($tmp);
-+    }
-+    else {
-+        $self->logger->warn(
-+            "crowdsecUrl isn't set, fallback to http://localhost:8080");
-+        $self->crowdsecUrl('http://localhost:8080');
-+    }
-+    return 1;
-+}
-+
-+sub bouncer {
-+    my ( $self, $ip ) = @_;
-+    my $resp = $self->ua->get(
-+        $self->crowdsecUrl . "/v1/decisions?ip=$ip",
-+        'Accept'    => 'application/json',
-+        'X-Api-Key' => $self->conf->{crowdsecKey},
-+    );
-+    if ( $resp->is_error ) {
-+        $self->logger->error( 'Bad CrowdSec response: ' . $resp->message );
-+        $self->logger->debug( $resp->content );
-+        return ( 1, PE_ERROR );
-+    }
-+    my $content = $resp->decoded_content;
-+    if ( !$content or $content eq 'null' ) {
-+        $self->userLogger->debug("$ip isn't known by CrowdSec");
-+        return ( 1, PE_OK );
-+    }
-+    my $json_hash;
-+    eval { $json_hash = from_json( $content, { allow_nonref => 1 } ); };
-+    if ($@) {
-+        $self->logger->error("Unable to decode CrowdSec response: $content");
-+        $self->logger->debug($@);
-+        return ( 1, PE_ERROR );
-+    }
-+    $self->logger->debug("CrowdSec response: $content");
-+
-+    # Response is "null" when IP is unknown
-+    if ($json_hash) {
-+
-+        # CrowdSec may return more than one decision
-+        foreach my $decision (@$json_hash) {
-+            if ( $decision->{type} and $decision->{type} eq 'ban' ) {
-+                return ( 0,
-+                        "$ip banned by CrowdSec ('"
-+                      . $decision->{scenario}
-+                      . "' for $decision->{duration})" );
-+            }
-+        }
-+        $self->userLogger->info("$ip not banned by CrowdSec");
-+        return ( 1, PE_OK );
-+    }
-+}
-+
-+sub ban {
-+    my $self = shift;
-+    my ( $ip, $msg, $data ) = @_;
-+    if ( my $token = $self->getToken ) {
-+        my $request = HTTP::Request->new(
-+            POST => $self->crowdsecUrl . '/v1/alerts',
-+            [
-+                'Content-Type'  => 'application/json',
-+                'Authorization' => "Bearer " . $self->token,
-+            ],
-+            $self->_banPayload(@_)
-+        );
-+        my $resp = $self->ua->request($request);
-+        unless ( $resp->is_success ) {
-+            $self->logger->error(
-+                join ' ',           'Unable to push alert',
-+                $resp->status_line, $resp->decoded_content
-+            );
-+            return;
-+        }
-+        $self->logger->notice("Push new Crowdsec alert for $ip: $msg");
-+        return 1;
-+    }
-+    else {
-+        $self->logger->error('Unable to push Crowdsec decision');
-+        return;
-+    }
-+}
-+
-+sub alert {
-+    my $self = shift;
-+    my ( $ip, $msg, $data ) = @_;
-+    $data ||= {};
-+    my $max   = $self->conf->{crowdsecMaxFailures};
-+    my $count = $self->getAlertsByIp($ip) || 0;
-+    $data->{remediation} =
-+      ( $max and $count >= ( $max - 1 ) ) ? JSON::true : JSON::false;
-+    $self->logger->debug("Crowdsec alerts count is $count for $ip");
-+    $data->{reason} ||= 'Reported by LLNG';
-+    $msg ||= 'Reported by LLNG';
-+    return $self->ban( $ip, $msg, $data );
-+}
-+
-+sub getAlertsByIp {
-+    my ( $self, $ip, $scenario ) = @_;
-+    $scenario ||= $defaultBanValues->{scenario};
-+    if ( my $token = $self->getToken ) {
-+        my $url     = $self->crowdsecUrl . '/v1/alerts';
-+        my $request = HTTP::Request->new(
-+            GET => $url,
-+            [
-+                'Authorization' => "Bearer " . $self->token,
-+            ],
-+        );
-+        my $resp = $self->ua->request($request);
-+        unless ( $resp->is_success ) {
-+            $self->logger->error(
-+                join ' ',           'Unable to get alerts',
-+                $resp->status_line, $resp->decoded_content
-+            );
-+            return;
-+        }
-+        my $alerts = eval { from_json( $resp->decoded_content ) };
-+        if ( $@ or !$alerts ) {
-+            $self->logger->error( join ' ', 'Unable to read Crowdsec response:',
-+                $@, $resp->decoded_content );
-+            return;
-+        }
-+        my $timeLimit = time - ( $self->conf->{crowdsecBlockDelay} || 180 );
-+        my @ipAlerts =
-+          grep {
-+                  $_->{source}->{value} eq $ip
-+              and $_->{scenario} eq $scenario
-+              and str2time( $_->{start_at} ) > $timeLimit
-+          } @$alerts;
-+        return ( scalar @ipAlerts );
-+    }
-+    else {
-+        $self->logger->error('Unable to push Crowdsec decision');
-+        return;
-+    }
-+}
-+
-+sub _banPayload {
-+    my ( $self, $ip, $msg, $data ) = @_;
-+    $msg ||= 'Banned by LLNG Crowdsec plugin';
-+    foreach my $k ( keys %$defaultBanValues ) {
-+        $data->{$k} //= $defaultBanValues->{$k};
-+    }
-+    my $timestamp = strftime( "%Y-%m-%dT%H:%M:%SZ", gmtime );
-+    $data->{start_at} ||= $timestamp;
-+    $data->{stop_at}  ||= $timestamp;
-+    $data->{source}   ||= { scope => 'ip', value => $ip };
-+    my $reason = delete( $data->{reason} ) || 'Banned by LLNG';
-+    return to_json( [ {
-+                %$data,
-+                message => $msg,
-+                events  => [ {
-+                        timestamp => $data->{start_at},
-+                        meta      => [
-+                            { key => 'log_type', value => 'llng-auth' },
-+                            { key => 'reason',   value => $reason }
-+                        ],
-+                        source => $data->{source},
-+                    }
-+                ],
-+            }
-+        ]
-+    );
-+}
-+
-+sub getToken {
-+    my ($self) = @_;
-+
-+    # Use token if available
-+    return $self->token if $self->token and $self->tokenExp < time - 10;
-+
-+    # Get new token
-+    my ( $user, $pwd ) =
-+      map { $self->conf->{$_} } qw(crowdsecMachineId crowdsecPassword);
-+    unless ( $user and $pwd ) {
-+        $self->logger->error('Missing crowdsec credentials, aborting');
-+        return;
-+    }
-+    my $request = HTTP::Request->new(
-+        POST => $self->crowdsecUrl . '/v1/watchers/login',
-+        [ 'Content-Type' => 'application/json' ],
-+        to_json( {
-+                machine_id => $user,
-+                password   => $pwd,
-+            }
-+        )
-+    );
-+    my $resp = $self->ua->request($request);
-+    unless ( $resp->is_success ) {
-+        $self->logger->error( join ' ', 'Unable to connect to Crowdsec:',
-+            $resp->status_line, $resp->decoded_content );
-+        return;
-+    }
-+    my $json = eval { from_json( $resp->decoded_content ) };
-+    if ( $@ or !$json ) {
-+        $self->logger->error( join ' ', 'Unable to read Crowdsec response:',
-+            $@, $resp->decoded_content );
-+        return;
-+    }
-+    $self->tokenExp( str2time( $json->{expire} ) );
-+    $self->logger->debug("Get Crowdsec token");
-+    return $self->token( $json->{token} );
-+}
-+
-+1;
 --- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm
 @@ -45,6 +45,7 @@
@@ -418,8 +154,113 @@ new file mode 100644
  1;
 new file mode 100644
 --- /dev/null
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdsecFilter.pm
+@@ -0,0 +1,101 @@
++package Lemonldap::NG::Portal::Lib::CrowdsecFilter;
++
++use strict;
++use Mouse::Role;
++use Regexp::Assemble;
++
++use constant knownCat      => (qw(url));
++use constant knownSuffixes => (qw(re txt));
++
++# Initialization functions for CrowdsecFilter feature
++
++sub initializeFilters {
++    my ($self) = @_;
++    my $filters = $self->parseFilters( $self->conf->{crowdsecFilters} );
++    if ( $filters and %$filters ) {
++        foreach my $cat ( keys %$filters ) {
++            my $re = Regexp::Assemble->new;
++            eval {
++                $re->add( map { qr/(?i)$_/ } @{ $filters->{$cat}->{re} } )
++                  if $filters->{$cat}->{re};
++                $re->add( map { qr/(?i)\Q$_\E/ } @{ $filters->{$cat}->{txt} } )
++                  if @{ $filters->{$cat}->{txt} };
++            };
++            if ($@) {
++                $self->logger->error("Unable to parst category $cat: $@");
++            }
++            else {
++                $self->filters->{$cat} = $re->re;
++                $self->logger->debug("RE $cat: $re");
++            }
++        }
++    }
++}
++
++sub parseFilters {
++    my ( $self, $dirname, $res, $cat ) = @_;
++    $self->logger->debug("Crowdsec filters, parsing $dirname");
++    $res //= {};
++    my $fh;
++    unless ( opendir $fh, $dirname ) {
++        $self->logger->error("Unable to read directory $dirname: $!");
++        return $res;
++    }
++    my @files = grep /\w/, readdir $fh;
++    closedir $fh;
++  LOOP: foreach my $file (@files) {
++
++        # Sub-directories fixes the category
++        my $path = "$dirname/$file";
++        if ( -d $path ) {
++            if ($cat) {
++                $self->parseFilters( $path, $res, $cat );
++            }
++            elsif ( my ($t) = grep { $file =~ m/^$_/ } knownCat ) {
++                $self->parseFilters( $path, $res, $t );
++            }
++            else {
++                $self->logger->error("Unknwon category for directory $path");
++            }
++            next LOOP;
++        }
++        $file =~ s/\.([^\.]+)$//;
++        my $type = $1;
++        unless ( $type and grep { $_ eq $type } knownSuffixes ) {
++            $self->logger->error("Bad suffix for $path, skipping");
++            next LOOP;
++        }
++        my $lcat = $cat;
++        unless ($lcat) {
++            $file =~ s/\.([^\.]+)$//;
++            $lcat = $1;
++            unless ($lcat) {
++                $self->logger->error("Malformed file $path (missing category)");
++                next LOOP;
++            }
++            unless ( grep { $_ eq $lcat } knownCat ) {
++                $self->logger->error("Unknown category $lcat for $path");
++                next LOOP;
++            }
++        }
++        unless ( open $fh, '<', $path ) {
++            $self->logger->error("Unable to read file $path: $!");
++            next LOOP;
++        }
++        $self->logger->debug(
++"Crowdsec filters, adding content of $path into category $lcat, type $type"
++        );
++        my $c = 0;
++        foreach (<$fh>) {
++            next if /^\s*#/;
++            next unless /\w/;
++            s/[\r\n]//g;
++            push @{ $res->{$lcat}->{$type} }, $_;
++            $c++;
++        }
++        $self->logger->debug("  -> $c lines added");
++    }
++    return $res;
++}
++
++1;
+new file mode 100644
+--- /dev/null
 +++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CrowdSecAgent.pm
-@@ -0,0 +1,114 @@
+@@ -0,0 +1,134 @@
 +package Lemonldap::NG::Portal::Plugins::CrowdSecAgent;
 +
 +use strict;
@@ -433,6 +274,7 @@ new file mode 100644
 +  PE_OK
 +  PE_OPENID_BADID
 +  PE_SAML_SIGNATURE_ERROR
++  PE_SENDRESPONSE
 +  PE_USERNOTFOUND
 +);
 +
@@ -450,9 +292,15 @@ new file mode 100644
 +
 +has rule => ( is => 'rw', default => sub { 0 } );
 +
++has filters => ( is => 'rw', default => sub { {} } );
++
 +# Entrypoint
 +use constant aroundSub => {
-+    controlUrl   => 'controlUrl',
++
++    # Filter function (if crowdsecFilters is set)
++    controlUrl => 'controlUrl',
++
++    # Generate alerts for bad credentials
 +    getUser      => 'sendIpAlerts',
 +    authenticate => 'sendIpAlerts'
 +};
@@ -469,6 +317,18 @@ new file mode 100644
 +    }
 +    $self->rule(
 +        $self->p->buildRule( $self->conf->{crowdsecAgent}, 'crowdsecAgent' ) );
++
++    if ( $self->conf->{crowdsecFilters} ) {
++        if ( -d $self->conf->{crowdsecFilters} ) {
++            with 'Lemonldap::NG::Portal::Lib::CrowdsecFilter';
++            $self->initializeFilters;
++        }
++        else {
++            $self->logger->error(
++                'Crowdsec filter directory not found, ignoring');
++        }
++    }
++
 +    return 1;
 +}
 +
@@ -501,9 +361,6 @@ new file mode 100644
 +    return $ret;
 +}
 +
-+my $badUrl =
-+qr#(?:\$(?:%7B(?:\$%7B(?:(?:lower:(?:j(?:%7D\$%7B(?:upper:n%7D\$%7Blower:d%7D\$%7Bupper:i%7D|lower:n%7D\$%7Blower:d%7Di)|ndi%7D)|\$%7Blower:jndi%7D%7D)|(?:date:'j'%7D\$%7Bdate:'n'%7D\$%7Bdate:'d'%7D\$%7Bdate:'i'|upper:j%7D\$%7Bupper:n%7D\$%7Bupper:d%7D\$%7Bupper:i)%7D):|:(?::-j%7D(?:\$%7B::-n%7D\$%7B::-d%7D\$%7B::-i%7D:|ndi)|-j%7D\$%7B:-n%7D\$%7B:-d%7D\$%7B:-i%7D:))|j(?:\$%7B\$%7B:-l%7D\$%7B:-o%7D\$%7B:-w%7D\$%7B:-e%7D\$%7B:-r%7D:n%7Ddi|nd(?:\$%7Bsys:SYS_NAME:-i%7D|i)):)|\{(?:\$\{(?:(?:lower:(?:j(?:\}\$\{(?:upper:n\}\$\{lower:d\}\$\{upper:i\}|lower:n\}\$\{lower:d\}i)|ndi\})|\$\{lower:jndi\}\})|(?:date:'j'\}\$\{date:'n'\}\$\{date:'d'\}\$\{date:'i'|upper:j\}\$\{upper:n\}\$\{upper:d\}\$\{upper:i)\}):|::-j\}(?:\$\{::-n\}\$\{::-d\}\$\{::-i\}:|ndi))|j(?:\$\{\$\{:-l\}\$\{:-o\}\$\{:-w\}\$\{:-e\}\$\{:-r\}:n\}di|nd(?:\$\{(?:sys:SYS_NAME:-i|upper:ı)\}|i)):))|%(?:2(?:4%7B(?:%24%7B(?:(?:lower:(?:j(?:%7D%24%7B(?:upper:n%7D%24%7Blower:d%7D%24%7Bupper:i%7D|lower:n%7D%24%7Blower:d%7Di)|ndi%7D)|%24%7Blower:jndi%7D%7D)|(?:date:'j'%7D%24%7Bdate:'n'%7D%24%7Bdate:'d'%7D%24%7Bdate:'i'|upper:j%7D%24%7Bupper:n%7D%24%7Bupper:d%7D%24%7Bupper:i)%7D):|::-j%7D(?:%24%7B::-n%7D%24%7B::-d%7D%24%7B::-i%7D:|ndi))|j(?:%24%7B%24%7B:-l%7D%24%7B:-o%7D%24%7B:-w%7D%24%7B:-e%7D%24%7B:-r%7D:n%7Ddi|nd(?:%24%7Bsys:SYS_NAME:-i%7D|i)):)|5(?:2(?:E%252E%252F|e%252e%252f)|SYSTEMROOT%25%5Cwin\.ini)|Fetc%2F(?:(?:group|host)s|passwd|shadow)|fetc%2f(?:(?:group|host)s|passwd|shadow)|0union(?:%20all)?%20select%20|cnull%2cnull|E%2E%2F|e%2e%2f)|3C(?:(?:framese|objec)t|s(?:cript|tyle|vg)|i(?:nput|mg)|b(?:ody|r)|(?:met)?a|embed|table|div|p )|40%40version|7c%7cchr%28)|i(?:n(?:dex\/(?:\\\\(?:x(?:5Cthink\\\\x5C(?:(?:Container|app)\/invokefunction&function=call_user_func_array&vars|view\\\\x5Cdriver\\\\x5CPhp\/display&content=<\\\?php)|09hink\\\\x07pp\/invokefunction&function=call_user_func_array&vars)|\\\\(?:think\\\\\\\\(?:Container|app)\/invokefunction&function=call_user_func_array&vars|x5Cthink\\\\\\\\x5Cview\\\\\\\\x5Cdriver\\\\\\\\x5CPhp\/display&content=<\\\?php)|think\\\\(?:(?:Container|app)\/invokefunction&function=call_user_func_array&vars|view\\\\driver\\\\Php\/display&content=<\\\?php))|%5Cthink%5C(?:(?:Container|app)\/invokefunction&function=call_user_func_array&vars|view%5Cdriver%5CPhp\/display&content=%3C\\\?php))|formation_schema\.tables)|(?:tsecteam_shell|sko(?:rpitx)?)\.php|r(?:onshell\.php|c\.pl))|\.(?:e(?:nv(?:[s~]|\.(?:d(?:ev(?:elopment\.local)?|ocker\.dev|ist)|p(?:rod(?:uction\.local)?|hp)|s(?:a(?:mple\.php|ve)|tage)|backup|local|test)|ironment|rc)?|xe)|s(?:ql(?:\.(?:bz(?:ip)?2|[rt]ar|[7g]z|zip))?|vn(?:\/entries)?|h_history|ubversion|3cfg|sh)|c(?:o(?:nfig(?:\/gatsby\/config\.json)?|rdova\/config\.json)|vs(?:ignore)?|ache)|d(?:ocker\/(?:(?:config|daemon)\.json|\.env)|eployment-config\.json|ll)|(?:jupyter\/jupyter_notebook_config|vscode\/sftp)\.json|p(?:r(?:inter|ofile)|a(?:sswd|c)|erf|wd)|git(?:\/(?:config|HEAD)|lab-ci\/\.env)?|h(?:t(?:a(?:ccess)?|passwd)|istory)|l(?:anproxy\/config\.json|istings?)|\.(?:xp_cmdshell|\\(?:\/)?|\/)|ba(?:[kt]|sh(?:_history|rc))|m(?:ysql_history|smtprc)|aws(?:(?:\/confi|cf)g)?|forward|rhosts)|(?:(?:S(?:i(?:m(?:ple_PHP_backdoor|Shell)|ncap_1\.0)|afe(?:_Mode_Bypass|0ver_Shell)|(?:mall_Web_|nIpEr_SA )Shell|TNC_WebShell_v0\.8)|N(?:etworkFileManagerPHP|on-alphanumeric|TDaddy_v1\.9|CC-Shell|GH)|M(?:(?:ackers_Private_|y)Shell|oroccan_Spamers)|r(?:u24_post_sh|(?:00|oo)t|5[78])|G(?:(?:amma_Web_|RP_Web)Shell|5)|Lo(?:aderz_WEB_Shell|cus7s)|D(?:ive_Shell|Tool_Pro|x)|g00n(?:shell-v1\.|v1)3|obfuscated-punknopass|(?:ZyklonShel|kra)l|KA_uShell_0\.1\.6|xleet(?:-shell)?|FaTaLisTiCz_Fx|qsd-backdoor|150)\.ph|A(?:(?:(?:jax_PHP_Command_|n(?:tichat_|i-))Shell|yyildiz_Tim|K-74)\.ph|Spy\.as)|R(?:ootshell\.v\.1\.0\.ph|emExp\.as)|JspWebshell(?: 1\.2\.js|_1\.2\.ph)|E(?:kin0x\.ph|FSO\.as)|(?:ntdaddy|3fexe)\.as)p|\/(?:_\/(?:%3B\/(?:META-INF\/maven\/com\.atlassian\.jira\/(?:atlassian-jira-webapp\/pom\.(?:properties|xml)|jira-webapp-dist\/pom\.(?:properties|xml))|WEB-INF\/(?:classes\/seraph-config|decorators|web)\.xml)|;\/(?:META-INF\/maven\/com\.atlassian\.jira\/(?:atlassian-jira-webapp\/pom\.(?:properties|xml)|jira-webapp-dist\/pom\.(?:properties|xml))|WEB-INF\/(?:classes\/seraph-config|decorators|web)\.xml))|etc\/(?:(?:group|host)s|passwd|shadow)|(?:proc\/self|var\/log)\/)|c(?:(?:99(?:_(?:locus7s|w4cking|PSych0|madnet)|-(?:shadows-mod|Ultimate)|u(?:nlimite)?d|(?:mad)?shell|v2)?|(?:pg_143_incl_xp|ybershel)l|(?:bfphp|tt_)sh|ihshell_fix|100|37|66)\.php|o(?:n(?:fig(?:killerionkros\.php|\/aws\.yml)|nect-back\.php)|mposer\.(?:json|lock)|\.php)|md(?:\.(?:p(?:hp|l)|aspx?|jsp)|_win32\.jsp|exec\.aspx)|gitelnet\.p(?:hp|l))|s(?:(?:im(?:ple(?:-backdoor|_cmd)|attacker)|o(?:ldierofallah|syete)|(?:afe0v|nip)er|h(?:3llx|ell)|72_Shell|mevk|tres)\.php|e(?:crets\.(?:json|yml)|lectchar%28)|p(?:y(?:shell|grup)\.php|exec\.aspx)|(?:ubstr(?:ing)?|leep)%28|ql\.aspx)|a(?:(?:n(?:tichat|dela|gel)|ZRaiLPhp_v1\.0|cid)\.php|sp(?:x(?:shell\.aspx|SH\.asp)|ydrv\.(?:as|ph)p)|ws(?:\/credentials|-key\.yml)|l(?:ert(?:%28|\()|fa3\.php))|C(?::(?:\/(?:inetpub\/wwwroot\/global\.asa|boot\.ini)|\\(?:inetpub\\wwwroot\\global\.asa|boot\.ini))|(?:rysta(?:lShel)?l|WShellDumper|asuS-1\.5)\.php)|P(?:(?:H(?:P(?:(?:Jacka|_Shel)l|RemoteView|SPY)|ANTASMA|Vayv)|hp(?:_Backdoor\.txt|Spy)|r(?:ivate-i3lue|edator))\.php|erlWebShellbyRST-GHC\.pl)|e(?:nv\.(?:(?:production|test|dev)\.js|ba(?:ckup|k)|json)|(?:(?:val-stdin|x0shell|rne|gy)\.ph|lmaliseker\.as)p)|<(?:(?:framese|objec)t|s(?:cript|tyle|vg)|i(?:nput|mg)|b(?:ody|r)|(?:met)?a|embed|table|div|p )|p(?:(?:unk(?:-nopass|holic)|hp-backdoor|HpINJ)\.php|rompt(?:%28|\()|ws\.p(?:hp|l)|g_sleep%28)|l(?:o(?:(?:lipop|stDC|cus|g)\.php|ad_file%28)|i(?:(?:z0zim|fkaS)\.php|st\.(?:jsp|pl)))|b(?:(?:(?:(?:dotw44shel|ackupsq)l|loodsecv4|37|ug)\.ph|rowser\.js)p|enchmark%28)|u(?:p(?:(?:_win32\.js|l0ader\.ph)p|\.(?:[aj]sp|pl)|per%28)|dp\.php)|d(?:(?:C3_Security|dos|ra|q)\.php|istinct%28|ebug\.log|c\.pl)|W(?:in(?:dows\/win\.ini|X_Shell\.php)|orse_Linux_Shell\.php)|w(?:e(?:evely\.php|wo\.pl)|indows\/win\.ini|so2\.8\.5\.php)|file(?:s(?:ystembrowser\.aspx|man\.php)|upload\.aspx)|t(?:(?:oo(?:laspshel)?l\.as|ryag\.ph)p|est-env\.json)|z(?:ehir(?:4\.(?:aspx?|php)|\.aspx?)|acosmall\.php)|j(?:sp(?:[Ss]hell|bd)\.jsp|avascript(?:%3A|:))|=(?:(?:ph|zi)p|expect|data|file):\/\/|m(?:(?:egabor|atamu|ma)\.php|d5%28)|h(?:(?:acker|krkoz)\.php|ex%28)|_wpeprivate\/config\.json)#;
-+
 +sub controlUrl {
 +    my ( $self, $sub, $req ) = @_;
 +    my $ret = $sub->($req);
@@ -514,17 +371,19 @@ new file mode 100644
 +        return $ret;
 +    }
 +
-+    return $ret unless $self->conf->{crowdsecCheckUrls};
-+    if ( $req->env->{REQUEST_URI} =~ $badUrl ) {
++    return $ret unless $self->filters;
++    if (    $self->filters->{url}
++        and $req->env->{REQUEST_URI} =~ $self->filters->{url} )
++    {
 +        my $msg = 'Bad URI detected: ' . $req->env->{REQUEST_URI};
 +        $self->alert( $req->address, $msg, { reason => "LLNG bad URL" } )
 +          ? $self->auditLog(
 +            $req,
-+            code    => 200,
-+            message => "Alert sent to Crowdsec: $msg",
-+            ip      => $req->address,
-+            uri     => $req->env->{REQUEST_URI},
-+            regexp  => $&,
++            code         => 200,
++            message      => "Alert sent to Crowdsec: $msg",
++            ip           => $req->address,
++            uri          => $req->env->{REQUEST_URI},
++            matchingPart => $&,
 +          )
 +          : $self->logger->error(
 +            "Unable to send alert to Crowdsec (was '$msg' for "

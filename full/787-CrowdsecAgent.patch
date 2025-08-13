@@ -1,0 +1,163 @@
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
+@@ -1527,6 +1527,10 @@ sub attributes {
+             type          => 'int',
+             documentation => 'Crowdsec-Agent check delay',
+         },
++        crowdsecFilters => {
++            type          => 'text',
++            documentation => 'Crowdsec filters directory',
++        },
+ 
+         # OIDC personnal offline token removal
+         oidcOfflineTokens => {
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Tree.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Tree.pm
+@@ -1224,6 +1224,7 @@ sub tree {
+                                                 'crowdsecPassword',
+                                                 'crowdsecMaxFailures',
+                                                 'crowdsecBlockDelay',
++                                                'crowdsecFilters',
+                                             ],
+                                         },
+                                     ],
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json
+@@ -283,6 +283,7 @@
+ "crowdsecAction":"إجراء",
+ "crowdsecAgent":"Activation",
+ "crowdsecBlockDelay":"Check delay",
++"crowdsecFilters":"Filters directory",
+ "crowdsecIgnoreFailures":"Ignore Crowdsec failures",
+ "crowdsecKey":"مفتاح أل API",
+ "crowdsecMachineId":"Crowdsec agent ID",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json
+@@ -283,6 +283,7 @@
+ "crowdsecAction":"Action",
+ "crowdsecAgent":"Activation",
+ "crowdsecBlockDelay":"Check delay",
++"crowdsecFilters":"Filters directory",
+ "crowdsecIgnoreFailures":"Ignore Crowdsec failures",
+ "crowdsecKey":"API key",
+ "crowdsecMachineId":"Crowdsec agent ID",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json
+@@ -283,6 +283,7 @@
+ "crowdsecAction":"Acción",
+ "crowdsecAgent":"Activation",
+ "crowdsecBlockDelay":"Check delay",
++"crowdsecFilters":"Filters directory",
+ "crowdsecIgnoreFailures":"Ignore Crowdsec failures",
+ "crowdsecKey":"Clave API",
+ "crowdsecMachineId":"Crowdsec agent ID",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json
+@@ -283,6 +283,7 @@
+ "crowdsecAction":"Action",
+ "crowdsecAgent":"Activation",
+ "crowdsecBlockDelay":"Délai d'examen",
++"crowdsecFilters":"Répertoire des filtres",
+ "crowdsecIgnoreFailures":"Ignorer les erreurs CrowdSec",
+ "crowdsecKey":"Clef de l'API",
+ "crowdsecMachineId":"ID de l'agent Crowdsec",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json
+@@ -283,6 +283,7 @@
+ "crowdsecAction":"פעולה",
+ "crowdsecAgent":"Activation",
+ "crowdsecBlockDelay":"Check delay",
++"crowdsecFilters":"Filters directory",
+ "crowdsecIgnoreFailures":"Ignore Crowdsec failures",
+ "crowdsecKey":"מפתח API",
+ "crowdsecMachineId":"Crowdsec agent ID",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json
+@@ -283,6 +283,7 @@
+ "crowdsecAction":"Azione",
+ "crowdsecAgent":"Activation",
+ "crowdsecBlockDelay":"Check delay",
++"crowdsecFilters":"Filters directory",
+ "crowdsecIgnoreFailures":"Ignore Crowdsec failures",
+ "crowdsecKey":"Chiave API",
+ "crowdsecMachineId":"Crowdsec agent ID",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json
+@@ -283,6 +283,7 @@
+ "crowdsecAction":"Akcja",
+ "crowdsecAgent":"Activation",
+ "crowdsecBlockDelay":"Check delay",
++"crowdsecFilters":"Filters directory",
+ "crowdsecIgnoreFailures":"Zignoruj ​​awarie Crowdsec",
+ "crowdsecKey":"Klucz API",
+ "crowdsecMachineId":"Crowdsec agent ID",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json
+@@ -283,6 +283,7 @@
+ "crowdsecAction":"Ação",
+ "crowdsecAgent":"Activation",
+ "crowdsecBlockDelay":"Check delay",
++"crowdsecFilters":"Filters directory",
+ "crowdsecIgnoreFailures":"Ignore Crowdsec failures",
+ "crowdsecKey":"Chave de API",
+ "crowdsecMachineId":"Crowdsec agent ID",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json
+@@ -283,6 +283,7 @@
+ "crowdsecAction":"Ação",
+ "crowdsecAgent":"Activation",
+ "crowdsecBlockDelay":"Check delay",
++"crowdsecFilters":"Filters directory",
+ "crowdsecIgnoreFailures":"Ignore Crowdsec failures",
+ "crowdsecKey":"Chave de API",
+ "crowdsecMachineId":"Crowdsec agent ID",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json
+@@ -283,6 +283,7 @@
+ "crowdsecAction":"Действие",
+ "crowdsecAgent":"Activation",
+ "crowdsecBlockDelay":"Check delay",
++"crowdsecFilters":"Filters directory",
+ "crowdsecIgnoreFailures":"Ignore Crowdsec failures",
+ "crowdsecKey":"Ключ API",
+ "crowdsecMachineId":"Crowdsec agent ID",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json
+@@ -283,6 +283,7 @@
+ "crowdsecAction":"Eylem",
+ "crowdsecAgent":"Activation",
+ "crowdsecBlockDelay":"Check delay",
++"crowdsecFilters":"Filters directory",
+ "crowdsecIgnoreFailures":"Ignore Crowdsec failures",
+ "crowdsecKey":"API anahtarı",
+ "crowdsecMachineId":"Crowdsec agent ID",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json
+@@ -283,6 +283,7 @@
+ "crowdsecAction":"Hành động",
+ "crowdsecAgent":"Activation",
+ "crowdsecBlockDelay":"Check delay",
++"crowdsecFilters":"Filters directory",
+ "crowdsecIgnoreFailures":"Ignore Crowdsec failures",
+ "crowdsecKey":"khóa API",
+ "crowdsecMachineId":"Crowdsec agent ID",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json
+@@ -283,6 +283,7 @@
+ "crowdsecAction":"動作",
+ "crowdsecAgent":"Activation",
+ "crowdsecBlockDelay":"Check delay",
++"crowdsecFilters":"Filters directory",
+ "crowdsecIgnoreFailures":"Ignore Crowdsec failures",
+ "crowdsecKey":"API 金鑰",
+ "crowdsecMachineId":"Crowdsec agent ID",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json
+@@ -283,6 +283,7 @@
+ "crowdsecAction":"動作",
+ "crowdsecAgent":"Activation",
+ "crowdsecBlockDelay":"Check delay",
++"crowdsecFilters":"Filters directory",
+ "crowdsecIgnoreFailures":"Ignore Crowdsec failures",
+ "crowdsecKey":"API 金鑰",
+ "crowdsecMachineId":"Crowdsec agent ID",
