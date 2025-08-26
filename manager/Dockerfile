@@ -36,6 +36,7 @@ RUN \
 	3452-sessionexplorer.patch \
 	784-Crowdsec.patch \
 	787-CrowdsecAgent.patch \
+	797-crowdsec-agent.patch \
     ; do echo patch $p && patch -p1 < $p; done && \
     rm -f *.patch && \
     LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini \

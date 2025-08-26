@@ -1,0 +1,52 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CrowdSecAgent.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CrowdSecAgent.pm
+@@ -31,6 +31,8 @@ has rule => ( is => 'rw', default => sub { 0 } );
+ 
+ has filters => ( is => 'rw', default => sub { {} } );
+ 
++has banResponse => ( is => 'rw' );
++
+ # Entrypoint
+ use constant aroundSub => {
+ 
+@@ -66,6 +68,13 @@ sub init {
+         }
+     }
+ 
++    $self->banResponse(
++        $self->_banResponse(
++            $self->conf->{crowdSecAgentResponseCode},
++            $self->conf->{crowdSecAgentResponseValue}
++        )
++    );
++
+     return 1;
+ }
+ 
+@@ -125,10 +134,25 @@ sub controlUrl {
+           : $self->logger->error(
+             "Unable to send alert to Crowdsec (was '$msg' for "
+               . $req->address );
+-        $req->response( [ 404, [], ['Not found'] ] );
++        $req->response( $self->banResponse );
+         return PE_SENDRESPONSE;
+     }
+     return $ret;
+ }
+ 
++sub _banResponse {
++    my ( $self, $code, $value ) = @_;
++    if ( $code == 200 ) {
++        return [
++            200,
++            [ 'Content-Type' => 'text/html' ],
++            [ $value || '<html><body>dummy</body></html>' ]
++        ];
++    }
++    if ( $code == 302 ) {
++        return [ 302, [ Location => $value || 'https://somewhere.else' ], [] ];
++    }
++    return [ 404, [], [ $value || 'Not found' ] ];
++}
++
+ 1;
