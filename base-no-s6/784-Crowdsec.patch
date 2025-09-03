@@ -1,12 +1,13 @@
 new file mode 100644
 --- /dev/null
 +++ b/usr/share/perl5/Lemonldap/NG/Common/CrowdSec.pm
-@@ -0,0 +1,266 @@
+@@ -0,0 +1,260 @@
 +package Lemonldap::NG::Common::CrowdSec;
 +
 +use strict;
 +use Date::Parse;
-+use JSON qw(from_json to_json);
++use Digest::SHA qw(sha256_hex);
++use JSON        qw(from_json to_json);
 +use Mouse::Role;
 +use POSIX qw(strftime);
 +use Lemonldap::NG::Common::UserAgent;
@@ -21,7 +22,6 @@ new file mode 100644
 +our $defaultBanValues = {
 +    events_count     => 1,
 +    scenario         => 'llng',
-+    scenario_hash    => 'llng',
 +    scenario_version => $VERSION,
 +    leakspeed        => '1s',
 +    remediation      => JSON::true,
@@ -45,13 +45,6 @@ new file mode 100644
 +has tokenExp => ( is => 'rw', default => 0 );
 +
 +has crowdsecUrl => ( is => 'rw' );
-+
-+has scenario => ( is => 'rw', default => 'llng' );
-+has scenarioHash => (
-+    is      => 'rw',
-+    lazy    => 1,
-+    default => sub { $_[0]->scenario }
-+);
 +
 +sub _init {
 +    my ($self) = @_;
@@ -211,6 +204,7 @@ new file mode 100644
 +    $data->{stop_at}  ||= $timestamp;
 +    $data->{source}   ||= { scope => 'ip', value => $ip };
 +    my $reason = delete( $data->{reason} ) || 'Banned by LLNG';
++    $data->{scenario_hash} = sha256_hex( $data->{scenario} );
 +    return to_json( [ {
 +                %$data,
 +                message => $msg,

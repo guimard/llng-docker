@@ -1,0 +1,22 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CrowdSecAgent.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CrowdSecAgent.pm
+@@ -87,7 +87,8 @@ sub sendIpAlerts {
+     }
+     my $msg = 'Authentication failed: '
+       . &Lemonldap::NG::Portal::Main::Constants::portalConsts->{$ret};
+-    $self->alert( $req->address, $msg )
++    $self->alert( $req->address, $msg,
++        { scenario => 'llng/badcredentials', reason => $msg, } )
+       ? $self->auditLog(
+         $req,
+         code    => 200,
+@@ -114,7 +115,8 @@ sub controlUrl {
+         and $req->env->{REQUEST_URI} =~ $self->filters->{url} )
+     {
+         my $msg = 'Bad URI detected: ' . $req->env->{REQUEST_URI};
+-        $self->alert( $req->address, $msg, { reason => "LLNG bad URL" } )
++        $self->alert( $req->address, $msg,
++            { scenario => 'llng/urlscan', reason => $msg, } )
+           ? $self->auditLog(
+             $req,
+             code         => 200,
