@@ -73,7 +73,7 @@ runs:
         run: |
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             TAGS="${{ inputs.DOCKER_IMAGE }}:latest${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}"
-            TAGS="${{ inputs.DOCKER_IMAGE }}:${{ steps.setversion.outputs.version }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}"
+            TAGS+=$'\n'"${{ inputs.DOCKER_IMAGE }}:${{ steps.setversion.outputs.version }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}"
             TAGS+=$'\n'"${{ inputs.DOCKER_IMAGE }}:${{ steps.setversion.outputs.version }}-${{ env.DEBIANRELEASE }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}"
           else
             TAGS="${{ inputs.DOCKER_IMAGE }}:latest${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}"
