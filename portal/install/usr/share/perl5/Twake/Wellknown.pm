@@ -2,6 +2,11 @@
 #
 package Twake::Wellknown;
 
+use strict;
+use Mouse;
+
+extends 'Lemonldap::NG::Portal::Main::Plugin';
+
 sub init {
     my $self = shift;
     $self->addAuthRoute(
