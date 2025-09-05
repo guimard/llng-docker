@@ -23,9 +23,13 @@ COPY *.patch /
 RUN \
     set -e && for p in \
         ignorepollers.patch \
-	fixedLogout.patch \
-	matrix-token-exchange.patch \
-        664-admin-logout.patch \
+        fixedLogout.patch \
+        matrix-token-exchange.patch \
+        722-adminlogout.patch \
+	3452-sessionexplorer.patch \
+	784-Crowdsec.patch \
+	787-CrowdsecAgent.patch \
+	797-crowdsec-agent.patch \
     ; do echo patch $p && patch -p1 < $p; done && \
     rm -f *.patch && \
     LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini \
@@ -43,7 +47,7 @@ RUN \
       docConstantsFile => "/dev/null", \
       )' && \
     perl -i -pe 's#^(use constant DEFAULTCONFFILE).*$#$1 => "/etc/lemonldap-ng/lemonldap-ng.ini";# && print STDERR "OK\n"' \
-    	/usr/share/perl5/Lemonldap/NG/Common/Conf/Constants.pm && \
+        /usr/share/perl5/Lemonldap/NG/Common/Conf/Constants.pm && \
     rm -f /usr/share/lemonldap-ng/manager/htdocs/static/js/conftree.min.js && \
     ln -s conftree.js /usr/share/lemonldap-ng/manager/htdocs/static/js/conftree.min.js
 

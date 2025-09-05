@@ -1,5 +1,13 @@
 # Changes
 
+## v2.21.2-3 _(2025-09-05)_
+* Replace adminLogout (MR 644) by MR 722
+* Patch SessionExplorer for nodes with only one dest
+* Import path to fiw Google authentication (mr 777)
+* Import Crowdsec enhancements (mr 784 787 797)
+* add plugin Twake::Wellknown.pm
+* Import 2.21.3 fix
+
 ## v2.21.2-2 _(2025-07-23)_
 * Render mail2f accessible via API
 * Fix Loki export in hiperf

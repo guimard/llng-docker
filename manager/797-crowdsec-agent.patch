@@ -1,0 +1,188 @@
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
+@@ -1531,6 +1531,20 @@ sub attributes {
+             type          => 'text',
+             documentation => 'Crowdsec filters directory',
+         },
++        crowdSecAgentResponseCode => {
++            type   => 'select',
++            select => [
++                { k => 200, v => 200 },
++                { k => 302, v => 302 },
++                { k => '',  v => 404 },
++            ],
++            default       => '',
++            documentation => 'Crowdsec ban response code',
++        },
++        crowdSecAgentResponseValue => {
++            type          => 'text',
++            documentation => 'Crowdsec ban response text',
++        },
+ 
+         # OIDC personnal offline token removal
+         oidcOfflineTokens => {
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Tree.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Tree.pm
+@@ -1225,6 +1225,8 @@ sub tree {
+                                                 'crowdsecMaxFailures',
+                                                 'crowdsecBlockDelay',
+                                                 'crowdsecFilters',
++                                                'crowdSecAgentResponseCode',
++                                                'crowdSecAgentResponseValue',
+                                             ],
+                                         },
+                                     ],
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json
+@@ -281,6 +281,8 @@
+ "corsMax_Age":"Access-Control-Max-Age",
+ "create":"أحدث",
+ "crossOrigineResourceSharing":"Cross-Origin Resource Sharing",
++"crowdSecAgentResponseCode":"Ban response code",
++"crowdSecAgentResponseValue":"Ban response content,",
+ "crowdsec":"تفعيل",
+ "crowdsecAction":"إجراء",
+ "crowdsecAgent":"Activation",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json
+@@ -281,6 +281,8 @@
+ "corsMax_Age":"Access-Control-Max-Age",
+ "create":"Create",
+ "crossOrigineResourceSharing":"Cross-Origin Resource Sharing",
++"crowdSecAgentResponseCode":"Ban response code",
++"crowdSecAgentResponseValue":"Ban response content,",
+ "crowdsec":"Activation",
+ "crowdsecAction":"Action",
+ "crowdsecAgent":"Activation",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json
+@@ -281,6 +281,8 @@
+ "corsMax_Age":"Access-Control-Max-Age",
+ "create":"Crear",
+ "crossOrigineResourceSharing":"Cross-Origin Resource Sharing",
++"crowdSecAgentResponseCode":"Ban response code",
++"crowdSecAgentResponseValue":"Ban response content,",
+ "crowdsec":"Activación",
+ "crowdsecAction":"Acción",
+ "crowdsecAgent":"Activation",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json
+@@ -281,6 +281,8 @@
+ "corsMax_Age":"Access-Control-Max-Age",
+ "create":"Créer",
+ "crossOrigineResourceSharing":"Partage des ressources entre origines multiples",
++"crowdSecAgentResponseCode":"Code de réponse pour les rejets",
++"crowdSecAgentResponseValue":"Contenu de la réponse",
+ "crowdsec":"Activation",
+ "crowdsecAction":"Action",
+ "crowdsecAgent":"Activation",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json
+@@ -281,6 +281,8 @@
+ "corsMax_Age":"Access-Control-Max-Age",
+ "create":"יצירה",
+ "crossOrigineResourceSharing":"שיתוף משאבי Cross-Origin ‏(CORS)",
++"crowdSecAgentResponseCode":"Ban response code",
++"crowdSecAgentResponseValue":"Ban response content,",
+ "crowdsec":"הפעלה",
+ "crowdsecAction":"פעולה",
+ "crowdsecAgent":"Activation",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json
+@@ -281,6 +281,8 @@
+ "corsMax_Age":"Access-Control-Max-Age",
+ "create":"Crea",
+ "crossOrigineResourceSharing":"Cross-Origin Resource Sharing",
++"crowdSecAgentResponseCode":"Ban response code",
++"crowdSecAgentResponseValue":"Ban response content,",
+ "crowdsec":"Attivazione",
+ "crowdsecAction":"Azione",
+ "crowdsecAgent":"Activation",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json
+@@ -281,6 +281,8 @@
+ "corsMax_Age":"Access-Control-Max-Age",
+ "create":"Stwórz",
+ "crossOrigineResourceSharing":"Udostępnianie zasobów między źródłami",
++"crowdSecAgentResponseCode":"Ban response code",
++"crowdSecAgentResponseValue":"Ban response content,",
+ "crowdsec":"Aktywacja",
+ "crowdsecAction":"Akcja",
+ "crowdsecAgent":"Activation",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json
+@@ -281,6 +281,8 @@
+ "corsMax_Age":"Access-Control-Max-Age",
+ "create":"Criar",
+ "crossOrigineResourceSharing":"Cross-Origin Resource Sharing",
++"crowdSecAgentResponseCode":"Ban response code",
++"crowdSecAgentResponseValue":"Ban response content,",
+ "crowdsec":"Ativação",
+ "crowdsecAction":"Ação",
+ "crowdsecAgent":"Activation",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json
+@@ -281,6 +281,8 @@
+ "corsMax_Age":"Access-Control-Max-Age",
+ "create":"Criar",
+ "crossOrigineResourceSharing":"Cross-Origin Resource Sharing",
++"crowdSecAgentResponseCode":"Ban response code",
++"crowdSecAgentResponseValue":"Ban response content,",
+ "crowdsec":"Ativação",
+ "crowdsecAction":"Ação",
+ "crowdsecAgent":"Activation",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json
+@@ -281,6 +281,8 @@
+ "corsMax_Age":"Access-Control-Max-Age",
+ "create":"Создать",
+ "crossOrigineResourceSharing":"Совместное использование ресурсов между источниками",
++"crowdSecAgentResponseCode":"Ban response code",
++"crowdSecAgentResponseValue":"Ban response content,",
+ "crowdsec":"Активация",
+ "crowdsecAction":"Действие",
+ "crowdsecAgent":"Activation",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json
+@@ -281,6 +281,8 @@
+ "corsMax_Age":"Access-Control-Max-Age",
+ "create":"Oluştur",
+ "crossOrigineResourceSharing":"Kökler Arası Kaynak Paylaşımı (CORS)",
++"crowdSecAgentResponseCode":"Ban response code",
++"crowdSecAgentResponseValue":"Ban response content,",
+ "crowdsec":"Aktivasyon",
+ "crowdsecAction":"Eylem",
+ "crowdsecAgent":"Activation",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json
+@@ -281,6 +281,8 @@
+ "corsMax_Age":" Truy cập- Kiểm soát- Tối đa - Tuổi",
+ "create":"Tạo",
+ "crossOrigineResourceSharing":"Chia sẻ tài nguyên nguồn gốc chéo",
++"crowdSecAgentResponseCode":"Ban response code",
++"crowdSecAgentResponseValue":"Ban response content,",
+ "crowdsec":"Kích hoạt",
+ "crowdsecAction":"Hành động",
+ "crowdsecAgent":"Activation",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json
+@@ -281,6 +281,8 @@
+ "corsMax_Age":"存取控制最大時間",
+ "create":"建立",
+ "crossOrigineResourceSharing":"跨來源資源共享",
++"crowdSecAgentResponseCode":"Ban response code",
++"crowdSecAgentResponseValue":"Ban response content,",
+ "crowdsec":"激活",
+ "crowdsecAction":"動作",
+ "crowdsecAgent":"Activation",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json
+@@ -281,6 +281,8 @@
+ "corsMax_Age":"存取控制最大時間",
+ "create":"建立",
+ "crossOrigineResourceSharing":"跨來源資源共享",
++"crowdSecAgentResponseCode":"Ban response code",
++"crowdSecAgentResponseValue":"Ban response content,",
+ "crowdsec":"啟用",
+ "crowdsecAction":"動作",
+ "crowdsecAgent":"Activation",

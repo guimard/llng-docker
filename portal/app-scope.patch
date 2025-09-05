@@ -47,7 +47,7 @@
 +                      JSON::to_json( \@applist );
 +                }
 +                else {
-+                    $self->userLogger->error(
++                    $self->userLogger->info(
 +                        'Try to access to applications scopes without right');
 +                }
 +                next;
