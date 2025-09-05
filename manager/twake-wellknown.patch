@@ -1,0 +1,183 @@
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
+@@ -5420,6 +5420,11 @@ m{^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
+             documentation =>
+ 'Shall OIDC/SAML/CAS protected apps access be recorded to session?'
+         },
++
++        # Twake
++        twakeWellKnown => {
++            type => 'keyTextContainer',
++        },
+     };
+ }
+ 
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Tree.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Tree.pm
+@@ -1305,6 +1305,12 @@ sub tree {
+                                 'compactConf',   'eventQueueName',
+                             ]
+                         },
++                        {
++                            title => 'twake',
++                            nodes => [
++                                'twakeWellKnown',
++                            ],
++                        },
+                     ]
+                 }
+             ]
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json
+@@ -1328,6 +1328,8 @@
+ "trustedBrowserUseTotp":"Use time-based fingerprinting",
+ "trustedDomains":"النطاقات الموثوق بها",
+ "trustedProxies":"عناوين الآي بي البروكسي الموثوق بها",
++"twake":"Twake",
++"twakeWellKnown":".well-known/twake-configuration content",
+ "twitterAppName":"اسم التطبيق",
+ "twitterAuthnLevel":"مستوى إثبات الهوية",
+ "twitterKey":"مفتاح أل API",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json
+@@ -1328,6 +1328,8 @@
+ "trustedBrowserUseTotp":"Use time-based fingerprinting",
+ "trustedDomains":"Trusted domains",
+ "trustedProxies":"Trusted proxies IP",
++"twake":"Twake",
++"twakeWellKnown":".well-known/twake-configuration content",
+ "twitterAppName":"Application name",
+ "twitterAuthnLevel":"Authentication level",
+ "twitterKey":"API key",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json
+@@ -1328,6 +1328,8 @@
+ "trustedBrowserUseTotp":"Use time-based fingerprinting",
+ "trustedDomains":"Dominios de confianza",
+ "trustedProxies":"IP de proxies de confianza",
++"twake":"Twake",
++"twakeWellKnown":".well-known/twake-configuration content",
+ "twitterAppName":"Nombre de aplicación",
+ "twitterAuthnLevel":"Nivel de autentificación",
+ "twitterKey":"Clave API",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json
+@@ -1328,6 +1328,8 @@
+ "trustedBrowserUseTotp":"Utiliser une empreinte basée sur le temps",
+ "trustedDomains":"Domaines approuvés",
+ "trustedProxies":"IP des proxys de confiance",
++"twake":"Twake",
++"twakeWellKnown":"Contenu de .well-known/twake-configuration",
+ "twitterAppName":"Nom de l'application",
+ "twitterAuthnLevel":"Niveau d'authentification",
+ "twitterKey":"Clef de l'API",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json
+@@ -1328,6 +1328,8 @@
+ "trustedBrowserUseTotp":"Use time-based fingerprinting",
+ "trustedDomains":"שמות תחום מהימנים",
+ "trustedProxies":"כתובות IP של מתווכים מהימנים",
++"twake":"Twake",
++"twakeWellKnown":".well-known/twake-configuration content",
+ "twitterAppName":"שם יישום",
+ "twitterAuthnLevel":"דרגת אימות",
+ "twitterKey":"מפתח API",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json
+@@ -1328,6 +1328,8 @@
+ "trustedBrowserUseTotp":"Use time-based fingerprinting",
+ "trustedDomains":"Domini attendibili",
+ "trustedProxies":"IP proxy attendibili",
++"twake":"Twake",
++"twakeWellKnown":".well-known/twake-configuration content",
+ "twitterAppName":"Nome dell'applicazione",
+ "twitterAuthnLevel":"Livello di autenticazione",
+ "twitterKey":"Chiave API",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json
+@@ -1328,6 +1328,8 @@
+ "trustedBrowserUseTotp":"Użyj odcisku palca opartego na czasie",
+ "trustedDomains":"Zaufane domeny",
+ "trustedProxies":"Zaufane proxy IP",
++"twake":"Twake",
++"twakeWellKnown":".well-known/twake-configuration content",
+ "twitterAppName":"Nazwa aplikacji",
+ "twitterAuthnLevel":"Poziom uwierzytelnienia",
+ "twitterKey":"Klucz API",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json
+@@ -1328,6 +1328,8 @@
+ "trustedBrowserUseTotp":"Use time-based fingerprinting",
+ "trustedDomains":"Domínios confiáveis",
+ "trustedProxies":"IPs dos Proxies confiáveis",
++"twake":"Twake",
++"twakeWellKnown":".well-known/twake-configuration content",
+ "twitterAppName":"Nome da aplicação",
+ "twitterAuthnLevel":"Nível de autenticação",
+ "twitterKey":"Chave de API",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json
+@@ -1328,6 +1328,8 @@
+ "trustedBrowserUseTotp":"Use time-based fingerprinting",
+ "trustedDomains":"Domínios confiáveis",
+ "trustedProxies":"IPs dos proxies confiáveis",
++"twake":"Twake",
++"twakeWellKnown":".well-known/twake-configuration content",
+ "twitterAppName":"Nome da aplicação",
+ "twitterAuthnLevel":"Nível de autenticação",
+ "twitterKey":"Chave de API",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json
+@@ -1328,6 +1328,8 @@
+ "trustedBrowserUseTotp":"Use time-based fingerprinting",
+ "trustedDomains":"Доверенные домены",
+ "trustedProxies":"IP доверенных прокси",
++"twake":"Twake",
++"twakeWellKnown":".well-known/twake-configuration content",
+ "twitterAppName":"Название приложения",
+ "twitterAuthnLevel":"Уровень аутентификации",
+ "twitterKey":"Ключ API",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json
+@@ -1328,6 +1328,8 @@
+ "trustedBrowserUseTotp":"Use time-based fingerprinting",
+ "trustedDomains":"Güvenilir etki alanları",
+ "trustedProxies":"Güvenilir tünel IP'si",
++"twake":"Twake",
++"twakeWellKnown":".well-known/twake-configuration content",
+ "twitterAppName":"Uygulama ismi",
+ "twitterAuthnLevel":"Doğrulama seviyesi",
+ "twitterKey":"API anahtarı",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json
+@@ -1328,6 +1328,8 @@
+ "trustedBrowserUseTotp":"Use time-based fingerprinting",
+ "trustedDomains":"Miền tin cậy",
+ "trustedProxies":"proxies IP tin cậy",
++"twake":"Twake",
++"twakeWellKnown":".well-known/twake-configuration content",
+ "twitterAppName":"Tên ứng dụng",
+ "twitterAuthnLevel":"Mức xác thực",
+ "twitterKey":"khóa API",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json
+@@ -1328,6 +1328,8 @@
+ "trustedBrowserUseTotp":"Use time-based fingerprinting",
+ "trustedDomains":"受信任的網域",
+ "trustedProxies":"受信任的代理伺服器 IP",
++"twake":"Twake",
++"twakeWellKnown":".well-known/twake-configuration content",
+ "twitterAppName":"應用程式名稱",
+ "twitterAuthnLevel":"驗證等級",
+ "twitterKey":"API 金鑰",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json
+@@ -1328,6 +1328,8 @@
+ "trustedBrowserUseTotp":"Use time-based fingerprinting",
+ "trustedDomains":"受信任的網域",
+ "trustedProxies":"受信任的代理伺服器 IP",
++"twake":"Twake",
++"twakeWellKnown":".well-known/twake-configuration content",
+ "twitterAppName":"應用程式名稱",
+ "twitterAuthnLevel":"驗證等級",
+ "twitterKey":"API 金鑰",
