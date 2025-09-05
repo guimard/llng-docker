@@ -44,7 +44,7 @@ POSTGRES_USER: your-admin-account
 POSTGRES_DB: your-admin-db
 PGPASSWORD: your-admin-password
 
-$ docker run /docker-entrypoint-initdb.d/init-user-db.sh ---env-file=env yadd/lemonldap-ng-pg-database 
+$ docker run /docker-entrypoint-initdb.d/init-user-db.sh ---env-file=env yadd/lemonldap-ng-pg-database
 ```
 >Note: `PGPASSWORD` env is used by the psql client at runtime.
 ## Repository and bug reports
