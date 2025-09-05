@@ -30,6 +30,7 @@ RUN \
 	784-Crowdsec.patch \
 	787-CrowdsecAgent.patch \
 	797-crowdsec-agent.patch \
+	twake-wellknown.patch \
     ; do echo patch $p && patch -p1 < $p; done && \
     rm -f *.patch && \
     LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini \
@@ -48,12 +49,17 @@ RUN \
       )' && \
     perl -i -pe 's#^(use constant DEFAULTCONFFILE).*$#$1 => "/etc/lemonldap-ng/lemonldap-ng.ini";# && print STDERR "OK\n"' \
         /usr/share/perl5/Lemonldap/NG/Common/Conf/Constants.pm && \
+    perl -i -pe 's/__DNSDOMAIN__/example.com/g; s#__CACHEDIR__#/var/cache/lemonldap-ng#g; s#__SESSIONDIR__#/var/lib/lemonldap-ng/sessions#g; s#__PSESSIONDIR__#/var/lib/lemonldap-ng/psessions#g; s#__NOTIFICATIONDIR__#/var/lib/lemonldap-ng/notifications#g;' /var/lib/lemonldap-ng/conf/lmConf-1.json && \ 
     rm -f /usr/share/lemonldap-ng/manager/htdocs/static/js/conftree.min.js && \
     ln -s conftree.js /usr/share/lemonldap-ng/manager/htdocs/static/js/conftree.min.js
+
+RUN if grep __ /var/lib/lemonldap-ng/conf/lmConf-1.json; then echo "Still __ in conf"; exit 1; fi
 
 RUN echo "# Install nginx configuration files" && \
     ln -s ../../lemonldap-ng/manager-nginx.conf /etc/nginx/sites-enabled/z_manager-nginx.conf
 
 COPY install /
+
+EXPOSE 80
 
 CMD ["/usr/sbin/nginx"]
