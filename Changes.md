@@ -1,5 +1,10 @@
 # Changes
 
+## v2.21.3-1 _(dev)_
+* Switch to Debian Trixie
+* Switch to PostgreSQL 17
+* Update to 2.21.3
+
 ## v2.21.2-3 _(2025-09-05)_
 * Replace adminLogout (MR 644) by MR 722
 * Patch SessionExplorer for nodes with only one dest

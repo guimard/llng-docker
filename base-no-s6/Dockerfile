@@ -1,8 +1,8 @@
-ARG DEBIANVERSION=bookworm
+ARG DEBIANVERSION=trixie
 
 FROM debian:${DEBIANVERSION}-slim as debian-backports-updated
 
-ENV DEBIAN_VERSION=bookworm
+ENV DEBIAN_VERSION=trixie
 
 RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
     apt-get -y update && \
@@ -17,8 +17,8 @@ RUN apt-get install -y zip && cd /tmp && unzip master.zip
 
 FROM debian-backports-updated
 
-ENV DEBIAN_VERSION="bookworm"
-ENV LLNGDIST="/bookworm-backports"
+ENV DEBIAN_VERSION="trixie"
+ENV LLNGDIST="/trixie-backports"
 #ENV LLNGDIST=
 
 LABEL maintainer="Yadd yadd@debian.org>" \
@@ -80,7 +80,7 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     apt-get -y --no-install-recommends install procps cron curl openssl jq liburi-perl \
     liblemonldap-ng-common-perl${LLNGDIST} \
     liblemonldap-ng-handler-perl${LLNGDIST} \
-    libapache-session-browseable-perl${LLNGDIST} libapache-session-ldap-perl \
+    libapache-session-browseable-perl libapache-session-ldap-perl \
     libapache-session-mongodb-perl libapache-session-sqlite3-perl \
     libapache-session-wrapper-perl libsoap-lite-perl \
     libdbi-perl libdbd-pg-perl libnet-cidr-perl \
@@ -95,7 +95,6 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     echo "# patch 724-webpubsub.patch" && patch -p1 < 724-webpubsub.patch && \
     echo "# 769-loki.patch" && patch -p1 <769-loki.patch && \
     echo "# 784-Crowdsec.patch" && patch -p1 < 784-Crowdsec.patch && \
-    echo "# 3462-sec.patch" && patch -p1 < 3462-sec.patch && \
     perl -000 -MJSON -i -ne '$_=JSON::from_json($_);$_->{reloadUrls}={};print JSON->new->pretty->canonical->encode($_)' /var/lib/lemonldap-ng/conf/lmConf-1.json && \
     perl -i -pe 's/\r//g' /usr/share/perl5/Lemonldap/NG/Common/Conf/DefaultValues.pm && \
     echo rm -f *.patch && \

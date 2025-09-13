@@ -40,7 +40,7 @@ RUN set -e && for p in appgrid.patch app-scope.patch ignorepollers.patch \
     getreftoken.patch 708-sid-in-userinfo.patch \
     717-introspection.patch 718-iat-and-nbf-in-at.patch \
     779-mail2f-api.patch \
-    722-adminlogout.patch 777-google-fix.patch 784-Crowdsec.patch 797-crowdsec-agent.patch 802-crowdsec-agent.patch \
+    722-adminlogout.patch 784-Crowdsec.patch 797-crowdsec-agent.patch 802-crowdsec-agent.patch \
     twake-wellknown.patch \
     ; do echo patch $p && patch -p1 < $p; done && \
     cp -f /usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.js /usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.min.js && \
