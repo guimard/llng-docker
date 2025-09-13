@@ -1,5 +1,5 @@
 # Build packages
-ARG DEBIAN_VERSION=bookworm
+ARG DEBIAN_VERSION=trixie
 FROM debian:${DEBIAN_VERSION}-slim
 
 ARG BRANCH=v2.0

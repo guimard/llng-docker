@@ -41,7 +41,7 @@ runs:
         uses: docker/metadata-action@v4
         with:
           images: ${{ inputs.DOCKER_IMAGE }}
-      - name: Build and push Docker image
+      - name: Build and push Docker stable images
         uses: docker/build-push-action@v4
         with:
           context: ${{ inputs.DIRNAME }}

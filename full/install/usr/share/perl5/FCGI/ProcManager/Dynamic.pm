@@ -203,7 +203,7 @@ sub pm_wait
 				$self->{_last_delta_time} = time();
 			};
                 }
-		elsif (keys(%{$self->{PIDS}}) < $self->{min_nproc}) 
+		elsif (keys(%{$self->{PIDS}}) < $self->{min_nproc})
 		{
 			# Если количество процессов меньше минимального - добавляем
 			$self->pm_notify("increase workers to minimal ".$self->{min_nproc});
@@ -244,7 +244,7 @@ sub pm_wait
 				$self->{_last_delta_time} = time();
 			};
 		}
-		elsif (keys(%{$self->{PIDS}}) < $self->{n_processes}) 
+		elsif (keys(%{$self->{PIDS}}) < $self->{n_processes})
 		{
 			# Если количество процессов меньше текущего - добавляем
 			$self->pm_notify("increase workers to ".$self->{n_processes});

@@ -34,7 +34,7 @@ services:
       - PG_SERVER=llng-db
       - REDIS_SERVER=redis:6379
       - PORTAL_CRON=no
-    depends_on: 
+    depends_on:
       llng-db:
         condition: service_healthy
     scale: 3
@@ -53,7 +53,7 @@ services:
       - USERLOGGER=stderr
       - PG_SERVER=llng-db
       - REDIS_SERVER=redis:6379
-    depends_on: 
+    depends_on:
       llng-db:
         condition: service_healthy
       auth:

@@ -1,8 +1,8 @@
-ARG DEBIANVERSION=bookworm
+ARG DEBIANVERSION=trixie
 
 FROM debian:${DEBIANVERSION}-slim as debian-backports-updated
 
-ENV DEBIAN_VERSION=bookworm
+ENV DEBIAN_VERSION=trixie
 
 RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
     apt-get -y update && \
@@ -12,8 +12,8 @@ RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
 
 FROM debian-backports-updated
 
-ENV DEBIAN_VERSION=bookworm
-#ENV LLNGDIST="/bookworm-backports"
+ENV DEBIAN_VERSION=trixie
+#ENV LLNGDIST="/trixie-backports"
 ENV LLNGDIST=
 
 LABEL maintainer="Yadd yadd@debian.org>" \
