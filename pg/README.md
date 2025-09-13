@@ -7,7 +7,7 @@ sessions.
 ## Tags
 
 * `<number>`: PostgreSQL major version
-* `<number>-bookworm`: [postgres tag](https://hub.docker.com/_/postgres) used as source of this image
+* `<number>-trixie`: [postgres tag](https://hub.docker.com/_/postgres) used as source of this image
 
 ## Variables with default values:
 
@@ -21,7 +21,7 @@ sessions.
 * PG\_OIDC\_TABLE: oidcsessions
 * PG\_CAS\_TABLE: cassessions
 
-and all variables from postgres:bookworm. Note that you should set
+and all variables from postgres:trixie. Note that you should set
 `POSTGRES_PASSWORD` variable _(root password)_
 
 ## Initialize configuration

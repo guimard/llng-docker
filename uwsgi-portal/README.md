@@ -16,7 +16,7 @@ Important uWSGI parameters:
  * processes number is scalled between **--cheaper** and **--processes**
  * **--perl-no-die-catch** avoid stupid error stack when sessions are expired
 
-See [uWSGI manpage](https://manpages.debian.org/bookworm/uwsgi-core/uwsgi-core.1.en.html)
+See [uWSGI manpage](https://manpages.debian.org/trixie/uwsgi-core/uwsgi-core.1.en.html)
 to learn more about uWSGI options.
 
 ## Repository and bug reports
