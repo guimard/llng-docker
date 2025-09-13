@@ -1,6 +1,6 @@
 # Changes
 
-## v2.21.3-1 _(dev)_
+## v2.21.3-1 _(2025-09-13)_
 * Switch to Debian Trixie
 * Switch to PostgreSQL 17
 * Update to 2.21.3
