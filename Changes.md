@@ -1,5 +1,8 @@
 # Changes
 
+## v2.21.3-2 _(dev)_
+* Add Twake app-accounts plugin
+
 ## v2.21.3-1 _(2025-09-13)_
 * Switch to Debian Trixie
 * Switch to PostgreSQL 17
