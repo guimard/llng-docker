@@ -1,8 +1,9 @@
 # Changes
 
-## v2.21.3-2 _(dev)_
+## v2.22.0 _(dev)_
 * Add Twake app-accounts plugin
 * Import 3478 fix (OIDC)
+* Update to 2.22.0
 
 ## v2.21.3-1 _(2025-09-13)_
 * Switch to Debian Trixie
