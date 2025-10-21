@@ -22,14 +22,8 @@ COPY *.patch /
 
 RUN \
     set -e && for p in \
-        ignorepollers.patch \
         fixedLogout.patch \
         matrix-token-exchange.patch \
-        722-adminlogout.patch \
-	3452-sessionexplorer.patch \
-	784-Crowdsec.patch \
-	787-CrowdsecAgent.patch \
-	797-crowdsec-agent.patch \
 	twake-plugins.patch \
     ; do echo patch $p && patch -p1 < $p; done && \
     rm -f *.patch && \
