@@ -1,25 +1,23 @@
 ARG DEBIANVERSION=trixie
 
-FROM debian:${DEBIANVERSION}-slim as debian-backports-updated
+FROM debian:${DEBIANVERSION}-slim as debian-updated
 
 ENV DEBIAN_VERSION=trixie
 
 RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
     apt-get -y update && \
     apt-get -y install xz-utils && \
-    apt-get -y upgrade && \
-    echo "deb http://deb.debian.org/debian" ${DEBIAN_VERSION}"-backports main" > /etc/apt/sources.list.d/backports.list && \
-    apt-get -y update
+    apt-get -y upgrade
 
-FROM debian-backports-updated as llng-client
+FROM debian-updated as llng-client
 ADD https://github.com/linagora/simple-oidc-client/archive/refs/heads/master.zip /tmp
 RUN apt-get install -y zip && cd /tmp && unzip master.zip
 
-FROM debian-backports-updated
+FROM debian-updated
 
 ENV DEBIAN_VERSION="trixie"
-ENV LLNGDIST="/trixie-backports"
-#ENV LLNGDIST=
+#ENV LLNGDIST="/trixie-backports"
+ENV LLNGDIST=
 
 LABEL maintainer="Yadd yadd@debian.org>" \
       name="yadd/lemonldap-ng-base" \
