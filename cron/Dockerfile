@@ -16,4 +16,6 @@ RUN apt-get update && apt-get install -y cron && \
     rm -rf /var/lib/apt/lists/* /usr/share/perl5/Lemonldap/NG/Handler \
     /etc/services.d /tmp/liblemonldap-ng-portal-*
 
+# Note: Traditional cron daemon requires root to execute jobs as different users
+# Individual cron jobs are configured to run as www-data via cron.d files
 CMD ["cron", "-f"]

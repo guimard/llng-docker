@@ -15,4 +15,6 @@ RUN apt-get -y update && \
 
 COPY start.sh /backup.sh
 
+USER www-data
+
 CMD ["/backup.sh"]

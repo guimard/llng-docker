@@ -107,11 +107,15 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
 #    echo "# Drop comments" && \
 #    perl -i -ne 'print unless /^\s*;/ or /^\s*$/' /etc/lemonldap-ng/lemonldap-ng.ini
 
+RUN chown -R www-data:www-data /var/lib/lemonldap-ng /etc/lemonldap-ng
+
 VOLUME ["/etc/lemonldap-ng","/var/lib/lemonldap-ng/conf", "/var/lib/lemonldap-ng/sessions", "/var/lib/lemonldap-ng/psessions"]
 
 COPY install /
 
 COPY start /
+
+USER www-data
 
 # DEBUG
 #CMD ["cat","/var/lib/lemonldap-ng/conf/lmConf-1.json"]

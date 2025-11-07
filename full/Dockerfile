@@ -56,10 +56,12 @@ RUN \
 RUN if grep __ /var/lib/lemonldap-ng/conf/lmConf-1.json; then echo "Still __ in conf"; exit 1; fi
 
 RUN echo "# Install nginx configuration files" && \
-    ln -s ../../lemonldap-ng/manager-nginx.conf /etc/nginx/sites-enabled/z_manager-nginx.conf
+    ln -s ../../lemonldap-ng/manager-nginx.conf /etc/nginx/sites-enabled/z_manager-nginx.conf && \
+    mkdir -p /var/lib/nginx /var/log/nginx && \
+    chown -R www-data:www-data /var/lib/nginx /var/log/nginx /var/cache/nginx /etc/nginx
 
 COPY install /
 
-EXPOSE 80
+EXPOSE 8080
 
 CMD ["/usr/sbin/nginx"]

@@ -19,3 +19,5 @@ RUN mkdir -p /llng-conf
 VOLUME ["/llng-conf/"]
 
 COPY install /
+
+# Note: Official PostgreSQL image runs as 'postgres' user (not root)

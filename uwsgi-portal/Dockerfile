@@ -48,10 +48,12 @@ RUN set -e && for p in appgrid.patch app-scope.patch ignorepollers.patch \
     rm -f /etc/nginx/sites-enabled/* && \
     ln -s ../../lemonldap-ng/portal-nginx.conf /etc/nginx/sites-enabled/ && \
     (echo ""; echo "daemon off;") >> /etc/nginx/nginx.conf && \
-    perl -i -pe 's#access_log .*;#access_log /dev/stdout;#; s#error_log .*;#error_log /dev/stdout info;#' /etc/nginx/nginx.conf
+    perl -i -pe 's#access_log .*;#access_log /dev/stdout;#; s#error_log .*;#error_log /dev/stdout info;#' /etc/nginx/nginx.conf && \
+    mkdir -p /var/lib/nginx /var/log/nginx && \
+    chown -R www-data:www-data /var/lib/nginx /var/log/nginx /var/cache/nginx /etc/nginx
 
 COPY install /
 
-EXPOSE 80
+EXPOSE 8080
 
 CMD ["/usr/sbin/nginx"]

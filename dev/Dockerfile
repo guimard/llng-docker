@@ -45,6 +45,8 @@ RUN echo "Install doc" && \
 RUN rm -rf /mnt/*.deb && \
     apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /var/lib/lemonldap-ng/cache && chown www-data:www-data /var/lib/lemonldap-ng/cache
+RUN mkdir -p /var/lib/lemonldap-ng/cache && chown www-data:www-data /var/lib/lemonldap-ng/cache && \
+    mkdir -p /var/lib/nginx /var/log/nginx && \
+    chown -R www-data:www-data /var/lib/nginx /var/log/nginx /var/cache/nginx /etc/nginx
 
 CMD ["/usr/sbin/nginx"]

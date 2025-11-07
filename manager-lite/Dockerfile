@@ -59,6 +59,8 @@ RUN \
 COPY install /
 COPY start.sh /
 
-EXPOSE 80
+EXPOSE 8080
+
+USER www-data
 
 CMD ["/start.sh"]
