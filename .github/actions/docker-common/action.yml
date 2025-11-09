@@ -25,7 +25,7 @@ inputs:
   VERSION:
     required: false
     description: Version to use, "no" to use env VERSION
-  NON-ROOT:
+  NON_ROOT:
     required: false
     default: no
     description: Publish a non-root
@@ -89,7 +89,7 @@ runs:
           echo "EOF" >> $GITHUB_OUTPUT
       - name: Generate non-root tags
         id: gentagsnonroot
-        if: inputs.NON-ROOT == 'yes'
+        if: inputs.NON_ROOT == 'yes'
         shell: bash
         run: |
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
@@ -115,7 +115,7 @@ runs:
           push: true
           tags: ${{ steps.gentags.outputs.tags }}
       - name: Build and publish non-root image
-        if: inputs.NON-ROOT == 'yes'
+        if: inputs.NON_ROOT == 'yes'
         uses: docker/build-push-action@v4
         with:
           context: no-root
