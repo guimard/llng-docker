@@ -93,12 +93,12 @@ runs:
         shell: bash
         run: |
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            TAGS="${{ inputs.DOCKER_IMAGE }}:latest-non-root${{ inputs.IMAGE_SUFFIX2 }}"
-            TAGS+=$'\n'"${{ inputs.DOCKER_IMAGE }}:${{ steps.setversion.outputs.version }}-non-root${{ inputs.IMAGE_SUFFIX2 }}"
-            TAGS+=$'\n'"${{ inputs.DOCKER_IMAGE }}:${{ steps.setversion.outputs.version }}-${{ env.DEBIANRELEASE }}-non-root${{ inputs.IMAGE_SUFFIX2 }}"
+            TAGS="${{ inputs.DOCKER_IMAGE }}:latest-non-root"
+            TAGS+=$'\n'"${{ inputs.DOCKER_IMAGE }}:${{ steps.setversion.outputs.version }}-non-root"
+            TAGS+=$'\n'"${{ inputs.DOCKER_IMAGE }}:${{ steps.setversion.outputs.version }}-${{ env.DEBIANRELEASE }}-non-root"
           else
-            TAGS="${{ inputs.DOCKER_IMAGE }}:latest-non-root${{ inputs.IMAGE_SUFFIX2 }}"
-            TAGS+=$'\n'"${{ inputs.DOCKER_IMAGE }}:${{ steps.date.outputs.date }}-non-root${{ inputs.IMAGE_SUFFIX2 }}"
+            TAGS="${{ inputs.DOCKER_IMAGE }}:latest-non-root"
+            TAGS+=$'\n'"${{ inputs.DOCKER_IMAGE }}:${{ steps.date.outputs.date }}-non-root"
           fi
 
           echo "tags<<EOF" >> $GITHUB_OUTPUT
