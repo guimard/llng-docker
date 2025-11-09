@@ -23,8 +23,12 @@ inputs:
     required: true
     description: Short description
   VERSION:
-    required: valse
+    required: false
+    description: Version to use, "no" to use env VERSION
+  NON-ROOT:
+    required: false
     default: no
+    description: Publish a non-root
 
 runs:
   using: "composite"
@@ -83,6 +87,23 @@ runs:
           echo "tags<<EOF" >> $GITHUB_OUTPUT
           echo "$TAGS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
+      - name: Generate non-root tags
+        id: gentagsnonroot
+        if: inputs.NON-ROOT == 'yes'
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            TAGS="${{ inputs.DOCKER_IMAGE }}:latest-non-root${{ inputs.IMAGE_SUFFIX2 }}"
+            TAGS+=$'\n'"${{ inputs.DOCKER_IMAGE }}:${{ steps.setversion.outputs.version }}-non-root${{ inputs.IMAGE_SUFFIX2 }}"
+            TAGS+=$'\n'"${{ inputs.DOCKER_IMAGE }}:${{ steps.setversion.outputs.version }}-${{ env.DEBIANRELEASE }}-non-root${{ inputs.IMAGE_SUFFIX2 }}"
+          else
+            TAGS="${{ inputs.DOCKER_IMAGE }}:latest-non-root${{ inputs.IMAGE_SUFFIX2 }}"
+            TAGS+=$'\n'"${{ inputs.DOCKER_IMAGE }}:${{ steps.date.outputs.date }}-non-root${{ inputs.IMAGE_SUFFIX2 }}"
+          fi
+
+          echo "tags<<EOF" >> $GITHUB_OUTPUT
+          echo "$TAGS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
       - name: Build and push Docker latest image
         uses: docker/build-push-action@v4
         with:
@@ -93,6 +114,16 @@ runs:
           platforms: ${{ steps.platforms.outputs.platforms }}
           push: true
           tags: ${{ steps.gentags.outputs.tags }}
+      - name: Build and publish non-root image
+        if: inputs.NON-ROOT == 'yes'
+        uses: docker/build-push-action@v4
+        with:
+          context: no-root
+          build-args: |
+            IMAGE: ${{ inputs.DOCKER_IMAGE }}:latest${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}
+          platforms: ${{ steps.platforms.outputs.platforms }}
+          push: true
+          tags: ${{ steps.gentagsnonroot.outputs.tags }}
       - name: push README to Dockerhub
         if: inputs.SHORT_DESCRIPTION != 'no'
         uses: christian-korneck/update-container-description-action@v1

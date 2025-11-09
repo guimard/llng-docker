@@ -18,8 +18,8 @@ RUN apt-get install -y zip && cd /tmp && unzip master.zip
 FROM debian-backports-updated
 
 ENV DEBIAN_VERSION="trixie"
-ENV LLNGDIST="/trixie-backports"
-#ENV LLNGDIST=
+#ENV LLNGDIST="/trixie-backports"
+ENV LLNGDIST=
 
 LABEL maintainer="Yadd yadd@debian.org>" \
       name="yadd/lemonldap-ng-base" \
