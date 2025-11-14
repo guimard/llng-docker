@@ -1,0 +1,50 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm
+@@ -58,6 +58,7 @@ our @pList = (
+       '::Plugins::OIDCInternalTokenExchange',
+     'or::oidcRPMetaDataOptions/*/oidcRPMetaDataOptionsTokenXAuthorizedMatrix'
+       => '::Plugins::MatrixTokenExchange',
++    'twakeWellKnown' => 'Twake::Wellknown',
+ );
+ 
+ ##@method list enabledPlugins
+new file mode 100644
+--- /dev/null
++++ b/usr/share/perl5/Twake/Wellknown.pm
+@@ -0,0 +1,36 @@
++# To enable it, add Twake::Wellknown into customPlugins key
++#
++package Twake::Wellknown;
++
++use strict;
++use Mouse;
++
++extends 'Lemonldap::NG::Portal::Main::Plugin';
++
++sub init {
++    my $self = shift;
++    if (    $self->conf->{twakeWellKnown}
++        and ref $self->conf->{twakeWellKnown}
++        and %{ $self->conf->{twakeWellKnown} } )
++    {
++        $self->addAuthRoute(
++            '.well-known' => { 'twake-configuration' => 'run' },
++            ['GET']
++        );
++        $self->addUnauthRoute(
++            '.well-known' => { 'twake-configuration' => 'run' },
++            ['GET']
++        );
++    }
++    else {
++        $self->logger->warn("No values inside twakeWellKnown, aborting");
++    }
++    return 1;
++}
++
++sub run {
++    my ( $self, $req ) = @_;
++    return $self->sendJSONresponse( $req, $self->conf->{twakeWellKnown} );
++}
++
++1;
