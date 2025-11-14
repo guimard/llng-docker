@@ -2,7 +2,7 @@ ARG IMAGE=
 FROM ${IMAGE}
 
 RUN \
-	for d in /run /etc/lemonldap-ng /var/lib/nginx/ /var/backup/; do \
+	for d in /run /etc/lemonldap-ng /var/lib/nginx/ /var/backup/ /etc/cron.d /etc/cron.daily /etc/cron.weekly; do \
 		echo "############# ${d}" >&2; \
 		if test -e ${d}; then chown -R www-data ${d}; fi; \
 	done; \
