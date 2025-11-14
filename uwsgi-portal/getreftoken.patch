@@ -1,10 +1,10 @@
 --- a/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
 @@ -2032,6 +2032,7 @@ sub _handleRefreshTokenGrant {
+         }
  
-         # Update refresh session
-         $self->updateRefreshToken( $refreshSession->id, $req->sessionInfo );
+         # Lookup attributes and macros for user
 +        $self->p->processHook( $req, 'oidcGotOfflineRefreshData', $rp, $refreshSession->data );
-         $userData = $refreshSession->data;
-         for ( keys %{ $req->sessionInfo } ) {
-             $refreshSession->data->{$_} = $req->sessionInfo->{$_};
+         $self->getAttributesForUser( $req, $refreshSession )
+           or return $self->sendOIDCError( $req, 'invalid_grant', 400 );
+ 
