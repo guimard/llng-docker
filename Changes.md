@@ -1,6 +1,6 @@
 # Changes
 
-## v2.21.3-2 _(dev)_
+## v2.21.3-2 _(2025-11-14)_
 * Add Twake app-accounts plugin
 * Import 3478 fix (OIDC)
 * Import Patroni
