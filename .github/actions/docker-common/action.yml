@@ -51,7 +51,7 @@ runs:
         shell: bash
         run: |
           VERSION="${{ inputs.VERSION }}"
-          if [[ "$VERSION" == "no" ]]; then
+          if [ "$VERSION" == "no" -o "$VERSION" == "" ]; then
             VERSION="${{ env.VERSION }}-${{ env.DOCKERREVISION }}"
           fi
           echo "✅ Using VERSION: $VERSION"
