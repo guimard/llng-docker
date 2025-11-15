@@ -1,0 +1,228 @@
+--- a/usr/share/perl5/Lemonldap/NG/Common/Conf/Backends/CDBI.pm
++++ b/usr/share/perl5/Lemonldap/NG/Common/Conf/Backends/CDBI.pm
+@@ -5,7 +5,7 @@ use utf8;
+ use JSON;
+ use Lemonldap::NG::Common::Conf::Backends::_DBI;
+ 
+-our $VERSION = '2.0.0';
++our $VERSION = '2.22.0';
+ our @ISA     = qw(Lemonldap::NG::Common::Conf::Backends::_DBI);
+ 
+ sub store {
+@@ -16,34 +16,23 @@ sub store {
+ 
+     $fields = to_json($fields);
+ 
+-    if ( $lastCfg == $cfgNum ) {
+-        $req = $self->_dbh->prepare(
+-            "UPDATE $self->{dbiTable} SET data=? WHERE cfgNum=?");
+-    }
+-    else {
+-        $req = $self->_dbh->prepare(
+-            "INSERT INTO $self->{dbiTable} (data,cfgNum) VALUES (?,?)");
+-    }
+-    unless ($req) {
+-        $self->logError;
+-        return UNKNOWN_ERROR;
+-    }
+-    my $execute;
+-    eval { $execute = $req->execute( $fields, $cfgNum ); };
+-    unless ($execute) {
+-        $self->logError;
+-        return UNKNOWN_ERROR;
+-    }
+-    return $cfgNum;
++    my $query =
++      $lastCfg == $cfgNum
++      ? "UPDATE $self->{dbiTable} SET data=? WHERE cfgNum=?"
++      : "INSERT INTO $self->{dbiTable} (data,cfgNum) VALUES (?,?)";
++    my $res = $self->_execute( $query, $fields, $cfgNum );
++    return $res > 0 ? $cfgNum : $res;
+ }
+ 
+ sub load {
+     my ( $self, $cfgNum, $fields ) = @_;
+     $fields = $fields ? join( ",", @$fields ) : '*';
+-    my $row = $self->_dbh->selectrow_arrayref(
+-        "SELECT data from " . $self->{dbiTable} . " WHERE cfgNum=?",
+-        {}, $cfgNum );
+-    unless ($row) {
++    my ( $res, $row ) = $self->_execute(
++        "SELECT data from " . $self->{dbiTable} . " WHERE cfgNum=?", $cfgNum );
++    if ( $res > 0 ) {
++        $row = $row->fetchrow_arrayref();
++    }
++    else {
+         $self->logError;
+         return 0;
+     }
+--- /dev/null
++++ b/usr/share/perl5/Lemonldap/NG/Common/Conf/Backends/Patroni.pm
+@@ -0,0 +1,48 @@
++package Lemonldap::NG::Common::Conf::Backends::Patroni;
++
++use strict;
++use Lemonldap::NG::Common::Conf::Backends::_DBI;
++use Lemonldap::NG::Common::Conf::Backends::CDBI;
++our @ISA = ('Lemonldap::NG::Common::Conf::Backends::CDBI');
++
++*store = \&Lemonldap::NG::Common::Conf::Backends::CDBI::store;
++*load = \&Lemonldap::NG::Common::Conf::Backends::CDBI::load;
++
++sub beforeRetry {
++    my ($self) = @_;
++    require Lemonldap::NG::Common::UserAgent;
++    require JSON;
++    my $ua = Lemonldap::NG::Common::UserAgent->new($self);
++    $ua->timeout(3);
++    my $res = 0;
++    foreach my $patroniUrl ( split /,\s*/, $self->{patroniUrl} ) {
++        my $resp = $ua->get($patroniUrl);
++        if ( $resp->is_success ) {
++            my $c = eval { JSON::from_json( $resp->decoded_content ) };
++            if ( $@ or !$c->{members} or ref( $c->{members} ) ne 'ARRAY' ) {
++                print STDERR "Bad response from $self->{patroniUrl}\n"
++                  . $resp->decoded_content;
++                next;
++            }
++            my ($leader) =
++              grep { $_->{role} eq 'leader' } @{ $c->{members} };
++            unless ($leader) {
++                print STDERR "No leader found from $self->{patroniUrl}\n"
++                  . $resp->decoded_content;
++                next;
++            }
++            delete $self->{_dbh};
++            $self->{dbiChain} =~ s/(?:port|host)=[^;]+;*//g;
++            $self->{dbiChain} =~ s/;$//;
++            $self->{dbiChain} .= ( $self->{dbiChain} =~ /:$/ ? '' : ';' )
++              . "host=$leader->{host};port=$leader->{port}";
++            $res = 1;
++            last;
++        }
++    }
++    return $res;
++}
++
++push @Lemonldap::NG::Common::Conf::Backends::_DBI::confDbiHooks, \&checkPatroni;
++
++1;
+--- a/usr/share/perl5/Lemonldap/NG/Common/Conf/Backends/_DBI.pm
++++ b/usr/share/perl5/Lemonldap/NG/Common/Conf/Backends/_DBI.pm
+@@ -1,16 +1,18 @@
+ package Lemonldap::NG::Common::Conf::Backends::_DBI;
+ 
+ use strict;
++no strict 'refs';
+ use utf8;
+ use DBI;
+-use Lemonldap::NG::Common::Conf::Constants;    #inherits
++use Lemonldap::NG::Common::Conf::Constants;
+ 
+-our $VERSION = '2.18.0';
++our $VERSION = '2.22.0';
+ our @ISA     = qw(Lemonldap::NG::Common::Conf::Constants);
+ our ( @EXPORT, %EXPORT_TAGS );
+ 
+ BEGIN {
+-    *Lemonldap::NG::Common::Conf::_dbh = \&_dbh;
++    *Lemonldap::NG::Common::Conf::_dbh     = \&_dbh;
++    *Lemonldap::NG::Common::Conf::_execute = \&_execute;
+     push @EXPORT, @Lemonldap::NG::Common::Conf::Constants::EXPORT;
+     %EXPORT_TAGS = %Lemonldap::NG::Common::Conf::Constants::EXPORT_TAGS;
+     push @EXPORT,
+@@ -34,11 +36,9 @@ sub prereq {
+ sub available {
+     my $self = shift;
+     my $sth =
+-      $self->_dbh->prepare( "SELECT DISTINCT cfgNum from "
++      $self->_execute( "SELECT DISTINCT cfgNum from "
+           . $self->{dbiTable}
+-          . " order by cfgNum" )
+-      or $self->logError;
+-    $sth->execute() or $self->logError;
++          . " order by cfgNum" );
+     my @conf;
+     while ( my @row = $sth->fetchrow_array ) {
+         push @conf, $row[0];
+@@ -48,8 +48,8 @@ sub available {
+ 
+ sub lastCfg {
+     my $self = shift;
+-    my @row  = $self->_dbh->selectrow_array(
+-        "SELECT max(cfgNum) from " . $self->{dbiTable} );
++    my $sth = $self->_execute( "SELECT max(cfgNum) from " . $self->{dbiTable} );
++    my @row = $sth->fetchrow_array();
+     return $row[0];
+ }
+ 
+@@ -57,8 +57,21 @@ sub _dbh {
+     my $self = shift;
+     $self->{dbiTable} ||= "lmConfig";
+     return $self->{_dbh} if ( $self->{_dbh} and $self->{_dbh}->ping );
+-    $self->{_dbh} = DBI->connect_cached( $self->{dbiChain}, $self->{dbiUser},
+-        $self->{dbiPassword}, { RaiseError => 1, AutoCommit => 1, } );
++    eval {
++        $self->{_dbh} =
++          DBI->connect_cached( $self->{dbiChain}, $self->{dbiUser},
++            $self->{dbiPassword}, { RaiseError => 1, AutoCommit => 1, } );
++    };
++    if ( $@ and &{ $self->{type} . "::beforeRetry" }($self) ) {
++        eval {
++            $self->{_dbh} =
++              DBI->connect_cached( $self->{dbiChain}, $self->{dbiUser},
++                $self->{dbiPassword}, { RaiseError => 1, AutoCommit => 1, } );
++        };
++    }
++    if ($@) {
++        die $@;
++    }
+     if ( $self->{dbiChain} =~ /^dbi:sqlite/i ) {
+         $self->{_dbh}->{sqlite_unicode} = 1;
+     }
+@@ -93,14 +106,9 @@ sub unlock {
+ 
+ sub delete {
+     my ( $self, $cfgNum ) = @_;
+-    my $req =
+-         $self->_dbh->prepare("DELETE FROM $self->{dbiTable} WHERE cfgNum=?")
+-      or $self->logError;
+-    my $res = $req->execute($cfgNum) or $self->logError;
+-    $Lemonldap::NG::Common::Conf::msg .=
+-      "Unable to find conf $cfgNum (" . $self->_dbh->errstr . ")"
+-      unless ($res);
+-    return $res;
++    my $res = $self->_execute( "DELETE FROM $self->{dbiTable} WHERE cfgNum=?",
++        $cfgNum );
++    return ( $res > 0 );
+ }
+ 
+ sub logError {
+@@ -109,4 +117,27 @@ sub logError {
+       "Database error: " . $DBI::errstr . "\n";
+ }
+ 
++sub _execute {
++    my ( $self, $query, @prms ) = @_;
++    my $req = $self->_dbh->prepare($query);
++    unless ($req) {
++        $self->logError;
++        return UNKNOWN_ERROR;
++    }
++    my $execute = eval { $req->execute(@prms) };
++    if ( !$execute and &{ $self->{type} . "::beforeRetry" }($self) ) {
++        $req     = $self->_dbh->prepare($query);
++        $execute = eval { $req->execute(@prms) };
++    }
++    unless ($execute) {
++        $self->logError;
++        return UNKNOWN_ERROR;
++    }
++    return ( 1, $req );
++}
++
++sub beforeRetry {
++    return !$_[0]->{noRetry};
++}
++
+ 1;

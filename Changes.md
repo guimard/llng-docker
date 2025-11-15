@@ -1,5 +1,11 @@
 # Changes
 
+## v2.21.3-2 _(2025-11-14)_
+* Add Twake app-accounts plugin
+* Import 3478 fix (OIDC)
+* Import Patroni
+* Add non-root images
+
 ## v2.21.3-1 _(2025-09-13)_
 * Switch to Debian Trixie
 * Switch to PostgreSQL 17

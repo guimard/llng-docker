@@ -19,6 +19,10 @@ inputs:
   IMAGE_SUFFIX2:
     required: false
     description: Optional image suffix
+  NON_ROOT:
+    required: false
+    default: no
+    description: Publish a non-root
 
 runs:
   using: "composite"
@@ -52,3 +56,13 @@ runs:
           push: true
           tags: |
             ${{ inputs.DOCKER_IMAGE }}:stable${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}
+      - name: Build and publish non-root image
+        if: inputs.NON_ROOT == 'yes'
+        uses: docker/build-push-action@v4
+        with:
+          context: no-root
+          build-args: |
+            IMAGE=${{ inputs.DOCKER_IMAGE }}:stable${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}
+          platforms: ${{ steps.platforms.outputs.platforms }}
+          push: true
+          tags: ${{ inputs.DOCKER_IMAGE }}:stable-non-root${{ inputs.IMAGE_SUFFIX2 }}

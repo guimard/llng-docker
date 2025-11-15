@@ -4,7 +4,7 @@ env:
   VERSION: 2.21.3
   PGVERSION: 17
   DEBIANRELEASE: trixie
-  DOCKERREVISION: 1
+  DOCKERREVISION: 2
 
 on:
   push:
@@ -207,6 +207,8 @@ jobs:
           DIRNAME: ./uwsgi-portal
           IMAGE_SUFFIX: "-no-s6"
           IMAGE_SUFFIX2: "-hiperf"
+          SHORT_DESCRIPTION: no
+          NON_ROOT: yes
 
   build-and-push-cron-no-s6:
     needs: build-and-push-base-no-s6
@@ -222,6 +224,8 @@ jobs:
           DOCKER_IMAGE: yadd/lemonldap-ng-cron
           DIRNAME: ./cron
           IMAGE_SUFFIX: "-no-s6"
+          SHORT_DESCRIPTION: no
+          NON_ROOT: yes
 
   build-and-push-cron-task-no-s6:
     needs: build-and-push-base-no-s6
@@ -237,6 +241,8 @@ jobs:
           DOCKER_IMAGE: yadd/lemonldap-ng-cron-task
           DIRNAME: ./cron-task
           IMAGE_SUFFIX: "-no-s6"
+          SHORT_DESCRIPTION: no
+          NON_ROOT: yes
 
   build-and-push-sessions-backup-no-s6:
     needs: build-and-push-base-no-s6
@@ -252,6 +258,8 @@ jobs:
           DOCKER_IMAGE: yadd/lemonldap-ng-sessions-backup
           DIRNAME: ./sessions-backup
           IMAGE_SUFFIX: "-no-s6"
+          SHORT_DESCRIPTION: no
+          NON_ROOT: yes
 
   build-and-push-manager-no-s6:
     needs: build-and-push-base-no-s6
@@ -267,6 +275,8 @@ jobs:
           DOCKER_IMAGE: yadd/lemonldap-ng-manager
           DIRNAME: ./manager
           IMAGE_SUFFIX: "-no-s6"
+          SHORT_DESCRIPTION: no
+          NON_ROOT: yes
 
   build-and-push-full-no-s6:
     needs: build-and-push-portal-no-s6
@@ -282,6 +292,8 @@ jobs:
           DOCKER_IMAGE: yadd/lemonldap-ng-full
           DIRNAME: ./full
           IMAGE_SUFFIX: "-no-s6"
+          SHORT_DESCRIPTION: no
+          NON_ROOT: yes
 
   build-and-push-ssoaas-fastcgi-server-no-s6:
     needs: build-and-push-base-no-s6
@@ -297,3 +309,5 @@ jobs:
           DOCKER_IMAGE: yadd/lemonldap-ng-ssoaas-fastcgi-server
           DIRNAME: ./ssoaas-fastcgi-server
           IMAGE_SUFFIX: "-no-s6"
+          SHORT_DESCRIPTION: no
+          NON_ROOT: yes
