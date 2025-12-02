@@ -19,3 +19,44 @@
      eval {
          $self->{_dbh} =
            DBI->connect_cached( $self->{dbiChain}, $self->{dbiUser},
+--- a/usr/share/perl5/Lemonldap/NG/Common/MessageBroker/Pg.pm
++++ b/usr/share/perl5/Lemonldap/NG/Common/MessageBroker/Pg.pm
+@@ -67,7 +67,16 @@ sub waitForNextMessage {
+ 
+ sub _dbh {
+     my ($self) = @_;
+-    return $self->{_dbh} if ( $self->{_dbh} and $self->{_dbh}->ping );
++
++    # Check if existing connection is still valid
++    # Handle can become unblessed after Patroni failover or connection loss
++    if ( $self->{_dbh} ) {
++        my $ok = eval { $self->{_dbh}->ping };
++        return $self->{_dbh} if $ok;
++
++        # Connection is dead, clean up before reconnecting
++        eval { $self->{_dbh}->disconnect };
++    }
+     $self->{_dbh} = undef;
+ 
+     # This timeout is inspired from example given by DBI(3)
+--- a/usr/share/perl5/Lemonldap/NG/Common/Notifications/DBI.pm
++++ b/usr/share/perl5/Lemonldap/NG/Common/Notifications/DBI.pm
+@@ -290,7 +290,17 @@ sub getIdentifier {
+ 
+ sub _dbh {
+     my $self = shift;
+-    return $self->{_dbh} if ( $self->{_dbh} and $self->{_dbh}->ping );
++
++    # Check if existing connection is still valid
++    # Handle can become unblessed after Patroni failover or connection loss
++    if ( $self->{_dbh} ) {
++        my $ok = eval { $self->{_dbh}->ping };
++        return $self->{_dbh} if $ok;
++
++        # Connection is dead, clean up before reconnecting
++        eval { $self->{_dbh}->disconnect };
++        delete $self->{_dbh};
++    }
+     $self->logger->debug("Notification DBI connection lost, getting a new one");
+     $self->{_dbh} = DBI->connect_cached( $self->{dbiChain}, $self->{dbiUser},
+         $self->{dbiPassword}, { RaiseError => 1, AutoCommit => 1, } );
