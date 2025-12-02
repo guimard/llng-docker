@@ -26,7 +26,7 @@ elsif ( $command eq 'set' ) {
     my ( $c, $key, $offset ) = follow( $conf, @ARGV );
     if ( $c->{$key} ne $val ) {
         my $realVal = $val;
-        if ( $val =~ /^[\{\[].*[\]\}]$/ ) {
+        if ( $val =~ /^[\{\[].*[\]\}]$/s ) {
             $realVal = eval { JSON::from_json($val) };
             die "Bad value for $ARGV[1]: $@" if $@;
         }
@@ -45,7 +45,7 @@ elsif ( $command eq 'setDomain' ) {
         print STDERR "New domain: $newDomain\n";
         delete $conf->{cipher};
         my $content = JSON::to_json($conf);
-        $content =~ s/\.\Q$currentDomain\E/\.$newDomain/g;
+        $content =~ s/\.\Q$currentDomain\E/\.$newDomain/gs;
         $conf = JSON::from_json($content);
         $conf->{domain} = $newDomain;
         my $res = $confAcc->saveConf( $conf, force => 1, cfgNumFixed => 1 );
@@ -72,7 +72,7 @@ sub follow {
 
 sub set {
     my ( $conf, $key, $val, $offset ) = @_;
-    if ( $val =~ /^[\{\[].*[\]\}]$/ ) {
+    if ( $val =~ /^[\{\[].*[\]\}]$/s ) {
         $ARGV[2] = eval { JSON::from_json( $ARGV[2] ) };
         die "Bad value for $ARGV[1]: $@" if $@;
     }
