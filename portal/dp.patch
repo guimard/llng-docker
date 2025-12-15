@@ -1,0 +1,3157 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
+@@ -1546,6 +1546,13 @@ sub token {
+         return $self->_handleTokenExchange( $req, $rp );
+     }
+ 
++    # Device Authorization Grant (RFC 8628)
++    elsif ( $grant_type eq 'urn:ietf:params:oauth:grant-type:device_code' ) {
++        my $h = $self->p->processHook( $req, 'oidcGotDeviceCodeGrant', $rp );
++        return $req->response if ( $h == PE_SENDRESPONSE );
++        return $self->sendOIDCError( $req, 'unsupported_grant_type', 400 );
++    }
++
+     # Unknown or unspecified grant type
+     else {
+         $self->userLogger->error(
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm
+@@ -41,6 +41,7 @@ our @pList = (
+     checkEntropy                        => '::Plugins::CheckEntropy',
+     initializePasswordReset             => '::Plugins::InitializePasswordReset',
+     ignorePollers                       => '::Plugins::IgnorePollers',
++    pamAccessActivation                 => '::Plugins::PamAccess',
+     adaptativeAuthenticationLevelRules  =>
+       '::Plugins::AdaptativeAuthenticationLevel',
+     refreshSessions         => '::Plugins::Refresh',
+@@ -56,6 +57,8 @@ our @pList = (
+     'or::oidcRPMetaDataOptions/*/oidcRPMetaDataOptionsTokenXAuthorizedMatrix'
+       => '::Plugins::MatrixTokenExchange',
+     'twakeWellKnown' => 'Twake::Wellknown',
++    'or::oidcRPMetaDataOptions/*/oidcRPMetaDataOptionsAllowDeviceAuthorizationGrant' =>
++      '::Plugins::OIDCDeviceAuthorization',
+ );
+ 
+ ##@method list enabledPlugins
+new file mode 100644
+--- /dev/null
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/OIDCDeviceAuthorization.pm
+@@ -0,0 +1,648 @@
++package Lemonldap::NG::Portal::Plugins::OIDCDeviceAuthorization;
++
++# OAuth 2.0 Device Authorization Grant - RFC 8628
++# https://datatracker.ietf.org/doc/html/rfc8628
++
++use strict;
++use Mouse;
++use Lemonldap::NG::Portal::Main::Constants qw(
++  PE_ERROR
++  PE_SENDRESPONSE
++);
++use Crypt::URandom;
++use Digest::SHA qw(sha256_hex);
++
++our $VERSION = '2.23.0';
++
++extends qw(
++  Lemonldap::NG::Portal::Main::Plugin
++);
++
++# Hooks declaration - following OIDCNativeSso pattern
++use constant hook => {
++
++    # Hook called by OpenIDConnect.pm token method for device_code grant
++    oidcGotDeviceCodeGrant => 'deviceCodeGrantHook',
++};
++
++# Character set for user_code (RFC 8628 section 6.1)
++# Excludes vowels to avoid offensive words, excludes 0/O, 1/I/L for readability
++use constant USER_CODE_CHARS => 'BCDFGHJKLMNPQRSTVWXZ23456789';
++
++# Session kind for device authorization storage
++use constant sessionKind => 'DEVA';
++
++# Lazy access to OIDC issuer - following OIDCNativeSso pattern
++has oidc => (
++    is      => 'ro',
++    lazy    => 1,
++    default => sub {
++        $_[0]
++          ->p->loadedModules->{'Lemonldap::NG::Portal::Issuer::OpenIDConnect'};
++    }
++);
++
++has rule => (
++    is      => 'rw',
++    default => sub {
++        sub { 1 }
++    }
++);
++
++# INITIALIZATION
++
++sub init {
++    my ($self) = @_;
++
++    # Check if OIDC issuer is enabled
++    unless ( $self->conf->{issuerDBOpenIDConnectActivation} ) {
++        $self->logger->error(
++            "OIDC issuer not enabled, Device Authorization plugin disabled");
++        return 0;
++    }
++
++    # Parse activation rule
++    if ( my $rule = $self->conf->{deviceAuthorizationRule} ) {
++        $self->rule( $self->p->buildRule( $rule, 'deviceAuthorizationRule' ) );
++        return 0 unless $self->rule;
++    }
++
++    # Device Authorization endpoint (RFC 8628 section 3.1)
++    # POST /oauth2/device - for devices to request authorization
++    my $oidc_path = $self->conf->{issuerDBOpenIDConnectPath} || '^/oauth2/';
++    $oidc_path =~ s/^.*?(\w+).*?$/$1/;    # Extract path name (e.g., "oauth2")
++    $self->addUnauthRoute(
++        $oidc_path => { 'device' => 'deviceAuthorizationEndpoint' },
++        ['POST']
++    );
++
++    # Device verification endpoint (for users) - /device
++    $self->addAuthRouteWithRedirect(
++        device => 'displayVerification',
++        ['GET']
++    );
++    $self->addAuthRoute(
++        device => 'submitVerification',
++        ['POST']
++    );
++
++    $self->logger->debug("Device Authorization Grant (RFC 8628) enabled");
++    return 1;
++}
++
++# Device Authorization endpoint (RFC 8628 section 3.1)
++# Called directly via route POST /oauth2/device
++sub deviceAuthorizationEndpoint {
++    my ( $self, $req ) = @_;
++
++    $self->logger->debug("Device Authorization endpoint called");
++
++    my $client_id = $req->param('client_id');
++
++    unless ($client_id) {
++        $self->logger->error(
++            "Missing client_id in device authorization request");
++        return $self->_sendDeviceError( $req, 'invalid_request',
++            'client_id is required' );
++    }
++
++    # Get RP from client_id
++    my $rp = $self->oidc->getRP($client_id);
++
++    unless ($rp) {
++        $self->logger->warn("Unknown client_id: $client_id");
++        return $self->_sendDeviceError( $req, 'invalid_client' );
++    }
++
++    # Check if this RP allows device authorization grant
++    unless ( $self->oidc->rpOptions->{$rp}
++        ->{oidcRPMetaDataOptionsAllowDeviceAuthorizationGrant} )
++    {
++        $self->logger->warn(
++            "Device authorization grant not allowed for RP $rp");
++        return $self->_sendDeviceError( $req, 'unauthorized_client' );
++    }
++
++    # Get requested scope
++    my $scope = $req->param('scope') || 'openid';
++
++    # Generate device_code (secret, used for polling)
++    my $device_code = $self->_generateDeviceCode();
++
++    # Generate user_code (shown to user)
++    my $user_code = $self->_generateUserCode();
++
++    # Store device authorization request
++    my $expiration =
++      $self->conf->{oidcServiceDeviceAuthorizationExpiration} || 600;
++    my $interval =
++      $self->conf->{oidcServiceDeviceAuthorizationPollingInterval} || 5;
++
++    # Create session with device_code hash as ID (for polling lookup)
++    my $device_code_hash = sha256_hex($device_code);
++
++    my $session_data = {
++        _type       => 'deviceauth',
++        _utime      => time() - $self->conf->{timeout} + $expiration,
++        device_code => $device_code,
++        user_code   => $user_code,
++        client_id   => $client_id,
++        rp          => $rp,
++        scope       => $scope,
++        status      => 'pending',              # pending, approved, denied
++        created_at  => time(),
++        expires_at  => time() + $expiration,
++    };
++
++    # Store the device authorization using getApacheSession with fixed ID
++    my $session = $self->p->getApacheSession(
++        $device_code_hash,
++        kind      => sessionKind,
++        info      => $session_data,
++        force     => 1,
++        hashStore => 0,
++    );
++
++    unless ( $session && $session->id ) {
++        $self->logger->error("Failed to create device authorization session");
++        return $self->_sendDeviceError( $req, 'server_error' );
++    }
++
++    # Also create a session indexed by user_code for verification lookup
++    my $user_code_hash    = sha256_hex($user_code);
++    my $user_code_session = $self->p->getApacheSession(
++        $user_code_hash,
++        kind => sessionKind,
++        info => {
++            _type            => 'deviceauth_usercode',
++            _utime           => time() - $self->conf->{timeout} + $expiration,
++            device_code_hash => $device_code_hash,
++            user_code        => $user_code,
++            expires_at       => time() + $expiration,
++        },
++        force     => 1,
++        hashStore => 0,
++    );
++
++    unless ( $user_code_session && $user_code_session->id ) {
++        $self->logger->error("Failed to create user_code lookup session");
++
++        # Clean up the device_code session
++        $session->remove;
++        return $self->_sendDeviceError( $req, 'server_error' );
++    }
++
++    # Build verification URI
++    my $portal           = $self->p->HANDLER->tsv->{portal}->();
++    my $verification_uri = "$portal/device";
++    my $formatted_code   = $self->_formatUserCode($user_code);
++    my $verification_uri_complete =
++      "$portal/device?user_code=" . ( $user_code =~ s/-//gr );
++
++    # RFC 8628 section 3.2 - Device Authorization Response
++    my $response = {
++        device_code               => $device_code,
++        user_code                 => $formatted_code,
++        verification_uri          => $verification_uri,
++        verification_uri_complete => $verification_uri_complete,
++        expires_in                => $expiration + 0,
++        interval                  => $interval + 0,
++    };
++
++    $self->logger->debug(
++        "Device authorization created: user_code=$user_code, client=$client_id"
++    );
++    $self->userLogger->info(
++        "Device authorization initiated for client $client_id");
++
++    return $self->p->sendJSONresponse( $req, $response );
++}
++
++# HOOK: Token endpoint handler for device_code grant
++# Called by OpenIDConnect.pm via processHook('oidcGotDeviceCodeGrant')
++sub deviceCodeGrantHook {
++    my ( $self, $req, $rp ) = @_;
++
++    $self->logger->debug("Device code grant hook called for RP $rp");
++
++    my $device_code = $req->param('device_code');
++    my $client_id   = $req->param('client_id')
++      || $self->oidc->rpOptions->{$rp}->{oidcRPMetaDataOptionsClientID};
++
++    unless ($device_code) {
++        return $self->_sendTokenError( $req, 'invalid_request',
++            'device_code is required' );
++    }
++
++    # Check if this RP allows device authorization grant
++    unless ( $self->oidc->rpOptions->{$rp}
++        ->{oidcRPMetaDataOptionsAllowDeviceAuthorizationGrant} )
++    {
++        $self->logger->warn(
++            "Device authorization grant not allowed for RP $rp");
++        return $self->_sendTokenError( $req, 'unauthorized_client' );
++    }
++
++    # Find the device authorization
++    my $device_auth = $self->_findByDeviceCode($device_code);
++
++    unless ($device_auth) {
++
++        # Token expired or invalid
++        return $self->_sendTokenError( $req, 'expired_token' );
++    }
++
++    # Verify RP matches
++    if ( $device_auth->{rp} ne $rp ) {
++        $self->logger->warn( "RP mismatch in device_code grant: expected "
++              . $device_auth->{rp}
++              . ", got $rp" );
++        return $self->_sendTokenError( $req, 'invalid_grant' );
++    }
++
++    # Check authorization status
++    my $status = $device_auth->{status} || 'pending';
++
++    if ( $status eq 'pending' ) {
++
++        # RFC 8628 section 3.5 - authorization_pending
++        return $self->_sendTokenError( $req, 'authorization_pending' );
++    }
++    elsif ( $status eq 'denied' ) {
++
++        # RFC 8628 section 3.5 - access_denied
++        $self->_deleteDeviceAuth($device_auth);
++        return $self->_sendTokenError( $req, 'access_denied' );
++    }
++    elsif ( $status eq 'approved' ) {
++
++        # Generate tokens!
++        return $self->_generateTokens( $req, $device_auth, $rp );
++    }
++    else {
++        $self->logger->error("Unknown device auth status: $status");
++        return $self->_sendTokenError( $req, 'server_error' );
++    }
++}
++
++# DEVICE VERIFICATION PAGE (for authenticated users)
++sub displayVerification {
++    my ( $self, $req ) = @_;
++
++    $self->logger->debug("Display device verification page");
++
++    # Check rule
++    unless ( $self->rule->( $req, $req->userData ) ) {
++        $self->userLogger->warn(
++            "User not allowed to verify device authorizations");
++        return $self->p->do( $req, [ sub { PE_ERROR } ] );
++    }
++
++    # Pre-fill user_code if provided in URL
++    my $user_code = $req->param('user_code') || '';
++    $user_code =~ s/[^A-Z0-9]//gi;    # Clean up
++
++    # Set template parameters
++    $req->data->{activeTimer} = 0;
++    $req->{user_code} = $user_code;
++
++    return $self->p->sendHtml(
++        $req, 'device',
++        params => {
++            USER_CODE => $user_code,
++            MSG       => '',
++        }
++    );
++}
++
++# DEVICE VERIFICATION SUBMIT
++sub submitVerification {
++    my ( $self, $req ) = @_;
++
++    $self->logger->debug("Device verification submitted");
++
++    # Check rule
++    unless ( $self->rule->( $req, $req->userData ) ) {
++        return $self->p->do( $req, [ sub { PE_ERROR } ] );
++    }
++
++    my $user_code = $req->param('user_code') || '';
++    $user_code =~ s/[^A-Z0-9]//gi;    # Remove formatting (dashes, spaces)
++    $user_code = uc($user_code);
++
++    unless ( $user_code && length($user_code) >= 6 ) {
++        return $self->_showVerificationError( $req, 'invalidUserCode' );
++    }
++
++    # Find the device authorization by user_code
++    my $device_auth = $self->_findByUserCode($user_code);
++    unless ($device_auth) {
++        $self->logger->info("Invalid or expired user_code: $user_code");
++        return $self->_showVerificationError( $req, 'invalidUserCode' );
++    }
++
++    # Check if already processed
++    if ( $device_auth->{status} ne 'pending' ) {
++        $self->logger->info("User code already processed: $user_code");
++        return $self->_showVerificationError( $req, 'codeAlreadyUsed' );
++    }
++
++    # Check action (approve or deny)
++    my $action = $req->param('action') || 'approve';
++
++    if ( $action eq 'deny' ) {
++
++        # User denied the authorization
++        $self->_updateDeviceAuthStatus( $device_auth, 'denied' );
++        $self->userLogger->notice( "Device authorization denied by user "
++              . $req->userData->{ $self->conf->{whatToTrace} }
++              . " for client "
++              . $device_auth->{client_id} );
++
++        return $self->p->sendHtml(
++            $req, 'device',
++            params => {
++                DEVICE_DENIED => 1,
++                MSG           => 'deviceDenied',
++            }
++        );
++    }
++
++    # Approve the authorization
++    # Store user info for token generation
++    my $user_session_id = $req->id || $req->userData->{_session_id};
++    $self->_updateDeviceAuthStatus(
++        $device_auth,
++        'approved',
++        {
++            user_session_id => $user_session_id,
++            user            => $req->userData->{ $self->conf->{whatToTrace} },
++            approved_at     => time(),
++        }
++    );
++
++    $self->userLogger->notice( "Device authorization approved by user "
++          . $req->userData->{ $self->conf->{whatToTrace} }
++          . " for client "
++          . $device_auth->{client_id} );
++
++    return $self->p->sendHtml(
++        $req, 'device',
++        params => {
++            DEVICE_APPROVED => 1,
++            CLIENT_ID       => $device_auth->{client_id},
++            SCOPE           => $device_auth->{scope},
++            MSG             => 'deviceApproved',
++        }
++    );
++}
++
++# PRIVATE METHODS
++
++sub _generateDeviceCode {
++    my ($self) = @_;
++
++    # 32 bytes of random data, hex encoded
++    return unpack( 'H*', Crypt::URandom::urandom(32) );
++}
++
++sub _generateUserCode {
++    my ($self) = @_;
++    my $length =
++      $self->conf->{oidcServiceDeviceAuthorizationUserCodeLength} || 8;
++    my $chars = USER_CODE_CHARS;
++    my $code  = '';
++    for ( 1 .. $length ) {
++        $code .= substr( $chars, int( rand( length($chars) ) ), 1 );
++    }
++    return $code;
++}
++
++sub _formatUserCode {
++    my ( $self, $code ) = @_;
++
++    # Format as XXXX-XXXX for readability
++    if ( length($code) == 8 ) {
++        return substr( $code, 0, 4 ) . '-' . substr( $code, 4, 4 );
++    }
++    return $code;
++}
++
++sub _findByUserCode {
++    my ( $self, $user_code ) = @_;
++
++    # Look up the user_code session to get the device_code_hash
++    my $user_code_hash = sha256_hex($user_code);
++
++    my $user_code_session =
++      $self->p->getApacheSession( $user_code_hash, kind => sessionKind, );
++
++    unless ( $user_code_session && $user_code_session->data ) {
++        $self->logger->debug("User code session not found: $user_code");
++        return undef;
++    }
++
++    # Check expiration
++    if ( time() > ( $user_code_session->data->{expires_at} || 0 ) ) {
++        $self->logger->debug("User code expired: $user_code");
++        $user_code_session->remove;
++        return undef;
++    }
++
++    my $device_code_hash = $user_code_session->data->{device_code_hash};
++    return $self->_getDeviceAuthByHash($device_code_hash);
++}
++
++sub _findByDeviceCode {
++    my ( $self, $device_code ) = @_;
++
++    my $device_code_hash = sha256_hex($device_code);
++    return $self->_getDeviceAuthByHash($device_code_hash);
++}
++
++sub _getDeviceAuthByHash {
++    my ( $self, $device_code_hash ) = @_;
++
++    my $session =
++      $self->p->getApacheSession( $device_code_hash, kind => sessionKind, );
++
++    unless ( $session && $session->data ) {
++        $self->logger->debug("Device auth session not found");
++        return undef;
++    }
++
++    # Check expiration
++    if ( time() > ( $session->data->{expires_at} || 0 ) ) {
++        $self->logger->debug("Device auth session expired");
++        $session->remove;
++        return undef;
++    }
++
++    # Return session data with session reference for updates
++    my $data = { %{ $session->data } };
++    $data->{_session}          = $session;
++    $data->{_device_code_hash} = $device_code_hash;
++
++    return $data;
++}
++
++sub _updateDeviceAuthStatus {
++    my ( $self, $device_auth, $status, $extra ) = @_;
++
++    my $session = $device_auth->{_session};
++    return unless $session;
++
++    # Update status
++    my $info = { status => $status };
++
++    # Add extra fields
++    if ($extra) {
++        for my $key ( keys %$extra ) {
++            $info->{$key} = $extra->{$key};
++        }
++    }
++
++    # Update session
++    $self->p->getApacheSession(
++        $session->id,
++        kind => sessionKind,
++        info => $info,
++    );
++}
++
++sub _deleteDeviceAuth {
++    my ( $self, $device_auth ) = @_;
++
++    # Delete the device_code session
++    if ( my $session = $device_auth->{_session} ) {
++        $session->remove;
++    }
++
++    # Also delete the user_code lookup session
++    if ( my $user_code = $device_auth->{user_code} ) {
++        my $user_code_hash = sha256_hex($user_code);
++        my $user_code_session =
++          $self->p->getApacheSession( $user_code_hash, kind => sessionKind, );
++        $user_code_session->remove if $user_code_session;
++    }
++}
++
++sub _generateTokens {
++    my ( $self, $req, $device_auth, $rp ) = @_;
++
++    my $scope = $device_auth->{scope};
++
++    # Get the user's session
++    my $user_session_id = $device_auth->{user_session_id};
++    my $session         = $self->p->getApacheSession($user_session_id);
++
++    unless ($session) {
++        $self->logger->error("User session not found for device authorization");
++        return $self->_sendTokenError( $req, 'server_error' );
++    }
++
++    # Generate access token
++    my $access_token = $self->oidc->newAccessToken(
++        $req, $rp, $scope,
++        $session->data,
++        {
++            scope           => $scope,
++            rp              => $rp,
++            user_session_id => $user_session_id,
++            grant_type      => "device_code",
++        }
++    );
++
++    unless ($access_token) {
++        $self->logger->error("Failed to create access token");
++        return $self->_sendTokenError( $req, 'server_error' );
++    }
++
++    my $expires_in =
++      $self->oidc->rpOptions->{$rp}
++      ->{oidcRPMetaDataOptionsAccessTokenExpiration}
++      || $self->conf->{oidcServiceAccessTokenExpiration}
++      || 3600;
++
++    my $response = {
++        access_token => "$access_token",
++        token_type   => 'Bearer',
++        expires_in   => $expires_in + 0,
++        scope        => $scope,
++    };
++
++    # Generate ID token if openid scope is requested
++    if ( $scope =~ /\bopenid\b/ ) {
++        my $id_token =
++          $self->oidc->_generateIDToken( $req, $rp, $scope, $session->data, 0 );
++        if ($id_token) {
++            $response->{id_token} = $id_token;
++        }
++    }
++
++    # Generate refresh token if allowed
++    if ( $self->oidc->rpOptions->{$rp}->{oidcRPMetaDataOptionsRefreshToken} ) {
++        my $refresh_token = $self->oidc->newRefreshToken(
++            $rp,
++            {
++                scope           => $scope,
++                client_id       => $device_auth->{client_id},
++                _session_uid    => $session->data->{_user},
++                auth_time       => $session->data->{_lastAuthnUTime},
++                grant_type      => "device_code",
++                user_session_id => $user_session_id,
++                %{ $session->data },
++            }
++        );
++
++        if ($refresh_token) {
++            $response->{refresh_token} = $refresh_token->id;
++        }
++    }
++
++    # Clean up the device authorization
++    $self->_deleteDeviceAuth($device_auth);
++
++    $self->logger->debug("Device code grant completed for RP $rp");
++
++    $req->response( $self->p->sendJSONresponse( $req, $response ) );
++    return PE_SENDRESPONSE;
++}
++
++sub _sendDeviceError {
++    my ( $self, $req, $error, $description ) = @_;
++
++    my $response = { error => $error };
++    $response->{error_description} = $description if $description;
++
++    # Return PSGI response directly (used by deviceAuthorizationEndpoint route)
++    return $self->p->sendJSONresponse( $req, $response, code => 400 );
++}
++
++sub _sendTokenError {
++    my ( $self, $req, $error, $description ) = @_;
++
++    my $response = { error => $error };
++    $response->{error_description} = $description if $description;
++
++    # authorization_pending and slow_down should return 400
++    # expired_token and access_denied should return 400
++    $req->response(
++        $self->p->sendJSONresponse( $req, $response, code => 400 ) );
++    return PE_SENDRESPONSE;
++}
++
++sub _showVerificationError {
++    my ( $self, $req, $msg ) = @_;
++
++    return $self->p->sendHtml(
++        $req, 'device',
++        params => {
++            USER_CODE => $req->param('user_code') || '',
++            MSG       => $msg,
++            ERROR     => 1,
++        }
++    );
++}
++
++1;
+new file mode 100644
+--- /dev/null
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/PamAccess.pm
+@@ -0,0 +1,838 @@
++# PAM Access plugin for LemonLDAP::NG
++#
++# This plugin provides:
++# - /pam : Web interface for users to generate temporary PAM access tokens
++# - /pam/verify : Server-to-server endpoint to validate one-time user tokens
++# - /pam/authorize : Server-to-server endpoint for authorization checks
++#
++# User tokens are one-time use tokens stored as sessions (kind=PAMTOKEN).
++# They are destroyed after first use for security.
++# Server authentication uses Bearer tokens obtained via Device Authorization Grant.
++
++package Lemonldap::NG::Portal::Plugins::PamAccess;
++
++use strict;
++use Mouse;
++use JSON qw(from_json to_json);
++use Lemonldap::NG::Portal::Main::Constants qw(
++    PE_OK
++    PE_ERROR
++    PE_SENDRESPONSE
++);
++
++our $VERSION = '2.22.0';
++
++extends 'Lemonldap::NG::Portal::Main::Plugin';
++
++use constant name => 'PamAccess';
++
++# MenuTab configuration - rule for displaying the tab
++has rule => (
++    is      => 'ro',
++    lazy    => 1,
++    builder => sub { $_[0]->conf->{portalDisplayPamAccess} // 0 },
++);
++with 'Lemonldap::NG::Portal::MenuTab';
++
++# Access to OIDC module for token generation/validation
++has oidc => (
++    is      => 'ro',
++    lazy    => 1,
++    default => sub {
++        $_[0]
++          ->p->loadedModules->{'Lemonldap::NG::Portal::Issuer::OpenIDConnect'};
++    }
++);
++
++# RP name for PAM tokens
++has rpName => (
++    is      => 'ro',
++    lazy    => 1,
++    default => sub { $_[0]->conf->{pamAccessRp} || 'pam-access' },
++);
++
++# INITIALIZATION
++
++sub init {
++    my ($self) = @_;
++
++    # Check that OIDC issuer is enabled
++    unless ( $self->conf->{issuerDBOpenIDConnectActivation} ) {
++        $self->logger->error(
++            'PamAccess plugin requires OIDC issuer to be enabled');
++        return 0;
++    }
++
++    # Routes for authenticated users (token generation interface)
++    $self->addAuthRoute( pam => 'pamInterface', ['GET'] )
++         ->addAuthRoute( pam => 'generateToken', ['POST'] );
++
++    # Route for server-to-server authorization (Bearer token auth)
++    $self->addUnauthRoute(
++        pam => { authorize => 'authorize' },
++        ['POST']
++    );
++
++    # Route for server heartbeat (refresh token based)
++    $self->addUnauthRoute(
++        pam => { heartbeat => 'heartbeat' },
++        ['POST']
++    );
++
++    # Route for one-time token verification (server-to-server)
++    $self->addUnauthRoute(
++        pam => { verify => 'verifyToken' },
++        ['POST']
++    );
++
++    return 1;
++}
++
++# MENUTAB - Display method for the portal menu tab
++
++sub display {
++    my ( $self, $req ) = @_;
++
++    return {
++        logo => 'key',
++        name => 'PamAccess',
++        id   => 'pamaccess',
++        html => $self->loadTemplate(
++            $req,
++            'pamaccess',
++            params => {
++                TOKEN          => '',
++                LOGIN          => $req->userData->{ $self->conf->{whatToTrace} } || '',
++                EXPIRES_IN     => '',
++                SHOW_TOKEN     => 0,
++                DEFAULT_DURATION => $self->conf->{pamAccessTokenDuration} || 600,
++                MAX_DURATION   => $self->conf->{pamAccessMaxDuration} || 3600,
++                js             => "$self->{p}->{staticPrefix}/common/js/pamaccess.js",
++            }
++        ),
++    };
++}
++
++# ROUTE HANDLERS
++
++# GET /pam - Display the token generation interface
++sub pamInterface {
++    my ( $self, $req ) = @_;
++
++    return $self->p->do( $req, [ sub { PE_OK } ] );
++}
++
++# POST /pam - Generate a new PAM access token (one-time use)
++sub generateToken {
++    my ( $self, $req ) = @_;
++
++    # Get requested duration
++    my $duration = $req->param('duration') || $self->conf->{pamAccessTokenDuration} || 600;
++
++    # Enforce maximum duration
++    my $maxDuration = $self->conf->{pamAccessMaxDuration} || 3600;
++    $duration = $maxDuration if $duration > $maxDuration;
++
++    my $login = $req->userData->{ $self->conf->{whatToTrace} };
++    my $groups = $req->userData->{groups} || '';
++
++    # Calculate _utime for automatic cleanup by purgeCentralCache
++    # _utime + timeout = expiration time
++    # So: _utime = now + duration - timeout
++    my $now = time();
++    my $timeout = $self->conf->{timeout} || 7200;
++    my $utime = $now + $duration - $timeout;
++
++    # Create one-time token as a session with kind=PAMTOKEN
++    my $tokenInfo = {
++        _type         => 'pamtoken',
++        _utime        => $utime,
++        _pamUser      => $login,
++        _pamGroups    => $groups,
++        _pamUid       => $req->userData->{uid} || $login,
++        _pamCreatedAt => $now,
++        _pamExpiresAt => $now + $duration,
++    };
++
++    my $tokenSession = $self->p->getApacheSession(
++        undef,
++        info => $tokenInfo,
++        kind => 'PAMTOKEN'
++    );
++
++    unless ( $tokenSession && $tokenSession->id ) {
++        $self->logger->error('Failed to create PAM token session');
++        return $self->p->sendJSONresponse(
++            $req,
++            { error => 'Token generation failed' },
++            code => 500
++        );
++    }
++
++    my $token = $tokenSession->id;
++    $self->logger->info("PAM one-time token generated for user $login (TTL: ${duration}s)");
++
++    # Audit log for token generation
++    $self->p->auditLog(
++        $req,
++        code    => 'PAM_TOKEN_GENERATED',
++        user    => $login,
++        message => "PAM one-time token generated for user $login (TTL: ${duration}s)",
++        ttl     => $duration,
++    );
++
++    return $self->p->sendJSONresponse(
++        $req,
++        {
++            token      => $token,
++            login      => $login,
++            expires_in => $duration,
++        }
++    );
++}
++
++# POST /pam/authorize - Server-to-server authorization check
++sub authorize {
++    my ( $self, $req ) = @_;
++
++    # 1. Validate Bearer token from Authorization header
++    my $access_token = $self->oidc->getEndPointAccessToken($req);
++    unless ($access_token) {
++        $self->logger->warn('PAM authorize: No Bearer token provided');
++        return $self->_unauthorizedResponse($req, 'Bearer token required');
++    }
++
++    my $tokenSession = $self->oidc->getAccessToken($access_token);
++    unless ($tokenSession) {
++        $self->logger->warn('PAM authorize: Invalid or expired Bearer token');
++        return $self->_unauthorizedResponse($req, 'Invalid or expired token');
++    }
++
++    # 2. Verify token was obtained via Device Authorization Grant
++    my $grant_type = $tokenSession->data->{grant_type} || '';
++    unless ( $grant_type eq 'device_code' ) {
++        $self->logger->warn(
++            "PAM authorize: Token not from Device Authorization Grant "
++            . "(grant_type: '$grant_type'). Server must enroll via /oauth2/device"
++        );
++        return $self->_forbiddenResponse(
++            $req,
++            'Server not enrolled. Use Device Authorization Grant to register this server.'
++        );
++    }
++
++    # 3. Verify token has correct scope (pam:server or pam)
++    my $scope = $tokenSession->data->{scope} || '';
++    unless ( $scope =~ /\bpam(?::server)?\b/ ) {
++        $self->logger->warn("PAM authorize: Invalid token scope '$scope'");
++        return $self->_forbiddenResponse($req, 'Invalid token scope');
++    }
++
++    # Log server identity from token
++    my $server_id = $tokenSession->data->{client_id} || 'unknown';
++    $self->logger->info("PAM authorize request from enrolled server: $server_id");
++
++    # 4. Parse JSON request body
++    my $body = eval { from_json( $req->content ) };
++    if ($@) {
++        $self->logger->error("PAM authorize: Invalid JSON body: $@");
++        return $self->_badRequest($req, 'Invalid JSON');
++    }
++
++    my $user         = $body->{user};
++    my $host         = $body->{host}         || '';
++    my $service      = $body->{service}      || 'ssh';
++    my $server_group = $body->{server_group} || 'default';
++
++    unless ($user) {
++        return $self->_badRequest($req, 'Missing user parameter');
++    }
++
++    $self->logger->debug("PAM authorize: checking user '$user' for host '$host', service '$service', server_group '$server_group'");
++
++    # 4. Lookup user (without active session)
++    $req->user($user);
++    $req->data->{_pamAuthorize} = 1;
++    $req->steps( [
++        'getUser',
++        'setSessionInfo',
++        $self->p->groupsAndMacros,
++        'setLocalGroups'
++    ] );
++
++    my $error = $self->p->process($req);
++
++    if ( $error != PE_OK ) {
++        $self->logger->info("PAM authorize: User '$user' not found (error: $error)");
++
++        # Audit log for authorization failure (user not found)
++        $self->p->auditLog(
++            $req,
++            code         => 'PAM_AUTHZ_USER_NOT_FOUND',
++            user         => $user,
++            message      => "PAM authorization failed: user '$user' not found",
++            host         => $host,
++            service      => $service,
++            server_group => $server_group,
++            server_id    => $server_id,
++        );
++
++        return $self->p->sendJSONresponse(
++            $req,
++            {
++                authorized => JSON::false,
++                user       => $user,
++                reason     => 'User not found',
++            },
++            code => 200
++        );
++    }
++
++    # 5. Evaluate authorization rule based on server_group
++    my $authorized = $self->_checkPamRule( $req, $host, $service, $server_group );
++
++    # Get groups for response
++    my $groups = $req->sessionInfo->{groups} || '';
++    my @groupList = split /[,;\s]+/, $groups;
++
++    $self->logger->info(
++        "PAM authorize: user '$user' " .
++        ($authorized ? 'granted' : 'denied') .
++        " access to host '$host'"
++    );
++
++    # Audit log for authorization result
++    if ($authorized) {
++        $self->p->auditLog(
++            $req,
++            code         => 'PAM_AUTHZ_SUCCESS',
++            user         => $user,
++            message      => "PAM authorization granted for user '$user' on host '$host'",
++            host         => $host,
++            service      => $service,
++            server_group => $server_group,
++            server_id    => $server_id,
++            groups       => \@groupList,
++        );
++    }
++    else {
++        $self->p->auditLog(
++            $req,
++            code         => 'PAM_AUTHZ_DENIED',
++            user         => $user,
++            message      => "PAM authorization denied for user '$user' on host '$host'",
++            host         => $host,
++            service      => $service,
++            server_group => $server_group,
++            server_id    => $server_id,
++            groups       => \@groupList,
++            reason       => 'Access denied by rule',
++        );
++    }
++
++    return $self->p->sendJSONresponse(
++        $req,
++        {
++            authorized => $authorized ? JSON::true : JSON::false,
++            user       => $user,
++            groups     => \@groupList,
++            ( $authorized ? () : ( reason => 'Access denied by rule' ) ),
++        },
++        code => 200
++    );
++}
++
++# HELPER METHODS
++
++sub _checkPamRule {
++    my ( $self, $req, $host, $service, $server_group ) = @_;
++
++    # Set variables available for rule evaluation
++    $req->sessionInfo->{_pamHost}        = $host;
++    $req->sessionInfo->{_pamService}     = $service;
++    $req->sessionInfo->{_pamServerGroup} = $server_group || 'default';
++
++    my $rules = $self->conf->{pamAccessServerGroups} || {};
++    my $rule;
++
++    # 1. Look for rule matching the requested server_group
++    if ( $server_group && exists $rules->{$server_group} ) {
++        $rule = $rules->{$server_group};
++        $self->logger->debug("PAM authorize: using rule for group '$server_group'");
++    }
++    # 2. Fallback to 'default' group
++    elsif ( exists $rules->{default} ) {
++        $rule = $rules->{default};
++        $self->logger->debug("PAM authorize: server_group '$server_group' not found, using 'default' rule");
++    }
++    # 3. No rule found -> deny access
++    else {
++        $self->logger->warn("PAM authorize: no rule found for group '$server_group' and no 'default' rule");
++        return 0;
++    }
++
++    # Simple boolean
++    return $rule if $rule =~ /^[01]$/;
++
++    # Empty rule -> deny
++    return 0 unless defined $rule && $rule ne '';
++
++    # Evaluate rule as expression
++    my $result = $self->p->HANDLER->buildSub(
++        $self->p->HANDLER->substitute($rule)
++    )->( $req, $req->sessionInfo );
++
++    return $result ? 1 : 0;
++}
++
++sub _unauthorizedResponse {
++    my ( $self, $req, $message ) = @_;
++    $message ||= 'Unauthorized';
++
++    return $self->p->sendJSONresponse(
++        $req,
++        { error => $message },
++        code => 401,
++        headers => [ 'WWW-Authenticate' => 'Bearer realm="pam"' ],
++    );
++}
++
++sub _forbiddenResponse {
++    my ( $self, $req, $message ) = @_;
++    $message ||= 'Forbidden';
++
++    return $self->p->sendJSONresponse(
++        $req,
++        { error => $message },
++        code => 403
++    );
++}
++
++sub _badRequest {
++    my ( $self, $req, $message ) = @_;
++    $message ||= 'Bad Request';
++
++    return $self->p->sendJSONresponse(
++        $req,
++        { error => $message },
++        code => 400
++    );
++}
++
++# POST /pam/verify - Verify and consume a one-time PAM token
++sub verifyToken {
++    my ( $self, $req ) = @_;
++
++    # 1. Validate server Bearer token from Authorization header
++    my $server_token = $self->oidc->getEndPointAccessToken($req);
++    unless ($server_token) {
++        $self->logger->warn('PAM verify: No server Bearer token provided');
++        return $self->_unauthorizedResponse( $req, 'Server Bearer token required' );
++    }
++
++    my $serverSession = $self->oidc->getAccessToken($server_token);
++    unless ($serverSession) {
++        $self->logger->warn('PAM verify: Invalid or expired server token');
++        return $self->_unauthorizedResponse( $req, 'Invalid or expired server token' );
++    }
++
++    # Verify server token was obtained via Device Authorization Grant
++    my $grant_type = $serverSession->data->{grant_type} || '';
++    unless ( $grant_type eq 'device_code' ) {
++        $self->logger->warn(
++            "PAM verify: Server token not from Device Authorization Grant "
++              . "(grant_type: '$grant_type')"
++        );
++        return $self->_forbiddenResponse( $req,
++            'Server not enrolled. Use Device Authorization Grant.' );
++    }
++
++    # 2. Parse JSON request body
++    my $body = eval { from_json( $req->content ) };
++    if ($@) {
++        $self->logger->error("PAM verify: Invalid JSON body: $@");
++        return $self->_badRequest( $req, 'Invalid JSON' );
++    }
++
++    my $user_token = $body->{token};
++    unless ($user_token) {
++        return $self->_badRequest( $req, 'token parameter required' );
++    }
++
++    # Get server info for audit
++    my $server_id = $serverSession->data->{client_id} || 'unknown';
++
++    # 3. Retrieve the PAMTOKEN session
++    my $tokenSession = $self->p->getApacheSession( $user_token, kind => 'PAMTOKEN' );
++    unless ($tokenSession) {
++        $self->logger->info("PAM verify: Invalid or expired token");
++
++        # Audit log for authentication failure
++        $self->p->auditLog(
++            $req,
++            code      => 'PAM_AUTH_INVALID_TOKEN',
++            message   => 'PAM authentication failed: invalid or expired token',
++            server_id => $server_id,
++            reason    => 'Invalid or expired token',
++        );
++
++        return $self->p->sendJSONresponse(
++            $req,
++            {
++                valid => JSON::false,
++                error => 'Invalid or expired token',
++            },
++            code => 200
++        );
++    }
++
++    # 4. Verify token type
++    my $type = $tokenSession->data->{_type} || '';
++    unless ( $type eq 'pamtoken' ) {
++        $self->logger->warn("PAM verify: Wrong token type '$type'");
++
++        # Audit log for security error
++        $self->p->auditLog(
++            $req,
++            code      => 'PAM_AUTH_WRONG_TOKEN_TYPE',
++            message   => "PAM authentication failed: wrong token type '$type'",
++            server_id => $server_id,
++            reason    => 'Invalid token type',
++        );
++
++        $tokenSession->remove;
++        return $self->p->sendJSONresponse(
++            $req,
++            {
++                valid => JSON::false,
++                error => 'Invalid token type',
++            },
++            code => 200
++        );
++    }
++
++    # 5. Check expiration
++    my $expiresAt = $tokenSession->data->{_pamExpiresAt} || 0;
++    if ( time() > $expiresAt ) {
++        my $user = $tokenSession->data->{_pamUser} || 'unknown';
++        $self->logger->info("PAM verify: Token expired");
++
++        # Audit log for expired token
++        $self->p->auditLog(
++            $req,
++            code      => 'PAM_AUTH_TOKEN_EXPIRED',
++            user      => $user,
++            message   => "PAM authentication failed: token expired for user '$user'",
++            server_id => $server_id,
++            reason    => 'Token expired',
++        );
++
++        $tokenSession->remove;
++        return $self->p->sendJSONresponse(
++            $req,
++            {
++                valid => JSON::false,
++                error => 'Token expired',
++            },
++            code => 200
++        );
++    }
++
++    # 6. Extract user info
++    my $user   = $tokenSession->data->{_pamUser}   || '';
++    my $groups = $tokenSession->data->{_pamGroups} || '';
++    my @groupList = $groups ? split( /[,;\s]+/, $groups ) : ();
++
++    # 7. CRITICAL: Remove the session (one-time use!)
++    $tokenSession->remove;
++
++    $self->logger->info("PAM verify: Token consumed for user '$user'");
++
++    # Audit log for successful authentication
++    $self->p->auditLog(
++        $req,
++        code      => 'PAM_AUTH_SUCCESS',
++        user      => $user,
++        message   => "PAM authentication successful for user '$user'",
++        server_id => $server_id,
++        groups    => \@groupList,
++    );
++
++    # 8. Return success with user info
++    return $self->p->sendJSONresponse(
++        $req,
++        {
++            valid  => JSON::true,
++            user   => $user,
++            groups => \@groupList,
++        },
++        code => 200
++    );
++}
++
++# POST /pam/heartbeat - Server heartbeat for monitoring
++sub heartbeat {
++    my ( $self, $req ) = @_;
++
++    # 1. Parse JSON request body
++    my $body = eval { from_json( $req->content ) };
++    if ($@) {
++        $self->logger->error("PAM heartbeat: Invalid JSON body: $@");
++        return $self->_badRequest( $req, 'Invalid JSON' );
++    }
++
++    # 2. Extract refresh_token from body
++    my $refresh_token_id = $body->{refresh_token};
++    unless ($refresh_token_id) {
++        return $self->_badRequest( $req, 'refresh_token required' );
++    }
++
++    # 3. Validate refresh token exists
++    my $rtSession = $self->oidc->getRefreshToken($refresh_token_id);
++    unless ($rtSession) {
++        $self->logger->warn('PAM heartbeat: invalid or expired refresh_token');
++        return $self->_unauthorizedResponse( $req, 'Invalid refresh_token' );
++    }
++
++    # 4. Verify token was obtained via Device Authorization Grant
++    my $grant_type = $rtSession->data->{grant_type} || '';
++    unless ( $grant_type eq 'device_code' ) {
++        $self->logger->warn(
++            "PAM heartbeat: Token not from Device Authorization Grant "
++              . "(grant_type: '$grant_type')"
++        );
++        return $self->_forbiddenResponse( $req,
++            'Token not from Device Authorization Grant' );
++    }
++
++    # 5. Update metadata in refresh_token session
++    my $now      = time();
++    my $hostname = $body->{hostname} || 'unknown';
++    my $updates  = {
++        _pamServer      => 1,
++        _pamHostname    => $hostname,
++        _pamServerGroup => $body->{server_group} || 'default',
++        _pamVersion     => $body->{version}      || '',
++        _pamLastSeen    => $now,
++        _pamStatus      => 'active',
++    };
++
++    # Store stats as JSON string if provided
++    if ( $body->{stats} ) {
++        $updates->{_pamStats} = to_json( $body->{stats} );
++    }
++
++    # First heartbeat = enrollment timestamp
++    unless ( $rtSession->data->{_pamEnrolledAt} ) {
++        $updates->{_pamEnrolledAt} = $now;
++    }
++
++    # Update the refresh_token session
++    $self->oidc->updateRefreshToken( $rtSession->id, $updates );
++
++    $self->logger->debug("PAM heartbeat from $hostname");
++
++    # 6. Respond with next heartbeat interval
++    my $interval = $self->conf->{pamAccessHeartbeatInterval} || 300;
++    return $self->p->sendJSONresponse(
++        $req,
++        {
++            status         => 'ok',
++            next_heartbeat => $interval,
++            server_time    => $now,
++        }
++    );
++}
++
++1;
++
++__END__
++
++=pod
++
++=encoding utf8
++
++=head1 NAME
++
++Lemonldap::NG::Portal::Plugins::PamAccess - PAM authentication/authorization plugin
++
++=head1 SYNOPSIS
++
++Enable this plugin in LemonLDAP::NG Manager:
++General Parameters > Plugins > PAM Access > Activation
++
++=head1 DESCRIPTION
++
++This plugin provides three main features:
++
++=head2 User Token Generation (/pam)
++
++Authenticated users can generate temporary ONE-TIME access tokens that can
++be used as passwords for PAM authentication (e.g., SSH login).
++
++Tokens are stored as sessions with kind='PAMTOKEN' and are automatically
++destroyed after first use, preventing replay attacks.
++
++=head2 Token Verification (/pam/verify)
++
++Servers validate and consume one-time user tokens. The token is destroyed
++immediately upon successful verification, ensuring single-use semantics.
++
++=head2 Server Authorization (/pam/authorize)
++
++Servers can check if a user is authorized to access a service, even when
++the user authenticates via SSH key (no token involved).
++
++=head1 ENDPOINTS
++
++=head2 GET /pam
++
++Display the token generation interface (requires authentication).
++
++=head2 POST /pam
++
++Generate a new one-time PAM access token.
++
++Parameters:
++- duration: Token validity in seconds (optional, default: 600)
++
++Response:
++{
++  "token": "session_id",
++  "login": "username",
++  "expires_in": 600
++}
++
++=head2 POST /pam/verify
++
++Verify and consume a one-time user token (server-to-server).
++
++Requires: Server Bearer token in Authorization header (from Device Auth Grant)
++
++Request body:
++{
++  "token": "user_token_to_verify"
++}
++
++Response:
++{
++  "valid": true/false,
++  "user": "username",
++  "groups": ["group1", "group2"],
++  "error": "..." (only if invalid)
++}
++
++IMPORTANT: The token is destroyed after successful verification (one-time use).
++
++=head2 POST /pam/authorize
++
++Check if a user is authorized (server-to-server).
++
++Requires: Bearer token in Authorization header
++
++Request body:
++{
++  "user": "username",
++  "host": "server.example.com",
++  "service": "ssh"
++}
++
++Response:
++{
++  "authorized": true/false,
++  "user": "username",
++  "groups": ["group1", "group2"],
++  "reason": "..." (only if denied)
++}
++
++=head2 POST /pam/heartbeat
++
++Server heartbeat for monitoring enrolled PAM servers.
++
++Request body:
++{
++  "refresh_token": "session_id_of_refresh_token",
++  "hostname": "server.example.com",
++  "server_group": "production",
++  "version": "1.0.0",
++  "stats": { "auth_success": 42, "auth_failure": 3 }
++}
++
++Response:
++{
++  "status": "ok",
++  "next_heartbeat": 300,
++  "server_time": 1702742400
++}
++
++=head1 CONFIGURATION
++
++=over
++
++=item pamAccessActivation
++
++Enable/disable the plugin (default: 0)
++
++=item portalDisplayPamAccess
++
++Rule for displaying the menu tab (default: 0)
++
++=item pamAccessTokenDuration
++
++Default token validity in seconds (default: 600)
++
++=item pamAccessMaxDuration
++
++Maximum token validity in seconds (default: 3600)
++
++=item pamAccessServerGroups
++
++Hash of server group names to authorization rules. Each PAM server can
++specify its group via the C<server_group> parameter in the authorize request.
++If a server's group is not found, the 'default' group rule is used.
++
++Example:
++  {
++    "production" => '$hGroup->{ops}',
++    "staging"    => '$hGroup->{ops} or $hGroup->{dev}',
++    "dev"        => '$hGroup->{dev} or $uid eq "admin"',
++    "default"    => '1'
++  }
++
++=item pamAccessRp
++
++OIDC Relying Party name for tokens (default: 'pam-access')
++
++=item pamAccessHeartbeatInterval
++
++Expected interval between server heartbeats in seconds (default: 300)
++
++=item pamAccessInactiveThreshold
++
++Time in seconds after which a server is considered inactive if no heartbeat
++received (default: 900)
++
++=item pamAccessHeartbeatRequired
++
++If enabled, servers must have a recent heartbeat to use /pam/authorize.
++This ensures that the PAM module is still active on the server. (default: 0)
++
++=back
++
++=head1 SEE ALSO
++
++L<Lemonldap::NG::Portal::Plugins::DeviceAuthorization> for server enrollment
++
++=head1 AUTHORS
++
++=over
++
++=item LemonLDAP::NG team L<https://lemonldap-ng.org/team>
++
++=back
++
++=head1 LICENSE AND COPYRIGHT
++
++See COPYING file for details.
++
++=cut
+new file mode 100644
+--- /dev/null
++++ b/usr/share/lemonldap-ng/portal/htdocs/static/common/js/pamaccess.js
+@@ -0,0 +1,63 @@
++(function () {
++  'use strict';
++
++  (function () {
++    $(window).on("load", function () {
++      var form = document.getElementById('pamTokenForm');
++      if (!form) return;
++      var resultDiv = document.getElementById('pamTokenResult');
++      var errorDiv = document.getElementById('pamTokenError');
++      var tokenInput = document.getElementById('pamToken');
++      var loginSpan = document.getElementById('pamLogin');
++      var expiresSpan = document.getElementById('pamExpiresIn');
++      var copyBtn = document.getElementById('copyPamToken');
++      var errorMsg = document.getElementById('pamErrorMessage');
++      form.addEventListener('submit', function (e) {
++        e.preventDefault();
++        resultDiv.classList.add('d-none');
++        errorDiv.classList.add('d-none');
++        var duration = document.getElementById('pamDuration').value;
++        $.ajax({
++          type: "POST",
++          url: scriptname + 'pam',
++          data: {
++            duration: duration
++          },
++          dataType: "json",
++          success: function success(data) {
++            if (data.error) {
++              errorMsg.textContent = data.error;
++              errorDiv.classList.remove('d-none');
++            } else {
++              tokenInput.value = data.token;
++              loginSpan.textContent = data.login;
++              var minutes = Math.floor(data.expires_in / 60);
++              var seconds = data.expires_in % 60;
++              expiresSpan.textContent = minutes + ' min ' + (seconds > 0 ? seconds + ' sec' : '');
++              resultDiv.classList.remove('d-none');
++            }
++          },
++          error: function error(xhr, status, _error) {
++            errorMsg.textContent = _error || status;
++            errorDiv.classList.remove('d-none');
++          }
++        });
++      });
++
++      // Copy button
++      if (copyBtn) {
++        copyBtn.addEventListener('click', function () {
++          tokenInput.select();
++          tokenInput.setSelectionRange(0, 99999);
++          navigator.clipboard.writeText(tokenInput.value).then(function () {
++            copyBtn.innerHTML = '<span class="fa fa-check"></span>';
++            setTimeout(function () {
++              copyBtn.innerHTML = '<span class="fa fa-copy"></span>';
++            }, 2000);
++          });
++        });
++      }
++    });
++  })();
++
++})();
+--- a/usr/share/lemonldap-ng/portal/htdocs/static/languages/ar.json
++++ b/usr/share/lemonldap-ng/portal/htdocs/static/languages/ar.json
+@@ -124,6 +124,7 @@
+ "authLevel":"مستوى إثبات الهوية",
+ "authPortal":"بوابة إثبات الهوية",
+ "authRemaining":"٪ s المصادقة المتبقية، غيير كلمة المرور الخاصة بك!",
++"authorize":"Authorize",
+ "autoAccept":"تقبل تلقائيا في 30 ثانية",
+ "autoGlobalLogout":"تقبل تلقائيا في 30 ثانية",
+ "back2CasUrl":"التطبيق الذي قمت بتسجيل الخروج منه للتو قد وفرت وصلة قد ترغب في أن تتبعها",
+@@ -149,6 +150,7 @@
+ "click2Reset":"انقر هنا لإعادة تعيين كلمة المرور الخاصة بك",
+ "clickHere":"الرجاء الضغط هنا",
+ "clickOnYubikey":"انقر على Yubikey الخاص بك",
++"clientId":"Client ID",
+ "close":"إغلاق",
+ "closeSSO":"أغلق جلسة الدخول الموحد (سسو)",
+ "code":"الشفرة",
+@@ -166,6 +168,13 @@
+ "currentPwd":"كلمة المرور الحالية",
+ "date":"تاريخ",
+ "decryptCipheredValue":"فك تشفير قيمة مشفرة",
++"deny":"Deny",
++"deviceApproved":"Device Approved",
++"deviceApprovedMsg":"The device has been authorized. You can close this window.",
++"deviceAuthorization":"Device Authorization",
++"deviceAuthorizationMsg":"Enter the code displayed on your device to authorize it.",
++"deviceDenied":"Device Denied",
++"deviceDeniedMsg":"The device authorization has been denied. You can close this window.",
+ "enterCred":"الرجاء إدخال بيانات الاعتماد الخاصة بك",
+ "enterExt2fCode":"تم إرسال رمز إليك. الرجاء إدخاله",
+ "enterMail2fCode":"تم ارسال رمز لبريدك الالكتروني. الرجاء ادخاله",
+@@ -182,6 +191,7 @@
+ "firstName":"الاسم الاول",
+ "forbidden":"ممنوع الولوج",
+ "forgotPwd":"نسيت كلمة المرور؟",
++"generatePamToken":"Generate Token",
+ "generatePwd":"إنشاء كلمة المرور تلقائيا",
+ "generic":"معلومات الاتصال",
+ "generic2fFormatError":"معلومات اتصالك غير مطابقة للشكل المطلوب",
+@@ -266,6 +276,15 @@
+ "openidPA":" سياسة استخدام البيانات متوفرة في",
+ "openidRpns":"المعايير %s  طلب الاتحاد غير متوف",
+ "otherSessions":"جلسات نشطة أخرى",
++"pamAccessInfo":"Generate a temporary token to use as your password for SSH or other PAM-enabled services.",
++"pamAccessTitle":"PAM Access Token",
++"pamExpiresIn":"Expires in",
++"pamInstructions":"Instructions",
++"pamInstructionsText":"Use this token as your password when connecting via SSH or other PAM-enabled services.",
++"pamLogin":"Login",
++"pamTokenDuration":"Token validity",
++"pamTokenError":"Failed to generate token",
++"pamTokenGenerated":"Your temporary token",
+ "password":"كلمة المرور",
+ "password2f":"كلمة المرور",
+ "passwordCompromised":"لم يتم العثور على كلمة المرور في قاعدة بيانات كلمات المرور المخترقة",
+@@ -304,6 +323,7 @@
+ "removeOtherSessions":"إزالة الجلسات الأخرى",
+ "rename":"Rename",
+ "renewSession":"تجديد الجلسة",
++"requestedScope":"Requested scope",
+ "resendCode":"إعادة إرسال الرمز",
+ "resendConfirmMail":"هل تريد إعادة إرسال رسالة التأكيد؟",
+ "resendTooSoon":"يرجى الانتظار قليلاً قبل محاولة إعادة إرسال الرمز",
+@@ -354,6 +374,8 @@
+ "upgradeSession":"ترقية الجلسة",
+ "useYubikey":"استخدم اليوبي كي الخاص بك",
+ "user":"المستخدم",
++"userCode":"Device Code",
++"userCodeHelp":"Enter the 8-character code shown on your device",
+ "validationDate":"تاريخ التحقق",
+ "value":"القيمة",
+ "verify":"التحقق",
+--- a/usr/share/lemonldap-ng/portal/htdocs/static/languages/de.json
++++ b/usr/share/lemonldap-ng/portal/htdocs/static/languages/de.json
+@@ -124,6 +124,7 @@
+ "authLevel":"Authentication level",
+ "authPortal":"Authentifizierungsportal",
+ "authRemaining":"%sverbleibende Authentifizierungen, bitte Passwort ändern!",
++"authorize":"Authorize",
+ "autoAccept":"Automatisch in 30 Sekunden annehmen",
+ "autoGlobalLogout":"Automatically global logout in 30 seconds",
+ "back2CasUrl":"Die Anwendung, von der Sie sich gerade abgemeldet haben, hat einen Link bereitgestellt, dem Sie folgen sollten",
+@@ -149,6 +150,7 @@
+ "click2Reset":"Hier klicken, um Ihr Passwort zurückzusetzen.",
+ "clickHere":"Bitte hier klicken",
+ "clickOnYubikey":"Klicke auf deinen Yubikey",
++"clientId":"Client ID",
+ "close":"Close",
+ "closeSSO":"Schließe deine SSO-Sitzung",
+ "code":"Code",
+@@ -166,6 +168,13 @@
+ "currentPwd":"Aktuelles Passwort",
+ "date":"Datum",
+ "decryptCipheredValue":"Decrypt a ciphered value",
++"deny":"Deny",
++"deviceApproved":"Device Approved",
++"deviceApprovedMsg":"The device has been authorized. You can close this window.",
++"deviceAuthorization":"Device Authorization",
++"deviceAuthorizationMsg":"Enter the code displayed on your device to authorize it.",
++"deviceDenied":"Device Denied",
++"deviceDeniedMsg":"The device authorization has been denied. You can close this window.",
+ "enterCred":"Bitte geben deine Zugangsdaten ein",
+ "enterExt2fCode":"Ein Code wurde an dich gesendet. Bitte gebe diesen ein",
+ "enterMail2fCode":"A code has been sent to your email address. Please enter it",
+@@ -182,6 +191,7 @@
+ "firstName":"Vorname",
+ "forbidden":"Access FORBIDDEN",
+ "forgotPwd":"Passwort vergessen ?",
++"generatePamToken":"Generate Token",
+ "generatePwd":"Passwort automatisch generieren",
+ "generic":"Contact information",
+ "generic2fFormatError":"Your contact information does not match the required format",
+@@ -266,6 +276,15 @@
+ "openidPA":"Die Datennutzungsrichtlinie ist verfügbar unter",
+ "openidRpns":"Der für den Verbund angeforderte Parameter %s ist nicht verfügbar",
+ "otherSessions":"Andere aktive Sitzungen",
++"pamAccessInfo":"Generate a temporary token to use as your password for SSH or other PAM-enabled services.",
++"pamAccessTitle":"PAM Access Token",
++"pamExpiresIn":"Expires in",
++"pamInstructions":"Instructions",
++"pamInstructionsText":"Use this token as your password when connecting via SSH or other PAM-enabled services.",
++"pamLogin":"Login",
++"pamTokenDuration":"Token validity",
++"pamTokenError":"Failed to generate token",
++"pamTokenGenerated":"Your temporary token",
+ "password":"Passwort",
+ "password2f":"Passwort",
+ "passwordCompromised":"Not found in a compromised password database",
+@@ -304,6 +323,7 @@
+ "removeOtherSessions":"Andere Sitzungen löschen",
+ "rename":"Rename",
+ "renewSession":"Renew session",
++"requestedScope":"Requested scope",
+ "resendCode":"Re-send code",
+ "resendConfirmMail":"Bestätigungsmail erneuert senden ?",
+ "resendTooSoon":"Please wait a little longer before trying to re-send the code",
+@@ -354,6 +374,8 @@
+ "upgradeSession":"Upgrade session",
+ "useYubikey":"Benutze deinen Yubikey",
+ "user":"Benutzer",
++"userCode":"Device Code",
++"userCodeHelp":"Enter the 8-character code shown on your device",
+ "validationDate":"Validation date",
+ "value":"Value",
+ "verify":"Verify",
+--- a/usr/share/lemonldap-ng/portal/htdocs/static/languages/en.json
++++ b/usr/share/lemonldap-ng/portal/htdocs/static/languages/en.json
+@@ -124,6 +124,7 @@
+ "authLevel":"Authentication level",
+ "authPortal":"Authentication portal",
+ "authRemaining":"%s authentications remaining, change your password!",
++"authorize":"Authorize",
+ "autoAccept":"Automatically accept in 30 seconds",
+ "autoGlobalLogout":"Automatically global logout in 30 seconds",
+ "back2CasUrl":"The application you just logged out of has provided a link it would like you to follow",
+@@ -149,6 +150,7 @@
+ "click2Reset":"Click here to reset your password",
+ "clickHere":"Please click here",
+ "clickOnYubikey":"Click on your Yubikey",
++"clientId":"Client ID",
+ "close":"Close",
+ "closeSSO":"Close your SSO session",
+ "code":"Code",
+@@ -166,6 +168,13 @@
+ "currentPwd":"Current password",
+ "date":"Date",
+ "decryptCipheredValue":"Decrypt a ciphered value",
++"deny":"Deny",
++"deviceApproved":"Device Approved",
++"deviceApprovedMsg":"The device has been authorized. You can close this window.",
++"deviceAuthorization":"Device Authorization",
++"deviceAuthorizationMsg":"Enter the code displayed on your device to authorize it.",
++"deviceDenied":"Device Denied",
++"deviceDeniedMsg":"The device authorization has been denied. You can close this window.",
+ "enterCred":"Please enter your credentials",
+ "enterExt2fCode":"A code has been sent to you. Please enter it",
+ "enterMail2fCode":"A code has been sent to your email address. Please enter it",
+@@ -182,6 +191,7 @@
+ "firstName":"First name",
+ "forbidden":"Access FORBIDDEN",
+ "forgotPwd":"Forgot your password?",
++"generatePamToken":"Generate Token",
+ "generatePwd":"Generate the password automatically",
+ "generic":"Contact information",
+ "generic2fFormatError":"Your contact information does not match the required format",
+@@ -266,6 +276,15 @@
+ "openidPA":"Data usage policy is available at",
+ "openidRpns":"Parameter %s requested for federation isn't available",
+ "otherSessions":"Other active sessions",
++"pamAccessInfo":"Generate a temporary token to use as your password for SSH or other PAM-enabled services.",
++"pamAccessTitle":"PAM Access Token",
++"pamExpiresIn":"Expires in",
++"pamInstructions":"Instructions",
++"pamInstructionsText":"Use this token as your password when connecting via SSH or other PAM-enabled services.",
++"pamLogin":"Login",
++"pamTokenDuration":"Token validity",
++"pamTokenError":"Failed to generate token",
++"pamTokenGenerated":"Your temporary token",
+ "password":"Password",
+ "password2f":"Password",
+ "passwordCompromised":"Not found in a compromised password database",
+@@ -304,6 +323,7 @@
+ "removeOtherSessions":"Remove other sessions",
+ "rename":"Rename",
+ "renewSession":"Renew session",
++"requestedScope":"Requested scope",
+ "resendCode":"Re-send code",
+ "resendConfirmMail":"Resend confirmation mail?",
+ "resendTooSoon":"Please wait a little longer before trying to re-send the code",
+@@ -354,6 +374,8 @@
+ "upgradeSession":"Upgrade session",
+ "useYubikey":"use your Yubikey",
+ "user":"User",
++"userCode":"Device Code",
++"userCodeHelp":"Enter the 8-character code shown on your device",
+ "validationDate":"Validation date",
+ "value":"Value",
+ "verify":"Verify",
+--- a/usr/share/lemonldap-ng/portal/htdocs/static/languages/es.json
++++ b/usr/share/lemonldap-ng/portal/htdocs/static/languages/es.json
+@@ -124,6 +124,7 @@
+ "authLevel":"Nivel de autentificación",
+ "authPortal":"Portal de autenticación",
+ "authRemaining":"%s autenticaciones restantes, ¡cambie su contraseña!",
++"authorize":"Authorize",
+ "autoAccept":"Aceptar automáticamente en 30 segundos ",
+ "autoGlobalLogout":"Desconexión global automática en 30 segundos",
+ "back2CasUrl":"La aplicación de la cual se acaba de desconectar le ha enviado un enlace y le gustaría que lo siguiese",
+@@ -149,6 +150,7 @@
+ "click2Reset":"Pulse aquí para restaurar el password",
+ "clickHere":"Por favor haga clic aquí",
+ "clickOnYubikey":"Haga clic en su Yubikey",
++"clientId":"Client ID",
+ "close":"Close",
+ "closeSSO":"Cierre su sesión SSO",
+ "code":"Código",
+@@ -166,6 +168,13 @@
+ "currentPwd":"Contraseña actual",
+ "date":"Fecha",
+ "decryptCipheredValue":"Desencriptar un valor cifrado",
++"deny":"Deny",
++"deviceApproved":"Device Approved",
++"deviceApprovedMsg":"The device has been authorized. You can close this window.",
++"deviceAuthorization":"Device Authorization",
++"deviceAuthorizationMsg":"Enter the code displayed on your device to authorize it.",
++"deviceDenied":"Device Denied",
++"deviceDeniedMsg":"The device authorization has been denied. You can close this window.",
+ "enterCred":"Por favor ingrese sus credenciales",
+ "enterExt2fCode":"Un código le ha sido enviado. Por favor ingréselo ",
+ "enterMail2fCode":"Un código le ha sido enviado a dirección de e-mail. Por favor ingréselo",
+@@ -182,6 +191,7 @@
+ "firstName":"Nombre",
+ "forbidden":"Acceso DENEGADO",
+ "forgotPwd":"Contraseña olvidada?",
++"generatePamToken":"Generate Token",
+ "generatePwd":"Generar la contraseña automáticamente",
+ "generic":"Contact information",
+ "generic2fFormatError":"Your contact information does not match the required format",
+@@ -266,6 +276,15 @@
+ "openidPA":"La política de uso de datos está disponible en",
+ "openidRpns":"El parámetro %s solicitado por la agrupación no está disponible",
+ "otherSessions":"Otras sesiones activas",
++"pamAccessInfo":"Generate a temporary token to use as your password for SSH or other PAM-enabled services.",
++"pamAccessTitle":"PAM Access Token",
++"pamExpiresIn":"Expires in",
++"pamInstructions":"Instructions",
++"pamInstructionsText":"Use this token as your password when connecting via SSH or other PAM-enabled services.",
++"pamLogin":"Login",
++"pamTokenDuration":"Token validity",
++"pamTokenError":"Failed to generate token",
++"pamTokenGenerated":"Your temporary token",
+ "password":"Contraseña",
+ "password2f":"Contraseña",
+ "passwordCompromised":"Not found in a compromised password database",
+@@ -304,6 +323,7 @@
+ "removeOtherSessions":"Suprimir las otras sesiones",
+ "rename":"Rename",
+ "renewSession":"Renew session",
++"requestedScope":"Requested scope",
+ "resendCode":"Re-send code",
+ "resendConfirmMail":"¿Reenviar e-mail de confirmación?",
+ "resendTooSoon":"Please wait a little longer before trying to re-send the code",
+@@ -354,6 +374,8 @@
+ "upgradeSession":"Actualizar la sesión",
+ "useYubikey":"utilice su Yubikey",
+ "user":"Usuario",
++"userCode":"Device Code",
++"userCodeHelp":"Enter the 8-character code shown on your device",
+ "validationDate":"Validation date",
+ "value":"Valor",
+ "verify":"Verificar",
+--- a/usr/share/lemonldap-ng/portal/htdocs/static/languages/fi.json
++++ b/usr/share/lemonldap-ng/portal/htdocs/static/languages/fi.json
+@@ -124,6 +124,7 @@
+ "authLevel":"Tunnistautumistaso",
+ "authPortal":"Todentautumisportaali",
+ "authRemaining":"%s todentautumista jäljellä, vaihda salasanasi!",
++"authorize":"Authorize",
+ "autoAccept":"Hyväksytään automaattisesti 30 sekunnissa",
+ "autoGlobalLogout":"Kirjaudutaan automaattisesti ulos kaikista istunnoista 30 sekunnissa",
+ "back2CasUrl":"Sovellus, josta juuri kirjauduit ulos, tarjosi linkin, jota se haluaisi sinun seuraavan",
+@@ -149,6 +150,7 @@
+ "click2Reset":"Napsauta tästä nollataksesi salasanasi",
+ "clickHere":"Napsauta tästä",
+ "clickOnYubikey":"Kosketa Yubikeytäsi",
++"clientId":"Client ID",
+ "close":"Sulje",
+ "closeSSO":"Sulje kertakirjautumisistuntosi",
+ "code":"Koodi",
+@@ -166,6 +168,13 @@
+ "currentPwd":"Nykyinen salasana",
+ "date":"Päivämäärä",
+ "decryptCipheredValue":"Pura koodattu arvo",
++"deny":"Deny",
++"deviceApproved":"Device Approved",
++"deviceApprovedMsg":"The device has been authorized. You can close this window.",
++"deviceAuthorization":"Device Authorization",
++"deviceAuthorizationMsg":"Enter the code displayed on your device to authorize it.",
++"deviceDenied":"Device Denied",
++"deviceDeniedMsg":"The device authorization has been denied. You can close this window.",
+ "enterCred":"Anna tunnistautumistietosi",
+ "enterExt2fCode":"Koodi on lähetetty sinulle. Ole hyvä ja anna se",
+ "enterMail2fCode":"Koodi on lähetetty sähköpostiisi. Ole hyvä ja anna se",
+@@ -182,6 +191,7 @@
+ "firstName":"Etunimi",
+ "forbidden":"Pääsy KIELLETTY",
+ "forgotPwd":"Unohditko salasanasi?",
++"generatePamToken":"Generate Token",
+ "generatePwd":"Luo salasana automaattisesti",
+ "generic":"Yhteystieto",
+ "generic2fFormatError":"Yhteystietosi eivät vastaa vaadittua muotoa",
+@@ -266,6 +276,15 @@
+ "openidPA":"Tietosuojakäytänne on saatavissa osoitteesta",
+ "openidRpns":"Luottamusverkostoa varten pyydetty parametri %s ei ole saatavilla",
+ "otherSessions":"Muut aktiiviset istunnot",
++"pamAccessInfo":"Generate a temporary token to use as your password for SSH or other PAM-enabled services.",
++"pamAccessTitle":"PAM Access Token",
++"pamExpiresIn":"Expires in",
++"pamInstructions":"Instructions",
++"pamInstructionsText":"Use this token as your password when connecting via SSH or other PAM-enabled services.",
++"pamLogin":"Login",
++"pamTokenDuration":"Token validity",
++"pamTokenError":"Failed to generate token",
++"pamTokenGenerated":"Your temporary token",
+ "password":"Salasana",
+ "password2f":"Salasana",
+ "passwordCompromised":"Ei löydy vaarantuneiden salasanojen tietokannasta",
+@@ -304,6 +323,7 @@
+ "removeOtherSessions":"Poista muut istunnot",
+ "rename":"Rename",
+ "renewSession":"Uudista istunto",
++"requestedScope":"Requested scope",
+ "resendCode":"Lähetä koodi uudestaan",
+ "resendConfirmMail":"Lähetä vahvistussähköposti uudestaan?",
+ "resendTooSoon":"Ole hyvä ja odota vähän pidempään ennen kuin yrität lähettää koodia uudestaan",
+@@ -354,6 +374,8 @@
+ "upgradeSession":"Ylennä istunto",
+ "useYubikey":"Käytä Yubikeytä",
+ "user":"Käyttäjä",
++"userCode":"Device Code",
++"userCodeHelp":"Enter the 8-character code shown on your device",
+ "validationDate":"Vahvistuspäivämäärä",
+ "value":"Arvo",
+ "verify":"Vahvista",
+--- a/usr/share/lemonldap-ng/portal/htdocs/static/languages/fr.json
++++ b/usr/share/lemonldap-ng/portal/htdocs/static/languages/fr.json
+@@ -124,6 +124,7 @@
+ "authLevel":"Niveau d'authentification",
+ "authPortal":"Portail d'authentification",
+ "authRemaining":"%s authentifications restantes, changez votre mot de passe !",
++"authorize":"Autoriser",
+ "autoAccept":"Acceptation automatique dans 30 secondes",
+ "autoGlobalLogout":"Déconnexion globale automatique dans 30 secondes",
+ "back2CasUrl":"Le service duquel vous arrivez a fourni un lien que vous êtes invité à suivre",
+@@ -149,6 +150,7 @@
+ "click2Reset":"Cliquez ici pour réinitialiser votre mot de passe",
+ "clickHere":"Cliquez ici",
+ "clickOnYubikey":"Cliquez sur votre Yubikey",
++"clientId":"ID Client",
+ "close":"Fermer",
+ "closeSSO":"Fermer votre Session SSO",
+ "code":"Code",
+@@ -166,6 +168,13 @@
+ "currentPwd":"Mot de passe actuel",
+ "date":"Date",
+ "decryptCipheredValue":"Décoder une valeur chiffrée",
++"deny":"Refuser",
++"deviceApproved":"Appareil approuvé",
++"deviceApprovedMsg":"L'appareil a été autorisé. Vous pouvez fermer cette fenêtre.",
++"deviceAuthorization":"Autorisation d'appareil",
++"deviceAuthorizationMsg":"Entrez le code affiché sur votre appareil pour l'autoriser.",
++"deviceDenied":"Appareil refusé",
++"deviceDeniedMsg":"L'autorisation de l'appareil a été refusée. Vous pouvez fermer cette fenêtre.",
+ "enterCred":"Merci de vous authentifier",
+ "enterExt2fCode":"Un code vous a été envoyé, entrez-le ici",
+ "enterMail2fCode":"Un code vous a été envoyé par mail, entrez-le ici",
+@@ -182,6 +191,7 @@
+ "firstName":"Prénom",
+ "forbidden":"Accès INTERDIT",
+ "forgotPwd":"Mot de passe oublié ?",
++"generatePamToken":"Générer un token",
+ "generatePwd":"Générer le mot de passe automatiquement",
+ "generic":"Information de contact",
+ "generic2fFormatError":"Vos informations de contact ne correspondent pas au format attendu",
+@@ -266,6 +276,15 @@
+ "openidPA":"La politique d'utilisation des données est disponible ici",
+ "openidRpns":"Le paramètre %s exigé pour la fédération n'est pas disponible",
+ "otherSessions":"Autres sessions ouvertes",
++"pamAccessInfo":"Générez un token temporaire à utiliser comme mot de passe pour SSH ou d'autres services PAM.",
++"pamAccessTitle":"Token d'accès PAM",
++"pamExpiresIn":"Expire dans",
++"pamInstructions":"Instructions",
++"pamInstructionsText":"Utilisez ce token comme mot de passe lors de la connexion via SSH ou d'autres services PAM.",
++"pamLogin":"Identifiant",
++"pamTokenDuration":"Durée de validité",
++"pamTokenError":"Échec de la génération du token",
++"pamTokenGenerated":"Votre token temporaire",
+ "password":"Mot de passe",
+ "password2f":"Mot de passe",
+ "passwordCompromised":"Absent d'une base de mots de passe compromis",
+@@ -304,6 +323,7 @@
+ "removeOtherSessions":"Fermer les autres sessions",
+ "rename":"Renommer",
+ "renewSession":"Renouveler la session",
++"requestedScope":"Scope demandé",
+ "resendCode":"Renvoyer le code",
+ "resendConfirmMail":"Renvoyer le mail de confirmation ?",
+ "resendTooSoon":"Veuillez patienter encore un peu avant de demander la retransmission du code",
+@@ -354,6 +374,8 @@
+ "upgradeSession":"Se réauthentifier",
+ "useYubikey":"Utilisez votre Yubikey",
+ "user":"Utilisateur",
++"userCode":"Code de l'appareil",
++"userCodeHelp":"Entrez le code à 8 caractères affiché sur votre appareil",
+ "validationDate":"Date de validation",
+ "value":"Valeur",
+ "verify":"Vérifier",
+--- a/usr/share/lemonldap-ng/portal/htdocs/static/languages/he.json
++++ b/usr/share/lemonldap-ng/portal/htdocs/static/languages/he.json
+@@ -124,6 +124,7 @@
+ "authLevel":"רמת אימות",
+ "authPortal":"שער אימות",
+ "authRemaining":"%s ניסיונות אימות נותרו, נא להחליף את הסיסמה שלך!",
++"authorize":"Authorize",
+ "autoAccept":"לקבל אוטומטית תוך 30 שניות",
+ "autoGlobalLogout":"יציאה גלובלית מהמערכת תוך 30 שניות",
+ "back2CasUrl":"היישום שיצאת ממנו סיפק קישור שהוא היה רוצה שתיגש אליו",
+@@ -149,6 +150,7 @@
+ "click2Reset":"לחיצה כאן לאיפוס הסיסמה שלך",
+ "clickHere":"נא ללחוץ כאן",
+ "clickOnYubikey":"יש ללחוץ על ה־Yubikey שלך",
++"clientId":"Client ID",
+ "close":"סגירה",
+ "closeSSO":"סגירת הפעלת ה־SSO שלך",
+ "code":"קוד",
+@@ -166,6 +168,13 @@
+ "currentPwd":"סיסמה נוכחית",
+ "date":"תאריך",
+ "decryptCipheredValue":"פענוח ערך מוצפן",
++"deny":"Deny",
++"deviceApproved":"Device Approved",
++"deviceApprovedMsg":"The device has been authorized. You can close this window.",
++"deviceAuthorization":"Device Authorization",
++"deviceAuthorizationMsg":"Enter the code displayed on your device to authorize it.",
++"deviceDenied":"Device Denied",
++"deviceDeniedMsg":"The device authorization has been denied. You can close this window.",
+ "enterCred":"נא למלא את פרטי הגישה שלך",
+ "enterExt2fCode":"נשלח אליך קוד. נא להקליד אותו",
+ "enterMail2fCode":"נשלח קוד לכתובת הדוא״ל שלך. נא להקליד אותו",
+@@ -182,6 +191,7 @@
+ "firstName":"שם פרטי",
+ "forbidden":"הגישה נדחתה",
+ "forgotPwd":"שכחת את הסיסמה שלך?",
++"generatePamToken":"Generate Token",
+ "generatePwd":"יצירת סיסמה אוטומטית",
+ "generic":"פרטי יצירת קשר",
+ "generic2fFormatError":"פרטי הקשר שלך לא תואמים לתבנית הנחוצה",
+@@ -266,6 +276,15 @@
+ "openidPA":"מדיניות השימוש בנתונים זמינה תחת",
+ "openidRpns":"המשתנה %s נחוץ שאיחוד אינו זמין",
+ "otherSessions":"הפעלות פעילות נוספות",
++"pamAccessInfo":"Generate a temporary token to use as your password for SSH or other PAM-enabled services.",
++"pamAccessTitle":"PAM Access Token",
++"pamExpiresIn":"Expires in",
++"pamInstructions":"Instructions",
++"pamInstructionsText":"Use this token as your password when connecting via SSH or other PAM-enabled services.",
++"pamLogin":"Login",
++"pamTokenDuration":"Token validity",
++"pamTokenError":"Failed to generate token",
++"pamTokenGenerated":"Your temporary token",
+ "password":"סיסמה",
+ "password2f":"סיסמה",
+ "passwordCompromised":"לא נמצאה במסד נתוני הסיסמאות שדלפו",
+@@ -304,6 +323,7 @@
+ "removeOtherSessions":"הסרת הפעלות אחרות",
+ "rename":"Rename",
+ "renewSession":"חידוש הפעלה",
++"requestedScope":"Requested scope",
+ "resendCode":"לשלוח את הקוד מחדש",
+ "resendConfirmMail":"לשלוח את הודעת האימות שוב?",
+ "resendTooSoon":"נא להמתין זמן ארוך יותר בטרם ניסיון שליחת הקוד מחדש",
+@@ -354,6 +374,8 @@
+ "upgradeSession":"שדרוג הפעלה",
+ "useYubikey":"שימוש ב־Yubikey שלך",
+ "user":"משתמש",
++"userCode":"Device Code",
++"userCodeHelp":"Enter the 8-character code shown on your device",
+ "validationDate":"תאריך תיקוף",
+ "value":"ערך",
+ "verify":"אימות",
+--- a/usr/share/lemonldap-ng/portal/htdocs/static/languages/it.json
++++ b/usr/share/lemonldap-ng/portal/htdocs/static/languages/it.json
+@@ -124,6 +124,7 @@
+ "authLevel":"Livello di autenticazione",
+ "authPortal":"Portale di autenticazione",
+ "authRemaining":"Rimangono ancora %s autenticazioni, modifica la password!",
++"authorize":"Authorize",
+ "autoAccept":"Accetta automaticamente in 30 secondi",
+ "autoGlobalLogout":"Logout globale automatico in 30 secondi",
+ "back2CasUrl":"L'applicazione dalla quale ti sei appena sconnesso ha fornito un link che dovresti seguire",
+@@ -149,6 +150,7 @@
+ "click2Reset":"Clicca qui per reimpostare la password",
+ "clickHere":"Per favore clicca qui",
+ "clickOnYubikey":"Clicca sulla tua Yubikey",
++"clientId":"Client ID",
+ "close":"Close",
+ "closeSSO":"Chiudi la sessione SSO",
+ "code":"Codice",
+@@ -166,6 +168,13 @@
+ "currentPwd":"Password attuale",
+ "date":"Data",
+ "decryptCipheredValue":"Decripta un valore cifrato",
++"deny":"Deny",
++"deviceApproved":"Device Approved",
++"deviceApprovedMsg":"The device has been authorized. You can close this window.",
++"deviceAuthorization":"Device Authorization",
++"deviceAuthorizationMsg":"Enter the code displayed on your device to authorize it.",
++"deviceDenied":"Device Denied",
++"deviceDeniedMsg":"The device authorization has been denied. You can close this window.",
+ "enterCred":"Inserisci le tue credenziali",
+ "enterExt2fCode":"Un codice vi é stato inviato. Inseritelo",
+ "enterMail2fCode":"Un codice é stato inviato alla vostra casella email. Inseritelo",
+@@ -182,6 +191,7 @@
+ "firstName":"Nome",
+ "forbidden":"Accesso VIETATO",
+ "forgotPwd":"Password dimenticata?",
++"generatePamToken":"Generate Token",
+ "generatePwd":"Generare automaticamente la password",
+ "generic":"Informazioni di contatto",
+ "generic2fFormatError":"Le informazioni di contatto non corrispondono al formato richiesto",
+@@ -266,6 +276,15 @@
+ "openidPA":"La politica di utilizzo dei dati è disponibile all'indirizzo",
+ "openidRpns":"Il parametro %s richiesto per la federazione non è disponibile",
+ "otherSessions":"Altre sessioni attive",
++"pamAccessInfo":"Generate a temporary token to use as your password for SSH or other PAM-enabled services.",
++"pamAccessTitle":"PAM Access Token",
++"pamExpiresIn":"Expires in",
++"pamInstructions":"Instructions",
++"pamInstructionsText":"Use this token as your password when connecting via SSH or other PAM-enabled services.",
++"pamLogin":"Login",
++"pamTokenDuration":"Token validity",
++"pamTokenError":"Failed to generate token",
++"pamTokenGenerated":"Your temporary token",
+ "password":"Password",
+ "password2f":"Password",
+ "passwordCompromised":"Non trovato in un database di password compromesse",
+@@ -304,6 +323,7 @@
+ "removeOtherSessions":"Rimuovere altre sessioni",
+ "rename":"Rename",
+ "renewSession":"Rinnova la sessione",
++"requestedScope":"Requested scope",
+ "resendCode":"Reinvio del codice",
+ "resendConfirmMail":"Inviare nuovamente mail di conferma?",
+ "resendTooSoon":"Attendere ancora un po' prima di provare a inviare nuovamente il codice",
+@@ -354,6 +374,8 @@
+ "upgradeSession":"Sessione di aggiornamento",
+ "useYubikey":"Usa la tua Yubikey",
+ "user":"Utente",
++"userCode":"Device Code",
++"userCodeHelp":"Enter the 8-character code shown on your device",
+ "validationDate":"Data di validazione",
+ "value":"Valore",
+ "verify":"Verifica",
+--- a/usr/share/lemonldap-ng/portal/htdocs/static/languages/mfe.json
++++ b/usr/share/lemonldap-ng/portal/htdocs/static/languages/mfe.json
+@@ -124,6 +124,7 @@
+ "authLevel":"Nivo otantifikasion",
+ "authPortal":"Portay otantifikasion",
+ "authRemaining":"%s otantifikasion ki reste, sanz ou modpas!",
++"authorize":"Authorize",
+ "autoAccept":"Aksepte otomatikman dan 30 segonn",
+ "autoGlobalLogout":"Logout globalman otomatikman dan 30 segonn",
+ "back2CasUrl":"Aplikasion kot ou fek dekonekte finn donn enn lien pou ou swiv",
+@@ -149,6 +150,7 @@
+ "click2Reset":"Klik isi pou reset ou modpas",
+ "clickHere":"Klik isi silvouple",
+ "clickOnYubikey":"Klik lor ou Yubikey",
++"clientId":"Client ID",
+ "close":"Ferme",
+ "closeSSO":"Ferm ou sesion SSO",
+ "code":"Kod",
+@@ -166,6 +168,13 @@
+ "currentPwd":"Modpas aktiel",
+ "date":"Dat",
+ "decryptCipheredValue":"Desifre enn valer kode",
++"deny":"Deny",
++"deviceApproved":"Device Approved",
++"deviceApprovedMsg":"The device has been authorized. You can close this window.",
++"deviceAuthorization":"Device Authorization",
++"deviceAuthorizationMsg":"Enter the code displayed on your device to authorize it.",
++"deviceDenied":"Device Denied",
++"deviceDeniedMsg":"The device authorization has been denied. You can close this window.",
+ "enterCred":"Silvouple rant ou bann idantifian",
+ "enterExt2fCode":"Finn avoy ou enn kod. Met li silvouple",
+ "enterMail2fCode":"Finn avoy enn kod lor ou ladres email. Met li silvouple",
+@@ -182,6 +191,7 @@
+ "firstName":"Prenom",
+ "forbidden":"Akse INTERDI",
+ "forgotPwd":"Finn bliye ou modpas?",
++"generatePamToken":"Generate Token",
+ "generatePwd":"Zener modpas-la otomatikman",
+ "generic":"Bann linformasion kontak",
+ "generic2fFormatError":"Ou bann linformasion kontak pa koresponn avek format neseser",
+@@ -266,6 +276,15 @@
+ "openidPA":"Polisi itilizasion done disponib lor",
+ "openidRpns":"Paramet %s ki finn demande pou federasion pa disponib",
+ "otherSessions":"Bann lezot sesion aktif",
++"pamAccessInfo":"Generate a temporary token to use as your password for SSH or other PAM-enabled services.",
++"pamAccessTitle":"PAM Access Token",
++"pamExpiresIn":"Expires in",
++"pamInstructions":"Instructions",
++"pamInstructionsText":"Use this token as your password when connecting via SSH or other PAM-enabled services.",
++"pamLogin":"Login",
++"pamTokenDuration":"Token validity",
++"pamTokenError":"Failed to generate token",
++"pamTokenGenerated":"Your temporary token",
+ "password":"Modpas",
+ "password2f":"Modpas",
+ "passwordCompromised":"Pa finn trouve dan enn baz done bann modpas ki finn konpromi",
+@@ -304,6 +323,7 @@
+ "removeOtherSessions":"Retir bann lezot sesion",
+ "rename":"Rename",
+ "renewSession":"Renouvle sesion",
++"requestedScope":"Requested scope",
+ "resendCode":"Re-avoy kod",
+ "resendConfirmMail":"Re-avoy bann mail konfirmasion?",
+ "resendTooSoon":"Silvouple atann inpe plis avan sey re-avoy kod-la",
+@@ -354,6 +374,8 @@
+ "upgradeSession":"Sesion ameliorasion",
+ "useYubikey":"servi ou Yubikey",
+ "user":"Itilizater",
++"userCode":"Device Code",
++"userCodeHelp":"Enter the 8-character code shown on your device",
+ "validationDate":"Dat validasion",
+ "value":"Valer",
+ "verify":"Verifie",
+--- a/usr/share/lemonldap-ng/portal/htdocs/static/languages/pl.json
++++ b/usr/share/lemonldap-ng/portal/htdocs/static/languages/pl.json
+@@ -124,6 +124,7 @@
+ "authLevel":"Poziom uwierzytelnienia",
+ "authPortal":"Portal uwierzytelniania",
+ "authRemaining":"Pozostało %s uwierzytelnień, zmień hasło!",
++"authorize":"Authorize",
+ "autoAccept":"Automatycznie zaakceptuj w ciągu 30 sekund",
+ "autoGlobalLogout":"Automatyczne globalne wylogowanie w ciągu 30 sekund",
+ "back2CasUrl":"Aplikacja, z której właśnie się wylogowałeś, udostępniała link, który chciałeś śledzić",
+@@ -149,6 +150,7 @@
+ "click2Reset":"Kliknij tu, by zresetować swoje hasło",
+ "clickHere":"Kliknij tutaj",
+ "clickOnYubikey":"Aktywuj swój Yubikey",
++"clientId":"Client ID",
+ "close":"Zamknij",
+ "closeSSO":"Zamknij sesję logowania jednokrotnego",
+ "code":"Kod",
+@@ -166,6 +168,13 @@
+ "currentPwd":"Aktualne hasło",
+ "date":"Data",
+ "decryptCipheredValue":"Odszyfruj zaszyfrowaną wartość",
++"deny":"Deny",
++"deviceApproved":"Device Approved",
++"deviceApprovedMsg":"The device has been authorized. You can close this window.",
++"deviceAuthorization":"Device Authorization",
++"deviceAuthorizationMsg":"Enter the code displayed on your device to authorize it.",
++"deviceDenied":"Device Denied",
++"deviceDeniedMsg":"The device authorization has been denied. You can close this window.",
+ "enterCred":"Proszę podać swoje dane uwierzytelniające",
+ "enterExt2fCode":"Kod został wysłany do ciebie. Proszę go teraz wpisać",
+ "enterMail2fCode":"Kod został wysłany na twój adres e-mail. Proszę go teraz wpisać",
+@@ -182,6 +191,7 @@
+ "firstName":"Imię",
+ "forbidden":"Dostęp ZABRONIONY",
+ "forgotPwd":"Zapomniałeś hasła?",
++"generatePamToken":"Generate Token",
+ "generatePwd":"Wygeneruj hasło automatycznie",
+ "generic":"Informacje kontaktowe",
+ "generic2fFormatError":"Twoje dane kontaktowe nie pasują do wymaganego formatu",
+@@ -266,6 +276,15 @@
+ "openidPA":"Polityka przetwarzania danych jest dostępna pod adresem",
+ "openidRpns":"Parametr %s wymagany dla federacji jest niedostępny",
+ "otherSessions":"Inne aktywne sesje",
++"pamAccessInfo":"Generate a temporary token to use as your password for SSH or other PAM-enabled services.",
++"pamAccessTitle":"PAM Access Token",
++"pamExpiresIn":"Expires in",
++"pamInstructions":"Instructions",
++"pamInstructionsText":"Use this token as your password when connecting via SSH or other PAM-enabled services.",
++"pamLogin":"Login",
++"pamTokenDuration":"Token validity",
++"pamTokenError":"Failed to generate token",
++"pamTokenGenerated":"Your temporary token",
+ "password":"Hasło",
+ "password2f":"Hasło",
+ "passwordCompromised":"Nie znaleziono w przejętej bazie danych haseł",
+@@ -304,6 +323,7 @@
+ "removeOtherSessions":"Usuń inne sesje",
+ "rename":"Rename",
+ "renewSession":"Odnów sesję",
++"requestedScope":"Requested scope",
+ "resendCode":"Ponownie wyślij kod",
+ "resendConfirmMail":"Czy wysłać ponownie wiadomość z potwierdzeniem?",
+ "resendTooSoon":"Poczekaj trochę dłużej, zanim spróbujesz ponownie wysłać kod",
+@@ -354,6 +374,8 @@
+ "upgradeSession":"Aktualizacja sesji",
+ "useYubikey":"użyj swojego Yubikey",
+ "user":"Użytkownik",
++"userCode":"Device Code",
++"userCodeHelp":"Enter the 8-character code shown on your device",
+ "validationDate":"Data walidacji",
+ "value":"Wartość",
+ "verify":"Zweryfikuj",
+--- a/usr/share/lemonldap-ng/portal/htdocs/static/languages/pt.json
++++ b/usr/share/lemonldap-ng/portal/htdocs/static/languages/pt.json
+@@ -124,6 +124,7 @@
+ "authLevel":"Nível de autenticação",
+ "authPortal":"Portal de autenticação",
+ "authRemaining":"%sautenticações restantes, altere sua senha!",
++"authorize":"Authorize",
+ "autoAccept":"Aceitar automaticamente em 30 segundos",
+ "autoGlobalLogout":"Logout global automático em 30 segundos",
+ "back2CasUrl":"O aplicativo do qual você acabou de sair forneceu um link que gostaria que você seguisse",
+@@ -149,6 +150,7 @@
+ "click2Reset":"Clique aqui para renovar a sua senha",
+ "clickHere":"Por favor, clique aqui",
+ "clickOnYubikey":"Clique no seu Yubikey",
++"clientId":"Client ID",
+ "close":"Fechar",
+ "closeSSO":"Feche sua sessão SSO",
+ "code":"Código",
+@@ -166,6 +168,13 @@
+ "currentPwd":"Senha atual",
+ "date":"Data",
+ "decryptCipheredValue":"Descriptografar um valor cifrado",
++"deny":"Deny",
++"deviceApproved":"Device Approved",
++"deviceApprovedMsg":"The device has been authorized. You can close this window.",
++"deviceAuthorization":"Device Authorization",
++"deviceAuthorizationMsg":"Enter the code displayed on your device to authorize it.",
++"deviceDenied":"Device Denied",
++"deviceDeniedMsg":"The device authorization has been denied. You can close this window.",
+ "enterCred":"Por favor insira suas credenciais",
+ "enterExt2fCode":"Um código foi enviado para você. Por favor o insira",
+ "enterMail2fCode":"Um código foi enviado para o seu endereço de e-mail. Por favor o insira",
+@@ -182,6 +191,7 @@
+ "firstName":"Primeiro nome",
+ "forbidden":"Acesso PROIBIDO",
+ "forgotPwd":"Esqueceu sua senha?",
++"generatePamToken":"Generate Token",
+ "generatePwd":"Gere a senha automaticamente",
+ "generic":"Informações de contato",
+ "generic2fFormatError":"Suas informações de contato não atendem ao formato exigido",
+@@ -266,6 +276,15 @@
+ "openidPA":"A política de uso de dados está disponível em",
+ "openidRpns":"Parâmetro %s solicitado para federação não está disponível",
+ "otherSessions":"Outras sessões ativas",
++"pamAccessInfo":"Generate a temporary token to use as your password for SSH or other PAM-enabled services.",
++"pamAccessTitle":"PAM Access Token",
++"pamExpiresIn":"Expires in",
++"pamInstructions":"Instructions",
++"pamInstructionsText":"Use this token as your password when connecting via SSH or other PAM-enabled services.",
++"pamLogin":"Login",
++"pamTokenDuration":"Token validity",
++"pamTokenError":"Failed to generate token",
++"pamTokenGenerated":"Your temporary token",
+ "password":"Senha",
+ "password2f":"Senha",
+ "passwordCompromised":"Não foi encontrada em um banco de dados de senhas comprometidas",
+@@ -304,6 +323,7 @@
+ "removeOtherSessions":"Remover outras sessões",
+ "rename":"Rename",
+ "renewSession":"Renovar sessão",
++"requestedScope":"Requested scope",
+ "resendCode":"Reenviar código",
+ "resendConfirmMail":"Reenviar e-mail de confirmação?",
+ "resendTooSoon":"Por favor aguarde um pouco mais antes de tentar reenviar o código",
+@@ -354,6 +374,8 @@
+ "upgradeSession":"Upgrade da sessão",
+ "useYubikey":"use seu Yubikey",
+ "user":"Usuário",
++"userCode":"Device Code",
++"userCodeHelp":"Enter the 8-character code shown on your device",
+ "validationDate":"Data de validação",
+ "value":"Valor",
+ "verify":"Verificar",
+--- a/usr/share/lemonldap-ng/portal/htdocs/static/languages/pt_BR.json
++++ b/usr/share/lemonldap-ng/portal/htdocs/static/languages/pt_BR.json
+@@ -124,6 +124,7 @@
+ "authLevel":"Nível de autenticação",
+ "authPortal":"Portal de autenticação",
+ "authRemaining":"%sautenticações restantes, altere sua senha!",
++"authorize":"Authorize",
+ "autoAccept":"Aceitar automaticamente em 30 segundos",
+ "autoGlobalLogout":"Logout global automático em 30 segundos",
+ "back2CasUrl":"O aplicativo do qual você acabou de sair forneceu um link que gostaria que você seguisse",
+@@ -149,6 +150,7 @@
+ "click2Reset":"Clique aqui para renovar a sua senha",
+ "clickHere":"Por favor, clique aqui",
+ "clickOnYubikey":"Clique no seu Yubikey",
++"clientId":"Client ID",
+ "close":"Fechar",
+ "closeSSO":"Feche sua sessão SSO",
+ "code":"Código",
+@@ -166,6 +168,13 @@
+ "currentPwd":"Senha atual",
+ "date":"Data",
+ "decryptCipheredValue":"Descriptografar um valor cifrado",
++"deny":"Deny",
++"deviceApproved":"Device Approved",
++"deviceApprovedMsg":"The device has been authorized. You can close this window.",
++"deviceAuthorization":"Device Authorization",
++"deviceAuthorizationMsg":"Enter the code displayed on your device to authorize it.",
++"deviceDenied":"Device Denied",
++"deviceDeniedMsg":"The device authorization has been denied. You can close this window.",
+ "enterCred":"Por favor insira suas credenciais",
+ "enterExt2fCode":"Um código foi enviado para você. Por favor o insira",
+ "enterMail2fCode":"Um código foi enviado para o seu endereço de e-mail. Por favor o insira",
+@@ -182,6 +191,7 @@
+ "firstName":"Primeiro nome",
+ "forbidden":"Acesso PROIBIDO",
+ "forgotPwd":"Esqueceu sua senha?",
++"generatePamToken":"Generate Token",
+ "generatePwd":"Gere a senha automaticamente",
+ "generic":"Informações de contato",
+ "generic2fFormatError":"Suas informações de contato não atendem ao formato exigido",
+@@ -266,6 +276,15 @@
+ "openidPA":"A política de uso de dados está disponível em",
+ "openidRpns":"Parâmetro %s solicitado para federação não está disponível",
+ "otherSessions":"Outras sessões ativas",
++"pamAccessInfo":"Generate a temporary token to use as your password for SSH or other PAM-enabled services.",
++"pamAccessTitle":"PAM Access Token",
++"pamExpiresIn":"Expires in",
++"pamInstructions":"Instructions",
++"pamInstructionsText":"Use this token as your password when connecting via SSH or other PAM-enabled services.",
++"pamLogin":"Login",
++"pamTokenDuration":"Token validity",
++"pamTokenError":"Failed to generate token",
++"pamTokenGenerated":"Your temporary token",
+ "password":"Senha",
+ "password2f":"Senha",
+ "passwordCompromised":"Não foi encontrada em um banco de dados de senhas comprometidas",
+@@ -304,6 +323,7 @@
+ "removeOtherSessions":"Remover outras sessões",
+ "rename":"Rename",
+ "renewSession":"Renovar sessão",
++"requestedScope":"Requested scope",
+ "resendCode":"Reenviar código",
+ "resendConfirmMail":"Reenviar e-mail de confirmação?",
+ "resendTooSoon":"Por favor aguarde um pouco mais antes de tentar reenviar o código",
+@@ -354,6 +374,8 @@
+ "upgradeSession":"Upgrade da sessão",
+ "useYubikey":"use seu Yubikey",
+ "user":"Usuário",
++"userCode":"Device Code",
++"userCodeHelp":"Enter the 8-character code shown on your device",
+ "validationDate":"Data de validação",
+ "value":"Valor",
+ "verify":"Verificar",
+--- a/usr/share/lemonldap-ng/portal/htdocs/static/languages/ru.json
++++ b/usr/share/lemonldap-ng/portal/htdocs/static/languages/ru.json
+@@ -124,6 +124,7 @@
+ "authLevel":"Уровень аутентификации",
+ "authPortal":"Портал аутентификации",
+ "authRemaining":"Осталось %s аутентификаций, смените пароль!",
++"authorize":"Authorize",
+ "autoAccept":"Автоматически принимать через 30 секунд",
+ "autoGlobalLogout":"Автоматический глобальный выход через 30 секунд",
+ "back2CasUrl":"Приложение, из которого вы только что вышли, предоставило ссылку, по которой требуется перейти",
+@@ -149,6 +150,7 @@
+ "click2Reset":"Нажмите, чтобы сбросить пароль",
+ "clickHere":"Нажмите сюда",
+ "clickOnYubikey":"Нажмите на свой Yubikey",
++"clientId":"Client ID",
+ "close":"Закрыть",
+ "closeSSO":"Закройте сеанс единого входа",
+ "code":"Код",
+@@ -166,6 +168,13 @@
+ "currentPwd":"Текущий пароль",
+ "date":"Дата",
+ "decryptCipheredValue":"Расшифровать зашифрованное значение",
++"deny":"Deny",
++"deviceApproved":"Device Approved",
++"deviceApprovedMsg":"The device has been authorized. You can close this window.",
++"deviceAuthorization":"Device Authorization",
++"deviceAuthorizationMsg":"Enter the code displayed on your device to authorize it.",
++"deviceDenied":"Device Denied",
++"deviceDeniedMsg":"The device authorization has been denied. You can close this window.",
+ "enterCred":"Пожалуйста, введите свои учетные данные",
+ "enterExt2fCode":"Вам был направлен код. Пожалуйста, введите его",
+ "enterMail2fCode":"На вашу почту был направлен код. Пожалуйста, введите его",
+@@ -182,6 +191,7 @@
+ "firstName":"Имя",
+ "forbidden":"Доступ ЗАПРЕЩЕН",
+ "forgotPwd":"Забыли пароль?",
++"generatePamToken":"Generate Token",
+ "generatePwd":"Автоматически сгенерировать пароль",
+ "generic":"Контактные данные",
+ "generic2fFormatError":"Your contact information does not match the required format",
+@@ -266,6 +276,15 @@
+ "openidPA":"Политика использования данных доступна на",
+ "openidRpns":"Параметр %s, запрошенный для federation, недоступен",
+ "otherSessions":"Другие активные сессии",
++"pamAccessInfo":"Generate a temporary token to use as your password for SSH or other PAM-enabled services.",
++"pamAccessTitle":"PAM Access Token",
++"pamExpiresIn":"Expires in",
++"pamInstructions":"Instructions",
++"pamInstructionsText":"Use this token as your password when connecting via SSH or other PAM-enabled services.",
++"pamLogin":"Login",
++"pamTokenDuration":"Token validity",
++"pamTokenError":"Failed to generate token",
++"pamTokenGenerated":"Your temporary token",
+ "password":"Пароль",
+ "password2f":"Пароль",
+ "passwordCompromised":"Не найден в базе скомпрометированных паролей",
+@@ -304,6 +323,7 @@
+ "removeOtherSessions":"Удалить остальные сеансы",
+ "rename":"Rename",
+ "renewSession":"Обновить сеанс",
++"requestedScope":"Requested scope",
+ "resendCode":"Отправить код еще раз",
+ "resendConfirmMail":"Отправить письмо с подтверждением еще раз?",
+ "resendTooSoon":"Пожалуйста, подождите немного, прежде чем пытаться повторно отправить код",
+@@ -354,6 +374,8 @@
+ "upgradeSession":"Обновить сеанс",
+ "useYubikey":"используйте свой Yubikey",
+ "user":"Пользователь",
++"userCode":"Device Code",
++"userCodeHelp":"Enter the 8-character code shown on your device",
+ "validationDate":"Дата проверки",
+ "value":"Значение",
+ "verify":"Подтвердить",
+--- a/usr/share/lemonldap-ng/portal/htdocs/static/languages/sk.json
++++ b/usr/share/lemonldap-ng/portal/htdocs/static/languages/sk.json
+@@ -124,6 +124,7 @@
+ "authLevel":"Úroveň autentifikácie",
+ "authPortal":"Portál autentifikácie",
+ "authRemaining":"%s autentifikácií zostáva, zmeňte svoje heslo!",
++"authorize":"Authorize",
+ "autoAccept":"Automaticky prijať za 30 sekúnd",
+ "autoGlobalLogout":"Automatická globálna odhlásenie za 30 sekúnd",
+ "back2CasUrl":"Aplikácia, z ktorej ste sa práve odhlásili, poskytla odkaz, ktorý by ste mali sledovať",
+@@ -149,6 +150,7 @@
+ "click2Reset":"Kliknite sem na resetovanie hesla",
+ "clickHere":"Prosím, kliknite sem",
+ "clickOnYubikey":"Kliknite na svoju Yubikey",
++"clientId":"Client ID",
+ "close":"Zavrieť",
+ "closeSSO":"Zavrieť svoju SSO reláciu",
+ "code":"Kód",
+@@ -166,6 +168,13 @@
+ "currentPwd":"Aktuálne heslo",
+ "date":"Dátum",
+ "decryptCipheredValue":"Dešifrovať zašifrovanú hodnotu",
++"deny":"Deny",
++"deviceApproved":"Device Approved",
++"deviceApprovedMsg":"The device has been authorized. You can close this window.",
++"deviceAuthorization":"Device Authorization",
++"deviceAuthorizationMsg":"Enter the code displayed on your device to authorize it.",
++"deviceDenied":"Device Denied",
++"deviceDeniedMsg":"The device authorization has been denied. You can close this window.",
+ "enterCred":"Prosím, zadajte svoje poverenia",
+ "enterExt2fCode":"Kód bol odoslaný na vás. Prosím, zadajte ho",
+ "enterMail2fCode":"Kód bol odoslaný na vašu e-mailovú adresu. Prosím, zadajte ho",
+@@ -182,6 +191,7 @@
+ "firstName":"Meno",
+ "forbidden":"Prístup ZAKÁZANÝ",
+ "forgotPwd":"Zabudli ste svoje heslo?",
++"generatePamToken":"Generate Token",
+ "generatePwd":"Automaticky vygenerovať heslo",
+ "generic":"Kontaktné informácie",
+ "generic2fFormatError":"Vaše kontaktné informácie nevyhovujú požadovanému formátu",
+@@ -266,6 +276,15 @@
+ "openidPA":"Politika používania údajov je k dispozícii na",
+ "openidRpns":"Parametr %s požadovaný na federáciu nie je k dispozícii",
+ "otherSessions":"Iné aktívne relácie",
++"pamAccessInfo":"Generate a temporary token to use as your password for SSH or other PAM-enabled services.",
++"pamAccessTitle":"PAM Access Token",
++"pamExpiresIn":"Expires in",
++"pamInstructions":"Instructions",
++"pamInstructionsText":"Use this token as your password when connecting via SSH or other PAM-enabled services.",
++"pamLogin":"Login",
++"pamTokenDuration":"Token validity",
++"pamTokenError":"Failed to generate token",
++"pamTokenGenerated":"Your temporary token",
+ "password":"Heslo",
+ "password2f":"Heslo",
+ "passwordCompromised":"Nenájdené v databáze kompromitovaných hesiel",
+@@ -304,6 +323,7 @@
+ "removeOtherSessions":"Odstrániť iné relácie",
+ "rename":"Rename",
+ "renewSession":"Obnoviť reláciu",
++"requestedScope":"Requested scope",
+ "resendCode":"Znovu odoslať kód",
+ "resendConfirmMail":"Znovu odoslať potvrdzovací e-mail?",
+ "resendTooSoon":"Prosím, počkajte trochu dlhšie pred pokusom o opätovné odoslanie kódu",
+@@ -354,6 +374,8 @@
+ "upgradeSession":"Zvýšiť reláciu",
+ "useYubikey":"použite svoju Yubikey",
+ "user":"Používateľ",
++"userCode":"Device Code",
++"userCodeHelp":"Enter the 8-character code shown on your device",
+ "validationDate":"Dátum overenia",
+ "value":"Hodnota",
+ "verify":"Overiť",
+--- a/usr/share/lemonldap-ng/portal/htdocs/static/languages/tr.json
++++ b/usr/share/lemonldap-ng/portal/htdocs/static/languages/tr.json
+@@ -124,6 +124,7 @@
+ "authLevel":"Kimlik doğrulama düzeyi",
+ "authPortal":"Kimlik doğrulama portalı",
+ "authRemaining":"%s kimlik doğrulaması kaldı, parolanızı değiştirin!",
++"authorize":"Authorize",
+ "autoAccept":"30 saniye içerisinde otomatik olarak kabul et",
+ "autoGlobalLogout":"30 saniye içinde otomatik olarak global çıkış yap",
+ "back2CasUrl":"Çıkış yaptığınız uygulama, takip etmenizi istediği bir bağlantı sağladı",
+@@ -149,6 +150,7 @@
+ "click2Reset":"Parolanızı sıfırlamak için buraya tıklayın",
+ "clickHere":"Lütfen buraya tıklayın",
+ "clickOnYubikey":"Yubikey'e tıklayın",
++"clientId":"Client ID",
+ "close":"Kapalı",
+ "closeSSO":"TOA oturumunuzu kapatın",
+ "code":"Kod",
+@@ -166,6 +168,13 @@
+ "currentPwd":"Mevcut parola",
+ "date":"Tarih",
+ "decryptCipheredValue":"Şifrelenmiş değeri çöz",
++"deny":"Deny",
++"deviceApproved":"Device Approved",
++"deviceApprovedMsg":"The device has been authorized. You can close this window.",
++"deviceAuthorization":"Device Authorization",
++"deviceAuthorizationMsg":"Enter the code displayed on your device to authorize it.",
++"deviceDenied":"Device Denied",
++"deviceDeniedMsg":"The device authorization has been denied. You can close this window.",
+ "enterCred":"Lütfen kimlik bilgilerinizi giriniz",
+ "enterExt2fCode":"Size bir kod gönderildi. Lütfen onu giriniz",
+ "enterMail2fCode":"E-posta adresinize bir kod gönderildi. Lütfen onu giriniz",
+@@ -182,6 +191,7 @@
+ "firstName":"Ad",
+ "forbidden":"Erişim YASAKLI",
+ "forgotPwd":"Parolanızı mı unuttunuz?",
++"generatePamToken":"Generate Token",
+ "generatePwd":"Parolayı otomatik olarak oluştur",
+ "generic":"İletişim bilgileri",
+ "generic2fFormatError":"İletişim bilgileriniz gerekli formatla eşleşmiyor",
+@@ -266,6 +276,15 @@
+ "openidPA":"Veri kullanım ilkesi mevcut",
+ "openidRpns":"Federasyon için %s parametre isteği mevcut değil!",
+ "otherSessions":"Diğer aktif oturumlar",
++"pamAccessInfo":"Generate a temporary token to use as your password for SSH or other PAM-enabled services.",
++"pamAccessTitle":"PAM Access Token",
++"pamExpiresIn":"Expires in",
++"pamInstructions":"Instructions",
++"pamInstructionsText":"Use this token as your password when connecting via SSH or other PAM-enabled services.",
++"pamLogin":"Login",
++"pamTokenDuration":"Token validity",
++"pamTokenError":"Failed to generate token",
++"pamTokenGenerated":"Your temporary token",
+ "password":"Parola",
+ "password2f":"Parola",
+ "passwordCompromised":"Güvenliği ihlal edilmiş bir parola veritabanında bulunamadı",
+@@ -304,6 +323,7 @@
+ "removeOtherSessions":"Diğer oturumları sil",
+ "rename":"Rename",
+ "renewSession":"Oturumu yenile",
++"requestedScope":"Requested scope",
+ "resendCode":"Kodu tekrar gönder",
+ "resendConfirmMail":"Doğrulama e-postasını tekrar gönder?",
+ "resendTooSoon":"Lütfen kodu yeniden göndermeyi denemeden önce biraz bekleyin.",
+@@ -354,6 +374,8 @@
+ "upgradeSession":"Oturumu yükselt",
+ "useYubikey":"Yubikey'inizi kullanın",
+ "user":"Kullanıcı",
++"userCode":"Device Code",
++"userCodeHelp":"Enter the 8-character code shown on your device",
+ "validationDate":"Doğrulama tarihi",
+ "value":"Değer",
+ "verify":"Doğrula",
+--- a/usr/share/lemonldap-ng/portal/htdocs/static/languages/vi.json
++++ b/usr/share/lemonldap-ng/portal/htdocs/static/languages/vi.json
+@@ -124,6 +124,7 @@
+ "authLevel":"Mức xác thực",
+ "authPortal":"Cổng thông tin xác thực",
+ "authRemaining":"%s xác thực vẫn còn, thay đổi mật khẩu của bạn!",
++"authorize":"Authorize",
+ "autoAccept":"Tự động chấp nhận trong 30 giây",
+ "autoGlobalLogout":"Tự động đăng xuất tất cả sau 30 giây",
+ "back2CasUrl":"Ứng dụng bạn vừa đăng xuất đã cung cấp một liên kết mà bạn muốn theo dõi",
+@@ -149,6 +150,7 @@
+ "click2Reset":"Nhấn ở đây để thiết lập lại mật khẩu của bạn",
+ "clickHere":"Vui lòng nhấp vào đây",
+ "clickOnYubikey":"Nhấp vào Yubikey của bạn",
++"clientId":"Client ID",
+ "close":"Đóng",
+ "closeSSO":"Đóng phiên SSO của bạn",
+ "code":"Mã",
+@@ -166,6 +168,13 @@
+ "currentPwd":"Mật khẩu hiện tại",
+ "date":"Ngày",
+ "decryptCipheredValue":"Giải mã một giá trị được mã hóa",
++"deny":"Deny",
++"deviceApproved":"Device Approved",
++"deviceApprovedMsg":"The device has been authorized. You can close this window.",
++"deviceAuthorization":"Device Authorization",
++"deviceAuthorizationMsg":"Enter the code displayed on your device to authorize it.",
++"deviceDenied":"Device Denied",
++"deviceDeniedMsg":"The device authorization has been denied. You can close this window.",
+ "enterCred":"Vui lòng nhập thông tin đăng nhập của bạn",
+ "enterExt2fCode":"Một mã đã được gửi cho bạn. Hãy nhập nó",
+ "enterMail2fCode":"Một mã đã được gửi đến địa chỉ email của bạn. Vui lòng nhập mã đó",
+@@ -182,6 +191,7 @@
+ "firstName":"Tên",
+ "forbidden":"Truy cập bị cấm",
+ "forgotPwd":"Quên mật khẩu của bạn?",
++"generatePamToken":"Generate Token",
+ "generatePwd":"Tạo mật khẩu tự động",
+ "generic":"Thông tin liên lạc",
+ "generic2fFormatError":"Your contact information does not match the required format",
+@@ -266,6 +276,15 @@
+ "openidPA":"Chính sách sử dụng dữ liệu có sẵn tại",
+ "openidRpns":"Đã yêu cầu tham số %s không có sẵn",
+ "otherSessions":"Các phiên hoạt động khác",
++"pamAccessInfo":"Generate a temporary token to use as your password for SSH or other PAM-enabled services.",
++"pamAccessTitle":"PAM Access Token",
++"pamExpiresIn":"Expires in",
++"pamInstructions":"Instructions",
++"pamInstructionsText":"Use this token as your password when connecting via SSH or other PAM-enabled services.",
++"pamLogin":"Login",
++"pamTokenDuration":"Token validity",
++"pamTokenError":"Failed to generate token",
++"pamTokenGenerated":"Your temporary token",
+ "password":"Mật khẩu",
+ "password2f":"Mật khẩu",
+ "passwordCompromised":"Không tìm thấy trong một cơ sở dữ liệu mật khẩu bị xâm nhập",
+@@ -304,6 +323,7 @@
+ "removeOtherSessions":"Xóa các phiên khác",
+ "rename":"Rename",
+ "renewSession":"làm mới phiên",
++"requestedScope":"Requested scope",
+ "resendCode":"Gửi lại mã",
+ "resendConfirmMail":"Gửi lại thư xác nhận?",
+ "resendTooSoon":"Vui lòng đợi thêm trước khi thử gửi lại mã",
+@@ -354,6 +374,8 @@
+ "upgradeSession":"Phiên nâng cấp",
+ "useYubikey":"sử dụng Yubikey của bạn",
+ "user":"Người dùng",
++"userCode":"Device Code",
++"userCodeHelp":"Enter the 8-character code shown on your device",
+ "validationDate":"ngày xác nhận",
+ "value":"Giá trị",
+ "verify":"Xác minh",
+--- a/usr/share/lemonldap-ng/portal/htdocs/static/languages/zh.json
++++ b/usr/share/lemonldap-ng/portal/htdocs/static/languages/zh.json
+@@ -124,6 +124,7 @@
+ "authLevel":"驗證等級",
+ "authPortal":"驗證首頁",
+ "authRemaining":"剩餘 %s 驗證，請變更您的密碼！",
++"authorize":"Authorize",
+ "autoAccept":"30秒后自动接受",
+ "autoGlobalLogout":"在30秒內自動全域登出",
+ "back2CasUrl":"您剛登出的應用程式提供了連結，並希望您追蹤該連結",
+@@ -149,6 +150,7 @@
+ "click2Reset":"點擊此處以重設您的密碼",
+ "clickHere":"请点击这里",
+ "clickOnYubikey":"點擊您的 Yubikey",
++"clientId":"Client ID",
+ "close":"Close",
+ "closeSSO":"關閉您的 SSO 工作階段",
+ "code":"代码",
+@@ -166,6 +168,13 @@
+ "currentPwd":"当前密码",
+ "date":"日期",
+ "decryptCipheredValue":"解密已加密的值",
++"deny":"Deny",
++"deviceApproved":"Device Approved",
++"deviceApprovedMsg":"The device has been authorized. You can close this window.",
++"deviceAuthorization":"Device Authorization",
++"deviceAuthorizationMsg":"Enter the code displayed on your device to authorize it.",
++"deviceDenied":"Device Denied",
++"deviceDeniedMsg":"The device authorization has been denied. You can close this window.",
+ "enterCred":"请输入您的认证信息",
+ "enterExt2fCode":"验证法已发送，请输入",
+ "enterMail2fCode":"代碼已傳送給您的電子郵件。請輸入它",
+@@ -182,6 +191,7 @@
+ "firstName":"名",
+ "forbidden":"禁止存取",
+ "forgotPwd":"忘记密码？",
++"generatePamToken":"Generate Token",
+ "generatePwd":"自动生成密码",
+ "generic":"Contact information",
+ "generic2fFormatError":"Your contact information does not match the required format",
+@@ -266,6 +276,15 @@
+ "openidPA":"数据使用条约可在此处了解",
+ "openidRpns":"聯盟要求的 %s 參數不可用",
+ "otherSessions":"其他作用中的工作階段",
++"pamAccessInfo":"Generate a temporary token to use as your password for SSH or other PAM-enabled services.",
++"pamAccessTitle":"PAM Access Token",
++"pamExpiresIn":"Expires in",
++"pamInstructions":"Instructions",
++"pamInstructionsText":"Use this token as your password when connecting via SSH or other PAM-enabled services.",
++"pamLogin":"Login",
++"pamTokenDuration":"Token validity",
++"pamTokenError":"Failed to generate token",
++"pamTokenGenerated":"Your temporary token",
+ "password":"密码",
+ "password2f":"密码",
+ "passwordCompromised":"Not found in a compromised password database",
+@@ -304,6 +323,7 @@
+ "removeOtherSessions":"移除其他会话",
+ "rename":"Rename",
+ "renewSession":"更新工作階段",
++"requestedScope":"Requested scope",
+ "resendCode":"Re-send code",
+ "resendConfirmMail":"重新发送确认邮件？",
+ "resendTooSoon":"Please wait a little longer before trying to re-send the code",
+@@ -354,6 +374,8 @@
+ "upgradeSession":"升級工作階段",
+ "useYubikey":"使用您的 Yubikey",
+ "user":"使用者",
++"userCode":"Device Code",
++"userCodeHelp":"Enter the 8-character code shown on your device",
+ "validationDate":"驗證日期",
+ "value":"值",
+ "verify":"验证",
+--- a/usr/share/lemonldap-ng/portal/htdocs/static/languages/zh_TW.json
++++ b/usr/share/lemonldap-ng/portal/htdocs/static/languages/zh_TW.json
+@@ -124,6 +124,7 @@
+ "authLevel":"驗證等級",
+ "authPortal":"驗證首頁",
+ "authRemaining":"剩餘 %s 驗證，請變更您的密碼！",
++"authorize":"Authorize",
+ "autoAccept":"在30秒內自動接受",
+ "autoGlobalLogout":"在30秒內自動全域登出",
+ "back2CasUrl":"您剛登出的應用程式提供了連結，並希望您追蹤該連結",
+@@ -149,6 +150,7 @@
+ "click2Reset":"點擊此處以重設您的密碼",
+ "clickHere":"請點擊此處",
+ "clickOnYubikey":"點擊您的 Yubikey",
++"clientId":"Client ID",
+ "close":"Close",
+ "closeSSO":"關閉您的 SSO 工作階段",
+ "code":"代碼",
+@@ -166,6 +168,13 @@
+ "currentPwd":"目前的密碼",
+ "date":"日期",
+ "decryptCipheredValue":"解密已加密的值",
++"deny":"Deny",
++"deviceApproved":"Device Approved",
++"deviceApprovedMsg":"The device has been authorized. You can close this window.",
++"deviceAuthorization":"Device Authorization",
++"deviceAuthorizationMsg":"Enter the code displayed on your device to authorize it.",
++"deviceDenied":"Device Denied",
++"deviceDeniedMsg":"The device authorization has been denied. You can close this window.",
+ "enterCred":"請輸入您的憑證",
+ "enterExt2fCode":"代碼已傳送給您。請輸入它",
+ "enterMail2fCode":"代碼已傳送給您的電子郵件。請輸入它",
+@@ -182,6 +191,7 @@
+ "firstName":"名",
+ "forbidden":"禁止存取",
+ "forgotPwd":"忘記您的密碼？",
++"generatePamToken":"Generate Token",
+ "generatePwd":"自動生成密碼",
+ "generic":"Contact information",
+ "generic2fFormatError":"Your contact information does not match the required format",
+@@ -266,6 +276,15 @@
+ "openidPA":"資料使用政策可從以下網站取得：",
+ "openidRpns":"聯盟要求的 %s 參數不可用",
+ "otherSessions":"其他作用中的工作階段",
++"pamAccessInfo":"Generate a temporary token to use as your password for SSH or other PAM-enabled services.",
++"pamAccessTitle":"PAM Access Token",
++"pamExpiresIn":"Expires in",
++"pamInstructions":"Instructions",
++"pamInstructionsText":"Use this token as your password when connecting via SSH or other PAM-enabled services.",
++"pamLogin":"Login",
++"pamTokenDuration":"Token validity",
++"pamTokenError":"Failed to generate token",
++"pamTokenGenerated":"Your temporary token",
+ "password":"密碼",
+ "password2f":"密碼",
+ "passwordCompromised":"Not found in a compromised password database",
+@@ -304,6 +323,7 @@
+ "removeOtherSessions":"移除其他工作階段",
+ "rename":"Rename",
+ "renewSession":"更新工作階段",
++"requestedScope":"Requested scope",
+ "resendCode":"Re-send code",
+ "resendConfirmMail":"重新傳送確認電子郵件？",
+ "resendTooSoon":"Please wait a little longer before trying to re-send the code",
+@@ -354,6 +374,8 @@
+ "upgradeSession":"升級工作階段",
+ "useYubikey":"使用您的 Yubikey",
+ "user":"使用者",
++"userCode":"Device Code",
++"userCodeHelp":"Enter the 8-character code shown on your device",
+ "validationDate":"驗證日期",
+ "value":"值",
+ "verify":"驗證",
+new file mode 100644
+--- /dev/null
++++ b/usr/share/lemonldap-ng/portal/js-src/pamaccess.js
+@@ -0,0 +1,60 @@
++(function() {
++  $(window).on("load", function() {
++    var form = document.getElementById('pamTokenForm');
++    if (!form) return;
++
++    var resultDiv = document.getElementById('pamTokenResult');
++    var errorDiv = document.getElementById('pamTokenError');
++    var tokenInput = document.getElementById('pamToken');
++    var loginSpan = document.getElementById('pamLogin');
++    var expiresSpan = document.getElementById('pamExpiresIn');
++    var copyBtn = document.getElementById('copyPamToken');
++    var errorMsg = document.getElementById('pamErrorMessage');
++
++    form.addEventListener('submit', function(e) {
++      e.preventDefault();
++      resultDiv.classList.add('d-none');
++      errorDiv.classList.add('d-none');
++
++      var duration = document.getElementById('pamDuration').value;
++
++      $.ajax({
++        type: "POST",
++        url: scriptname + 'pam',
++        data: { duration: duration },
++        dataType: "json",
++        success: function(data) {
++          if (data.error) {
++            errorMsg.textContent = data.error;
++            errorDiv.classList.remove('d-none');
++          } else {
++            tokenInput.value = data.token;
++            loginSpan.textContent = data.login;
++            var minutes = Math.floor(data.expires_in / 60);
++            var seconds = data.expires_in % 60;
++            expiresSpan.textContent = minutes + ' min ' + (seconds > 0 ? seconds + ' sec' : '');
++            resultDiv.classList.remove('d-none');
++          }
++        },
++        error: function(xhr, status, error) {
++          errorMsg.textContent = error || status;
++          errorDiv.classList.remove('d-none');
++        }
++      });
++    });
++
++    // Copy button
++    if (copyBtn) {
++      copyBtn.addEventListener('click', function() {
++        tokenInput.select();
++        tokenInput.setSelectionRange(0, 99999);
++        navigator.clipboard.writeText(tokenInput.value).then(function() {
++          copyBtn.innerHTML = '<span class="fa fa-check"></span>';
++          setTimeout(function() {
++            copyBtn.innerHTML = '<span class="fa fa-copy"></span>';
++          }, 2000);
++        });
++      });
++    }
++  });
++})();
+new file mode 100644
+--- /dev/null
++++ b/usr/share/lemonldap-ng/portal/templates/bootstrap/device.tpl
+@@ -0,0 +1,113 @@
++<TMPL_INCLUDE NAME="header.tpl">
++
++<div id="logincontent" class="container">
++
++  <TMPL_IF NAME="DEVICE_APPROVED">
++    <!-- Device authorization approved -->
++    <div class="card border-success">
++      <div class="card-header text-white bg-success">
++        <h3 class="card-title">
++          <span class="fa fa-check-circle"></span>
++          <span trspan="deviceApproved">Device Approved</span>
++        </h3>
++      </div>
++      <div class="card-body">
++        <p trspan="deviceApprovedMsg">The device has been authorized. You can close this window.</p>
++        <TMPL_IF NAME="CLIENT_ID">
++          <p>
++            <strong trspan="clientId">Client ID</strong>: <TMPL_VAR NAME="CLIENT_ID">
++          </p>
++        </TMPL_IF>
++        <TMPL_IF NAME="SCOPE">
++          <p>
++            <strong trspan="requestedScope">Requested scope</strong>: <TMPL_VAR NAME="SCOPE">
++          </p>
++        </TMPL_IF>
++      </div>
++    </div>
++
++  <TMPL_ELSE>
++    <TMPL_IF NAME="DEVICE_DENIED">
++      <!-- Device authorization denied -->
++      <div class="card border-danger">
++        <div class="card-header text-white bg-danger">
++          <h3 class="card-title">
++            <span class="fa fa-times-circle"></span>
++            <span trspan="deviceDenied">Device Denied</span>
++          </h3>
++        </div>
++        <div class="card-body">
++          <p trspan="deviceDeniedMsg">The device authorization has been denied. You can close this window.</p>
++        </div>
++      </div>
++
++    <TMPL_ELSE>
++      <!-- Device code entry form -->
++      <form id="deviceform" action="<TMPL_VAR NAME="PORTAL_URL">device" method="post" class="login" role="form">
++
++        <input type="hidden" name="skin" value="<TMPL_VAR NAME="SKIN">" />
++
++        <div class="card border-info">
++          <div class="card-header text-white bg-info">
++            <h3 class="card-title">
++              <span class="fa fa-desktop"></span>
++              <span trspan="deviceAuthorization">Device Authorization</span>
++            </h3>
++          </div>
++          <div class="card-body">
++
++            <p trspan="deviceAuthorizationMsg">Enter the code displayed on your device to authorize it.</p>
++
++            <TMPL_IF NAME="ERROR">
++              <div class="alert alert-danger">
++                <span class="fa fa-exclamation-triangle"></span>
++                <span trspan="<TMPL_VAR NAME="MSG">"><TMPL_VAR NAME="MSG"></span>
++              </div>
++            </TMPL_IF>
++
++            <div class="form-group">
++              <label for="user_code" trspan="userCode">Device Code</label>
++              <input type="text"
++                     name="user_code"
++                     id="user_code"
++                     class="form-control form-control-lg text-center text-uppercase"
++                     value="<TMPL_VAR NAME="USER_CODE">"
++                     placeholder="XXXX-XXXX"
++                     pattern="[A-Za-z0-9\-]{6,12}"
++                     maxlength="12"
++                     autocomplete="off"
++                     autofocus
++                     required />
++              <small class="form-text text-muted" trspan="userCodeHelp">Enter the 8-character code shown on your device</small>
++            </div>
++
++            <div class="buttons">
++              <button type="submit" name="action" value="approve" class="btn btn-success btn-lg">
++                <span class="fa fa-check"></span>
++                <span trspan="authorize">Authorize</span>
++              </button>
++              <button type="submit" name="action" value="deny" class="btn btn-danger">
++                <span class="fa fa-times"></span>
++                <span trspan="deny">Deny</span>
++              </button>
++            </div>
++
++          </div>
++        </div>
++
++      </form>
++    </TMPL_IF>
++  </TMPL_IF>
++
++  <div id="back2portal">
++    <div class="buttons">
++      <a href="<TMPL_VAR NAME="PORTAL_URL">" class="btn btn-primary" role="button">
++        <span class="fa fa-home"></span>
++        <span trspan="goToPortal">Go to portal</span>
++      </a>
++    </div>
++  </div>
++
++</div>
++
++<TMPL_INCLUDE NAME="footer.tpl">
+new file mode 100644
+--- /dev/null
++++ b/usr/share/lemonldap-ng/portal/templates/bootstrap/pamaccess.tpl
+@@ -0,0 +1,60 @@
++<script type="text/javascript" src="<TMPL_VAR NAME="js">"></script>
++<div class="card border-secondary">
++  <div class="card-header text-white bg-secondary">
++    <h4 class="card-title" trspan="pamAccessTitle">PAM Access Token</h4>
++  </div>
++  <div class="card-body">
++    <p trspan="pamAccessInfo">Generate a temporary token to use as your password for SSH or other PAM-enabled services.</p>
++
++    <form id="pamTokenForm" class="mb-4">
++      <div class="form-group row mb-3">
++        <label class="col-sm-4 col-form-label" for="pamDuration" trspan="pamTokenDuration">Token validity</label>
++        <div class="col-sm-8">
++          <select class="form-control" id="pamDuration" name="duration">
++            <option value="60">1 minute</option>
++            <option value="300">5 minutes</option>
++            <option value="600" selected>10 minutes</option>
++            <option value="1800">30 minutes</option>
++            <option value="3600">1 hour</option>
++          </select>
++        </div>
++      </div>
++      <div class="form-group row">
++        <div class="col-sm-8 offset-sm-4">
++          <button type="submit" class="btn btn-primary" id="generatePamToken">
++            <span class="fa fa-key"></span>
++            <span trspan="generatePamToken">Generate Token</span>
++          </button>
++        </div>
++      </div>
++    </form>
++
++    <div id="pamTokenResult" class="d-none">
++      <div class="alert alert-success">
++        <h5 trspan="pamTokenGenerated">Your temporary token</h5>
++        <div class="input-group mb-3">
++          <input type="text" class="form-control font-monospace" id="pamToken" readonly>
++          <button class="btn btn-outline-secondary" type="button" id="copyPamToken" title="Copy">
++            <span class="fa fa-copy"></span>
++          </button>
++        </div>
++        <p class="mb-1">
++          <strong trspan="pamLogin">Login:</strong>
++          <code id="pamLogin"></code>
++        </p>
++        <p class="mb-0">
++          <strong trspan="pamExpiresIn">Expires in:</strong>
++          <span id="pamExpiresIn"></span>
++        </p>
++      </div>
++      <div class="alert alert-info">
++        <h6 trspan="pamInstructions">Instructions</h6>
++        <p class="mb-0" trspan="pamInstructionsText">Use this token as your password when connecting via SSH or other PAM-enabled services.</p>
++      </div>
++    </div>
++
++    <div id="pamTokenError" class="alert alert-danger d-none">
++      <span trspan="pamTokenError">Failed to generate token</span>: <span id="pamErrorMessage"></span>
++    </div>
++  </div>
++</div>
+new file mode 100644
+--- /dev/null
