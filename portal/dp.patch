@@ -688,7 +688,7 @@ new file mode 100644
 new file mode 100644
 --- /dev/null
 +++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/PamAccess.pm
-@@ -0,0 +1,838 @@
+@@ -0,0 +1,953 @@
 +# PAM Access plugin for LemonLDAP::NG
 +#
 +# This plugin provides:
@@ -776,6 +776,12 @@ new file mode 100644
 +        ['POST']
 +    );
 +
++    # Route for NSS user info lookup (server-to-server)
++    $self->addUnauthRoute(
++        pam => { userinfo => 'userinfo' },
++        ['POST']
++    );
++
 +    return 1;
 +}
 +
@@ -844,6 +850,14 @@ new file mode 100644
 +        _pamCreatedAt => $now,
 +        _pamExpiresAt => $now + $duration,
 +    };
++
++    # Add exported variables for user provisioning
++    my $exportedVars = $self->conf->{pamAccessExportedVars} || {};
++    for my $key ( keys %$exportedVars ) {
++        my $attr = $exportedVars->{$key};
++        my $value = $req->userData->{$attr};
++        $tokenInfo->{"_pamAttr_$key"} = $value if defined $value && $value ne '';
++    }
 +
 +    my $tokenSession = $self->p->getApacheSession(
 +        undef,
@@ -1234,6 +1248,14 @@ new file mode 100644
 +    my $groups = $tokenSession->data->{_pamGroups} || '';
 +    my @groupList = $groups ? split( /[,;\s]+/, $groups ) : ();
 +
++    # Extract exported attributes (prefixed with _pamAttr_)
++    my %attrs;
++    for my $key ( keys %{ $tokenSession->data } ) {
++        if ( $key =~ /^_pamAttr_(.+)$/ ) {
++            $attrs{$1} = $tokenSession->data->{$key};
++        }
++    }
++
 +    # 7. CRITICAL: Remove the session (one-time use!)
 +    $tokenSession->remove;
 +
@@ -1249,13 +1271,14 @@ new file mode 100644
 +        groups    => \@groupList,
 +    );
 +
-+    # 8. Return success with user info
++    # 8. Return success with user info and exported attributes
 +    return $self->p->sendJSONresponse(
 +        $req,
 +        {
 +            valid  => JSON::true,
 +            user   => $user,
 +            groups => \@groupList,
++            ( %attrs ? ( attrs => \%attrs ) : () ),
 +        },
 +        code => 200
 +    );
@@ -1332,6 +1355,98 @@ new file mode 100644
 +            next_heartbeat => $interval,
 +            server_time    => $now,
 +        }
++    );
++}
++
++# POST /pam/userinfo - Get user info for NSS module
++sub userinfo {
++    my ( $self, $req ) = @_;
++
++    # 1. Validate server Bearer token from Authorization header
++    my $server_token = $self->oidc->getEndPointAccessToken($req);
++    unless ($server_token) {
++        $self->logger->warn('PAM userinfo: No server Bearer token provided');
++        return $self->_unauthorizedResponse( $req, 'Server Bearer token required' );
++    }
++
++    my $serverSession = $self->oidc->getAccessToken($server_token);
++    unless ($serverSession) {
++        $self->logger->warn('PAM userinfo: Invalid or expired server token');
++        return $self->_unauthorizedResponse( $req, 'Invalid or expired server token' );
++    }
++
++    # Verify server token was obtained via Device Authorization Grant
++    my $grant_type = $serverSession->data->{grant_type} || '';
++    unless ( $grant_type eq 'device_code' ) {
++        $self->logger->warn(
++            "PAM userinfo: Server token not from Device Authorization Grant "
++              . "(grant_type: '$grant_type')"
++        );
++        return $self->_forbiddenResponse( $req,
++            'Server not enrolled. Use Device Authorization Grant.' );
++    }
++
++    # 2. Parse JSON request body
++    my $body = eval { from_json( $req->content ) };
++    if ($@) {
++        $self->logger->error("PAM userinfo: Invalid JSON body: $@");
++        return $self->_badRequest( $req, 'Invalid JSON' );
++    }
++
++    my $user = $body->{user};
++    unless ($user) {
++        return $self->_badRequest( $req, 'user parameter required' );
++    }
++
++    # 3. Lookup user in backend
++    $req->user($user);
++    $req->data->{_pamUserinfo} = 1;
++    $req->steps( [
++        'getUser',
++        'setSessionInfo',
++        $self->p->groupsAndMacros,
++        'setLocalGroups'
++    ] );
++
++    my $error = $self->p->process($req);
++
++    if ( $error != PE_OK ) {
++        $self->logger->debug("PAM userinfo: User '$user' not found (error: $error)");
++        return $self->p->sendJSONresponse(
++            $req,
++            {
++                found => JSON::false,
++                user  => $user,
++            },
++            code => 200
++        );
++    }
++
++    # 4. Build response with user attributes
++    my $exportedVars = $self->conf->{pamAccessExportedVars} || {};
++    my %attrs;
++
++    for my $key ( keys %$exportedVars ) {
++        my $attr = $exportedVars->{$key};
++        my $value = $req->sessionInfo->{$attr};
++        $attrs{$key} = $value if defined $value && $value ne '';
++    }
++
++    # Always include basic info
++    my $groups = $req->sessionInfo->{groups} || '';
++    my @groupList = split /[,;\s]+/, $groups;
++
++    $self->logger->debug("PAM userinfo: Found user '$user'");
++
++    return $self->p->sendJSONresponse(
++        $req,
++        {
++            found  => JSON::true,
++            user   => $user,
++            groups => \@groupList,
++            %attrs,
++        },
++        code => 200
 +    );
 +}
 +

@@ -1,6 +1,6 @@
 --- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
-@@ -1551,6 +1551,54 @@ sub attributes {
+@@ -1551,6 +1551,63 @@ sub attributes {
              documentation => 'OIDC personnal offline token removal',
          },
  
@@ -51,11 +51,20 @@
 +            documentation =>
 +              'Require recent heartbeat for /pam/authorize requests',
 +        },
++        pamAccessExportedVars => {
++            type          => 'keyTextContainer',
++            keyTest       => qr/^[a-zA-Z][a-zA-Z0-9_-]*$/,
++            keyMsgFail    => '__badVariableName__',
++            test          => qr/^[a-zA-Z][a-zA-Z0-9_:\-]*$/,
++            msgFail       => '__badValue__',
++            default       => {},
++            documentation => 'Exported variables for PAM user provisioning',
++        },
 +
          # History
          failedLoginNumber => {
              default       => 5,
-@@ -1610,6 +1658,11 @@ sub attributes {
+@@ -1610,6 +1667,11 @@ sub attributes {
              'default' => '$_auth eq \'OIDC\'',
              'type'    => 'boolOrExpr'
          },
@@ -67,7 +76,7 @@
          portalDisplayOidcConsents => {
              type          => 'boolOrExpr',
              default       => '$_oidcConsents && $_oidcConsents =~ /\w+/',
-@@ -5150,6 +5203,24 @@ m{^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
+@@ -5150,6 +5212,24 @@ m{^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
              default       => 2592000,
              documentation => 'OpenID Connect global offline session TTL',
          },
@@ -92,7 +101,7 @@
          oidcStorage => {
              type          => 'PerlModule',
              documentation => 'Apache::Session module to store OIDC user data',
-@@ -5432,6 +5503,12 @@ m{^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
+@@ -5432,6 +5512,12 @@ m{^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
              default       => 0,
              documentation => 'Allow OAuth2 Client Credentials Grant',
          },
@@ -125,7 +134,7 @@
                                          'portalDisplayOidcConsents',
                                          'portalDisplayLogout',
                                          'portalDisplayOrder'
-@@ -961,6 +962,21 @@
+@@ -961,6 +962,22 @@
                              title => 'adminLogoutServer',
                              nodes => ['adminLogoutServerSecret']
                          },
@@ -142,6 +151,7 @@
 +                                'pamAccessHeartbeatInterval',
 +                                'pamAccessInactiveThreshold',
 +                                'pamAccessHeartbeatRequired',
++                                'pamAccessExportedVars',
 +                            ]
 +                        },
                      ]
