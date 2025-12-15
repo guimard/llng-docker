@@ -11,6 +11,7 @@ our @ignore = qw(
 Makefile
 MANIFEST
 Common/Conf/Constants\.pm
+Common/Conf/DefaultValues\.pm
 Common/Conf/ReConstants\.pm
 Manager/Attributes\.pm
 htdocs/static/js/conftree\.
