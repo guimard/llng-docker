@@ -27,7 +27,9 @@ RUN echo "# Install nginx and portal libs" && \
         libcrypt-jwt-perl libdigest-hmac-perl libdata-password-zxcvbn-perl \
         libhttp-browserdetect-perl libnet-dns-perl \
         uwsgi uwsgi-plugin-psgi \
+	openssh-client \
         && \
+	rm -f /usr/bin/scp /usr/bin/sftp /usr/bin/ssh /usr/bin/ssh-add /usr/bin/ssh-agent /usr/bin/ssh-argv0 /usr/bin/ssh-copy-id /usr/bin/ssh-keyscan && \
     apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY *.patch /
