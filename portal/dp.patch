@@ -1955,7 +1955,7 @@ new file mode 100644
 new file mode 100644
 --- /dev/null
 +++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/SSHCA.pm
-@@ -0,0 +1,1317 @@
+@@ -0,0 +1,1148 @@
 +# SSH Certificate Authority plugin for LemonLDAP::NG
 +#
 +# This plugin provides SSH certificate signing functionality:
