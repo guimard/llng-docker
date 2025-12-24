@@ -1,6 +1,6 @@
 --- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
-@@ -1551,6 +1551,95 @@ sub attributes {
+@@ -1546,6 +1546,95 @@
              documentation => 'OIDC personnal offline token removal',
          },
  
@@ -93,12 +93,12 @@
 +              'Default offline authorization cache TTL (seconds)',
 +        },
 +
-         # History
-         failedLoginNumber => {
-             default       => 5,
-@@ -1610,6 +1699,16 @@ sub attributes {
-             'default' => '$_auth eq \'OIDC\'',
-             'type'    => 'boolOrExpr'
+         # IgnorePollers plugin
+         ignorePollers => {
+             type          => 'bool',
+@@ -1617,6 +1706,16 @@
+             type          => 'bool',
+             documentation => 'Display reset password button in portal',
          },
 +        portalDisplayPamAccess => {
 +            type          => 'boolOrExpr',
@@ -113,7 +113,7 @@
          portalDisplayOidcConsents => {
              type          => 'boolOrExpr',
              default       => '$_oidcConsents && $_oidcConsents =~ /\w+/',
-@@ -5150,6 +5249,24 @@ m{^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
+@@ -5093,6 +5192,24 @@
              default       => 2592000,
              documentation => 'OpenID Connect global offline session TTL',
          },
@@ -138,7 +138,7 @@
          oidcStorage => {
              type          => 'PerlModule',
              documentation => 'Apache::Session module to store OIDC user data',
-@@ -5432,6 +5549,12 @@ m{^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
+@@ -5360,6 +5477,12 @@
              default       => 0,
              documentation => 'Allow OAuth2 Client Credentials Grant',
          },
@@ -151,8 +151,8 @@
          oidcRPMetaDataOptionsRefreshToken => {
              type          => 'bool',
              default       => 0,
-@@ -5575,6 +5698,48 @@ m{^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
- 'Shall OIDC/SAML/CAS protected apps access be recorded to session?'
+@@ -5501,6 +5624,48 @@
+ 'List of Matrix servers authorized to query for an access_token of this RP',
          },
  
 +        # SSH CA
@@ -197,9 +197,9 @@
 +            documentation => 'Path to SSH certificate serial number file',
 +        },
 +
-         # Fake attribute: used by manager REST API to agglomerate all other
-         # nodes
-         keyNodes => {
+         # Twake
+         twakeWellKnown => {
+             type => 'keyTextContainer',
 --- a/usr/share/perl5/Lemonldap/NG/Manager/Build/CTrees.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/CTrees.pm
 @@ -274,6 +274,7 @@ sub cTrees {
