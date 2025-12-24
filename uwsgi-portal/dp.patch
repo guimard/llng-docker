@@ -16,11 +16,12 @@
          $self->userLogger->error(
 --- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm
-@@ -41,6 +41,7 @@ our @pList = (
+@@ -41,6 +41,8 @@ our @pList = (
      checkEntropy                        => '::Plugins::CheckEntropy',
      initializePasswordReset             => '::Plugins::InitializePasswordReset',
      ignorePollers                       => '::Plugins::IgnorePollers',
 +    pamAccessActivation                 => '::Plugins::PamAccess',
++    sshCaActivation                     => '::Plugins::SSHCA',
      adaptativeAuthenticationLevelRules  =>
        '::Plugins::AdaptativeAuthenticationLevel',
      refreshSessions         => '::Plugins::Refresh',
@@ -36,11 +37,13 @@
 new file mode 100644
 --- /dev/null
 +++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/OIDCDeviceAuthorization.pm
-@@ -0,0 +1,648 @@
+@@ -0,0 +1,808 @@
 +package Lemonldap::NG::Portal::Plugins::OIDCDeviceAuthorization;
 +
 +# OAuth 2.0 Device Authorization Grant - RFC 8628
 +# https://datatracker.ietf.org/doc/html/rfc8628
++#
++# With PKCE extension (RFC 7636) for additional security
 +
 +use strict;
 +use Mouse;
@@ -65,8 +68,8 @@ new file mode 100644
 +};
 +
 +# Character set for user_code (RFC 8628 section 6.1)
-+# Excludes vowels to avoid offensive words, excludes 0/O, 1/I/L for readability
-+use constant USER_CODE_CHARS => 'BCDFGHJKLMNPQRSTVWXZ23456789';
++# Base-20 without vowels to avoid offensive words, easy to type on mobile
++use constant USER_CODE_CHARS => 'BCDFGHJKLMNPQRSTVWXZ';
 +
 +# Session kind for device authorization storage
 +use constant sessionKind => 'DEVA';
@@ -85,6 +88,16 @@ new file mode 100644
 +    is      => 'rw',
 +    default => sub {
 +        sub { 1 }
++    }
++);
++
++# Lazy access to CrowdSecAgent plugin (optional, for abuse reporting)
++has crowdsec => (
++    is      => 'ro',
++    lazy    => 1,
++    default => sub {
++        $_[0]
++          ->p->loadedModules->{'Lemonldap::NG::Portal::Plugins::CrowdSecAgent'};
 +    }
 +);
 +
@@ -124,6 +137,16 @@ new file mode 100644
 +        device => 'submitVerification',
 +        ['POST']
 +    );
++
++    # Warn if CrowdSec is not configured (RFC 8628 recommends IP-based lockout)
++    # Check config rather than loadedModules since init order is not guaranteed
++    unless ($self->conf->{crowdsec}
++        and $self->conf->{crowdsecAgent} )
++    {
++        $self->logger->warn(
++"CrowdSecAgent plugin not configured. RFC 8628 recommends IP-based rate limiting for device authorization. Consider enabling CrowdSec for better security."
++        );
++    }
 +
 +    $self->logger->debug("Device Authorization Grant (RFC 8628) enabled");
 +    return 1;
@@ -165,6 +188,35 @@ new file mode 100644
 +    # Get requested scope
 +    my $scope = $req->param('scope') || 'openid';
 +
++    # PKCE support (RFC 7636)
++    my $code_challenge        = $req->param('code_challenge');
++    my $code_challenge_method = $req->param('code_challenge_method') || 'plain';
++
++    # Check if PKCE is required for this RP
++    if ( $self->oidc->rpOptions->{$rp}->{oidcRPMetaDataOptionsRequirePKCE}
++        and !$code_challenge )
++    {
++        $self->logger->warn(
++            "PKCE required but no code_challenge provided for RP $rp");
++        return $self->_sendDeviceError( $req, 'invalid_request',
++            'code_challenge is required' );
++    }
++
++    # Validate code_challenge_method if PKCE is used
++    if ($code_challenge) {
++        unless ( $code_challenge_method eq 'plain'
++            or $code_challenge_method eq 'S256' )
++        {
++            $self->logger->warn(
++                "Invalid code_challenge_method: $code_challenge_method");
++            return $self->_sendDeviceError( $req, 'invalid_request',
++                'code_challenge_method must be plain or S256' );
++        }
++        $self->logger->debug(
++"PKCE enabled for device authorization (method=$code_challenge_method)"
++        );
++    }
++
 +    # Generate device_code (secret, used for polling)
 +    my $device_code = $self->_generateDeviceCode();
 +
@@ -181,16 +233,18 @@ new file mode 100644
 +    my $device_code_hash = sha256_hex($device_code);
 +
 +    my $session_data = {
-+        _type       => 'deviceauth',
-+        _utime      => time() - $self->conf->{timeout} + $expiration,
-+        device_code => $device_code,
-+        user_code   => $user_code,
-+        client_id   => $client_id,
-+        rp          => $rp,
-+        scope       => $scope,
-+        status      => 'pending',              # pending, approved, denied
-+        created_at  => time(),
-+        expires_at  => time() + $expiration,
++        _type          => 'deviceauth',
++        _utime         => time() - $self->conf->{timeout} + $expiration,
++        device_code    => $device_code,
++        user_code      => $user_code,
++        client_id      => $client_id,
++        rp             => $rp,
++        scope          => $scope,
++        status         => 'pending',              # pending, approved, denied
++        created_at     => time(),
++        expires_at     => time() + $expiration,
++        code_challenge => $code_challenge,
++        code_challenge_method => $code_challenge_method,
 +    };
 +
 +    # Store the device authorization using getApacheSession with fixed ID
@@ -253,6 +307,14 @@ new file mode 100644
 +    );
 +    $self->userLogger->info(
 +        "Device authorization initiated for client $client_id");
++
++    $self->auditLog(
++        $req,
++        code      => "ISSUER_OIDC_DEVICE_AUTH_INITIATED",
++        rp        => $rp,
++        user_code => $user_code,
++        message   => "Device authorization initiated for RP $rp",
++    );
 +
 +    return $self->p->sendJSONresponse( $req, $response );
 +}
@@ -377,6 +439,19 @@ new file mode 100644
 +    my $device_auth = $self->_findByUserCode($user_code);
 +    unless ($device_auth) {
 +        $self->logger->info("Invalid or expired user_code: $user_code");
++
++        # Report to CrowdSec if available (potential bruteforce)
++        $self->_reportInvalidUserCode( $req, $user_code );
++
++        my $user = $req->userData->{ $self->conf->{whatToTrace} };
++        $self->auditLog(
++            $req,
++            code      => "ISSUER_OIDC_DEVICE_AUTH_INVALID_CODE",
++            user_code => $user_code,
++            user      => $user,
++            message   => "Invalid or expired user_code submitted by $user",
++        );
++
 +        return $self->_showVerificationError( $req, 'invalidUserCode' );
 +    }
 +
@@ -393,10 +468,20 @@ new file mode 100644
 +
 +        # User denied the authorization
 +        $self->_updateDeviceAuthStatus( $device_auth, 'denied' );
-+        $self->userLogger->notice( "Device authorization denied by user "
-+              . $req->userData->{ $self->conf->{whatToTrace} }
-+              . " for client "
++        my $user = $req->userData->{ $self->conf->{whatToTrace} };
++        $self->userLogger->notice(
++            "Device authorization denied by user $user for client "
 +              . $device_auth->{client_id} );
++
++        $self->auditLog(
++            $req,
++            code      => "ISSUER_OIDC_DEVICE_AUTH_DENIED",
++            rp        => $device_auth->{rp},
++            user_code => $device_auth->{user_code},
++            user      => $user,
++            message   =>
++              "Device authorization denied by $user for RP $device_auth->{rp}",
++        );
 +
 +        return $self->p->sendHtml(
 +            $req, 'device',
@@ -410,20 +495,30 @@ new file mode 100644
 +    # Approve the authorization
 +    # Store user info for token generation
 +    my $user_session_id = $req->id || $req->userData->{_session_id};
++    my $user            = $req->userData->{ $self->conf->{whatToTrace} };
 +    $self->_updateDeviceAuthStatus(
 +        $device_auth,
 +        'approved',
 +        {
 +            user_session_id => $user_session_id,
-+            user            => $req->userData->{ $self->conf->{whatToTrace} },
++            user            => $user,
 +            approved_at     => time(),
 +        }
 +    );
 +
-+    $self->userLogger->notice( "Device authorization approved by user "
-+          . $req->userData->{ $self->conf->{whatToTrace} }
-+          . " for client "
++    $self->userLogger->notice(
++        "Device authorization approved by user $user for client "
 +          . $device_auth->{client_id} );
++
++    $self->auditLog(
++        $req,
++        code      => "ISSUER_OIDC_DEVICE_AUTH_APPROVED",
++        rp        => $device_auth->{rp},
++        user_code => $device_auth->{user_code},
++        user      => $user,
++        message   =>
++          "Device authorization approved by $user for RP $device_auth->{rp}",
++    );
 +
 +    return $self->p->sendHtml(
 +        $req, 'device',
@@ -449,10 +544,15 @@ new file mode 100644
 +    my ($self) = @_;
 +    my $length =
 +      $self->conf->{oidcServiceDeviceAuthorizationUserCodeLength} || 8;
-+    my $chars = USER_CODE_CHARS;
-+    my $code  = '';
-+    for ( 1 .. $length ) {
-+        $code .= substr( $chars, int( rand( length($chars) ) ), 1 );
++    my $chars     = USER_CODE_CHARS;
++    my $chars_len = length($chars);
++    my $code      = '';
++
++    # Use cryptographically secure random bytes to generate the user code
++    my $bytes = Crypt::URandom::urandom($length);
++    foreach my $b ( split //, $bytes ) {
++        my $idx = ord($b) % $chars_len;
++        $code .= substr( $chars, $idx, 1 );
 +    }
 +    return $code;
 +}
@@ -569,6 +669,36 @@ new file mode 100644
 +sub _generateTokens {
 +    my ( $self, $req, $device_auth, $rp ) = @_;
 +
++    # Validate PKCE if it was used
++    my $code_challenge        = $device_auth->{code_challenge};
++    my $code_challenge_method = $device_auth->{code_challenge_method};
++
++    if ($code_challenge) {
++        my $code_verifier = $req->param('code_verifier');
++
++        # Verify code_verifier is provided when code_challenge exists
++        unless ($code_verifier) {
++            $self->logger->error(
++                "code_verifier is required when code_challenge was provided");
++            return $self->_sendTokenError( $req, 'invalid_grant',
++                'code_verifier is required' );
++        }
++
++        # Use the OIDC issuer's validatePKCEChallenge method
++        unless (
++            $self->oidc->validatePKCEChallenge(
++                $code_verifier, $code_challenge, $code_challenge_method
++            )
++          )
++        {
++            $self->logger->error(
++                "PKCE validation failed for device code grant");
++            return $self->_sendTokenError( $req, 'invalid_grant',
++                'PKCE validation failed' );
++        }
++        $self->logger->debug("PKCE validation successful");
++    }
++
 +    my $scope = $device_auth->{scope};
 +
 +    # Get the user's session
@@ -644,6 +774,16 @@ new file mode 100644
 +
 +    $self->logger->debug("Device code grant completed for RP $rp");
 +
++    my $user = $device_auth->{user};
++    $self->auditLog(
++        $req,
++        code      => "ISSUER_OIDC_DEVICE_AUTH_TOKEN_GRANTED",
++        rp        => $rp,
++        user_code => $device_auth->{user_code},
++        user      => $user,
++        message   => "Device code exchanged for tokens by $user for RP $rp",
++    );
++
 +    $req->response( $self->p->sendJSONresponse( $req, $response ) );
 +    return PE_SENDRESPONSE;
 +}
@@ -684,11 +824,32 @@ new file mode 100644
 +    );
 +}
 +
++# CrowdSec integration methods
++
++sub _reportInvalidUserCode {
++    my ( $self, $req, $user_code ) = @_;
++
++    my $crowdsec = $self->crowdsec;
++    return unless $crowdsec && $crowdsec->can('alert');
++
++    my $ip  = $req->address;
++    my $msg = "RFC 8628: Invalid user_code attempt from $ip (code: $user_code)";
++
++    $crowdsec->alert(
++        $ip, $msg,
++        {
++            scenario => 'llng/device-auth-bruteforce',
++            reason   => $msg,
++        }
++    );
++    $self->logger->debug("Reported invalid user_code attempt to CrowdSec");
++}
++
 +1;
 new file mode 100644
 --- /dev/null
 +++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/PamAccess.pm
-@@ -0,0 +1,953 @@
+@@ -0,0 +1,1102 @@
 +# PAM Access plugin for LemonLDAP::NG
 +#
 +# This plugin provides:
@@ -706,9 +867,9 @@ new file mode 100644
 +use Mouse;
 +use JSON qw(from_json to_json);
 +use Lemonldap::NG::Portal::Main::Constants qw(
-+    PE_OK
-+    PE_ERROR
-+    PE_SENDRESPONSE
++  PE_OK
++  PE_ERROR
++  PE_SENDRESPONSE
 +);
 +
 +our $VERSION = '2.22.0';
@@ -754,9 +915,27 @@ new file mode 100644
 +        return 0;
 +    }
 +
++    # Check that at least one RP has Device Authorization Grant enabled
++    my $deviceAuthEnabled = 0;
++    my $rpOptions         = $self->conf->{oidcRPMetaDataOptions} || {};
++    for my $rp ( keys %$rpOptions ) {
++        if ( $rpOptions->{$rp}
++            {oidcRPMetaDataOptionsAllowDeviceAuthorizationGrant} )
++        {
++            $deviceAuthEnabled = 1;
++            last;
++        }
++    }
++    unless ($deviceAuthEnabled) {
++        $self->logger->error(
++'PamAccess plugin requires at least one OIDC RP with Device Authorization Grant enabled'
++        );
++        return 0;
++    }
++
 +    # Routes for authenticated users (token generation interface)
 +    $self->addAuthRoute( pam => 'pamInterface', ['GET'] )
-+         ->addAuthRoute( pam => 'generateToken', ['POST'] );
++      ->addAuthRoute( pam => 'generateToken', ['POST'] );
 +
 +    # Route for server-to-server authorization (Bearer token auth)
 +    $self->addUnauthRoute(
@@ -798,13 +977,14 @@ new file mode 100644
 +            $req,
 +            'pamaccess',
 +            params => {
-+                TOKEN          => '',
-+                LOGIN          => $req->userData->{ $self->conf->{whatToTrace} } || '',
-+                EXPIRES_IN     => '',
-+                SHOW_TOKEN     => 0,
-+                DEFAULT_DURATION => $self->conf->{pamAccessTokenDuration} || 600,
-+                MAX_DURATION   => $self->conf->{pamAccessMaxDuration} || 3600,
-+                js             => "$self->{p}->{staticPrefix}/common/js/pamaccess.js",
++                TOKEN => '',
++                LOGIN => $req->userData->{ $self->conf->{whatToTrace} } || '',
++                EXPIRES_IN       => '',
++                SHOW_TOKEN       => 0,
++                DEFAULT_DURATION => $self->conf->{pamAccessTokenDuration}
++                  || 600,
++                MAX_DURATION => $self->conf->{pamAccessMaxDuration} || 3600,
++                js => "$self->{p}->{staticPrefix}/common/js/pamaccess.js",
 +            }
 +        ),
 +    };
@@ -824,21 +1004,22 @@ new file mode 100644
 +    my ( $self, $req ) = @_;
 +
 +    # Get requested duration
-+    my $duration = $req->param('duration') || $self->conf->{pamAccessTokenDuration} || 600;
++    my $duration =
++      $req->param('duration') || $self->conf->{pamAccessTokenDuration} || 600;
 +
 +    # Enforce maximum duration
 +    my $maxDuration = $self->conf->{pamAccessMaxDuration} || 3600;
 +    $duration = $maxDuration if $duration > $maxDuration;
 +
-+    my $login = $req->userData->{ $self->conf->{whatToTrace} };
++    my $login  = $req->userData->{ $self->conf->{whatToTrace} };
 +    my $groups = $req->userData->{groups} || '';
 +
 +    # Calculate _utime for automatic cleanup by purgeCentralCache
 +    # _utime + timeout = expiration time
 +    # So: _utime = now + duration - timeout
-+    my $now = time();
++    my $now     = time();
 +    my $timeout = $self->conf->{timeout} || 7200;
-+    my $utime = $now + $duration - $timeout;
++    my $utime   = $now + $duration - $timeout;
 +
 +    # Create one-time token as a session with kind=PAMTOKEN
 +    my $tokenInfo = {
@@ -854,9 +1035,10 @@ new file mode 100644
 +    # Add exported variables for user provisioning
 +    my $exportedVars = $self->conf->{pamAccessExportedVars} || {};
 +    for my $key ( keys %$exportedVars ) {
-+        my $attr = $exportedVars->{$key};
++        my $attr  = $exportedVars->{$key};
 +        my $value = $req->userData->{$attr};
-+        $tokenInfo->{"_pamAttr_$key"} = $value if defined $value && $value ne '';
++        $tokenInfo->{"_pamAttr_$key"} = $value
++          if defined $value && $value ne '';
 +    }
 +
 +    my $tokenSession = $self->p->getApacheSession(
@@ -875,15 +1057,17 @@ new file mode 100644
 +    }
 +
 +    my $token = $tokenSession->id;
-+    $self->logger->info("PAM one-time token generated for user $login (TTL: ${duration}s)");
++    $self->logger->info(
++        "PAM one-time token generated for user $login (TTL: ${duration}s)");
 +
 +    # Audit log for token generation
 +    $self->p->auditLog(
 +        $req,
 +        code    => 'PAM_TOKEN_GENERATED',
 +        user    => $login,
-+        message => "PAM one-time token generated for user $login (TTL: ${duration}s)",
-+        ttl     => $duration,
++        message =>
++          "PAM one-time token generated for user $login (TTL: ${duration}s)",
++        ttl => $duration,
 +    );
 +
 +    return $self->p->sendJSONresponse(
@@ -904,25 +1088,24 @@ new file mode 100644
 +    my $access_token = $self->oidc->getEndPointAccessToken($req);
 +    unless ($access_token) {
 +        $self->logger->warn('PAM authorize: No Bearer token provided');
-+        return $self->_unauthorizedResponse($req, 'Bearer token required');
++        return $self->_unauthorizedResponse( $req, 'Bearer token required' );
 +    }
 +
 +    my $tokenSession = $self->oidc->getAccessToken($access_token);
 +    unless ($tokenSession) {
 +        $self->logger->warn('PAM authorize: Invalid or expired Bearer token');
-+        return $self->_unauthorizedResponse($req, 'Invalid or expired token');
++        return $self->_unauthorizedResponse( $req, 'Invalid or expired token' );
 +    }
 +
 +    # 2. Verify token was obtained via Device Authorization Grant
 +    my $grant_type = $tokenSession->data->{grant_type} || '';
 +    unless ( $grant_type eq 'device_code' ) {
 +        $self->logger->warn(
-+            "PAM authorize: Token not from Device Authorization Grant "
-+            . "(grant_type: '$grant_type'). Server must enroll via /oauth2/device"
++                "PAM authorize: Token not from Device Authorization Grant "
++              . "(grant_type: '$grant_type'). Server must enroll via /oauth2/device"
 +        );
-+        return $self->_forbiddenResponse(
-+            $req,
-+            'Server not enrolled. Use Device Authorization Grant to register this server.'
++        return $self->_forbiddenResponse( $req,
++'Server not enrolled. Use Device Authorization Grant to register this server.'
 +        );
 +    }
 +
@@ -930,18 +1113,19 @@ new file mode 100644
 +    my $scope = $tokenSession->data->{scope} || '';
 +    unless ( $scope =~ /\bpam(?::server)?\b/ ) {
 +        $self->logger->warn("PAM authorize: Invalid token scope '$scope'");
-+        return $self->_forbiddenResponse($req, 'Invalid token scope');
++        return $self->_forbiddenResponse( $req, 'Invalid token scope' );
 +    }
 +
 +    # Log server identity from token
 +    my $server_id = $tokenSession->data->{client_id} || 'unknown';
-+    $self->logger->info("PAM authorize request from enrolled server: $server_id");
++    $self->logger->info(
++        "PAM authorize request from enrolled server: $server_id");
 +
 +    # 4. Parse JSON request body
 +    my $body = eval { from_json( $req->content ) };
 +    if ($@) {
 +        $self->logger->error("PAM authorize: Invalid JSON body: $@");
-+        return $self->_badRequest($req, 'Invalid JSON');
++        return $self->_badRequest( $req, 'Invalid JSON' );
 +    }
 +
 +    my $user         = $body->{user};
@@ -950,25 +1134,27 @@ new file mode 100644
 +    my $server_group = $body->{server_group} || 'default';
 +
 +    unless ($user) {
-+        return $self->_badRequest($req, 'Missing user parameter');
++        return $self->_badRequest( $req, 'Missing user parameter' );
 +    }
 +
-+    $self->logger->debug("PAM authorize: checking user '$user' for host '$host', service '$service', server_group '$server_group'");
++    $self->logger->debug(
++"PAM authorize: checking user '$user' for host '$host', service '$service', server_group '$server_group'"
++    );
 +
 +    # 4. Lookup user (without active session)
 +    $req->user($user);
 +    $req->data->{_pamAuthorize} = 1;
 +    $req->steps( [
-+        'getUser',
-+        'setSessionInfo',
-+        $self->p->groupsAndMacros,
-+        'setLocalGroups'
-+    ] );
++            'getUser',                 'setSessionInfo',
++            $self->p->groupsAndMacros, 'setLocalGroups'
++        ]
++    );
 +
 +    my $error = $self->p->process($req);
 +
 +    if ( $error != PE_OK ) {
-+        $self->logger->info("PAM authorize: User '$user' not found (error: $error)");
++        $self->logger->info(
++            "PAM authorize: User '$user' not found (error: $error)");
 +
 +        # Audit log for authorization failure (user not found)
 +        $self->p->auditLog(
@@ -994,38 +1180,42 @@ new file mode 100644
 +    }
 +
 +    # 5. Evaluate authorization rule based on server_group
-+    my $authorized = $self->_checkPamRule( $req, $host, $service, $server_group );
++    my $result = $self->_checkPamRule( $req, $host, $service, $server_group );
++    my $authorized   = $result->{authorized};
++    my $sudo_allowed = $result->{sudo_allowed};
 +
 +    # Get groups for response
-+    my $groups = $req->sessionInfo->{groups} || '';
++    my $groups    = $req->sessionInfo->{groups} || '';
 +    my @groupList = split /[,;\s]+/, $groups;
 +
-+    $self->logger->info(
-+        "PAM authorize: user '$user' " .
-+        ($authorized ? 'granted' : 'denied') .
-+        " access to host '$host'"
-+    );
++    $self->logger->info( "PAM authorize: user '$user' "
++          . ( $authorized ? 'granted' : 'denied' )
++          . " access to host '$host'"
++          . ( $authorized && $sudo_allowed ? ' (sudo allowed)' : '' ) );
 +
 +    # Audit log for authorization result
 +    if ($authorized) {
 +        $self->p->auditLog(
 +            $req,
-+            code         => 'PAM_AUTHZ_SUCCESS',
-+            user         => $user,
-+            message      => "PAM authorization granted for user '$user' on host '$host'",
++            code    => 'PAM_AUTHZ_SUCCESS',
++            user    => $user,
++            message =>
++              "PAM authorization granted for user '$user' on host '$host'",
 +            host         => $host,
 +            service      => $service,
 +            server_group => $server_group,
 +            server_id    => $server_id,
 +            groups       => \@groupList,
++            sudo_allowed => $sudo_allowed,
 +        );
 +    }
 +    else {
 +        $self->p->auditLog(
 +            $req,
-+            code         => 'PAM_AUTHZ_DENIED',
-+            user         => $user,
-+            message      => "PAM authorization denied for user '$user' on host '$host'",
++            code    => 'PAM_AUTHZ_DENIED',
++            user    => $user,
++            message =>
++              "PAM authorization denied for user '$user' on host '$host'",
 +            host         => $host,
 +            service      => $service,
 +            server_group => $server_group,
@@ -1035,20 +1225,52 @@ new file mode 100644
 +        );
 +    }
 +
-+    return $self->p->sendJSONresponse(
-+        $req,
-+        {
-+            authorized => $authorized ? JSON::true : JSON::false,
-+            user       => $user,
-+            groups     => \@groupList,
-+            ( $authorized ? () : ( reason => 'Access denied by rule' ) ),
-+        },
-+        code => 200
-+    );
++    # Build response with permissions
++    my $response = {
++        authorized => $authorized ? JSON::true : JSON::false,
++        user       => $user,
++        groups     => \@groupList,
++    };
++
++    # Add permissions for authorized users
++    if ($authorized) {
++        $response->{permissions} =
++          { sudo_allowed => $sudo_allowed ? JSON::true : JSON::false, };
++
++        # Add user attributes for NSS/cache (from exported vars)
++        my $exportedVars = $self->conf->{pamAccessExportedVars} || {};
++        for my $key ( keys %$exportedVars ) {
++            my $attr  = $exportedVars->{$key};
++            my $value = $req->sessionInfo->{$attr};
++            if ( defined $value && $value ne '' ) {
++                $response->{$key} = $value;
++            }
++        }
++
++        # Check if offline mode is enabled for this user
++        my $offlineEnabled = $self->_evaluateOfflineMode($req);
++        if ($offlineEnabled) {
++            my $offlineTtl = $self->conf->{pamAccessOfflineTtl} || 86400;
++            $response->{offline} = {
++                enabled => JSON::true,
++                ttl     => $offlineTtl,
++            };
++            $self->logger->debug(
++"PAM authorize: offline mode enabled for user '$user' (TTL: ${offlineTtl}s)"
++            );
++        }
++    }
++    else {
++        $response->{reason} = 'Access denied by rule';
++    }
++
++    return $self->p->sendJSONresponse( $req, $response, code => 200 );
 +}
 +
 +# HELPER METHODS
 +
++# Check PAM authorization rule for a specific service type
++# Returns: { authorized => 0|1, sudo_allowed => 0|1 }
 +sub _checkPamRule {
 +    my ( $self, $req, $host, $service, $server_group ) = @_;
 +
@@ -1057,35 +1279,126 @@ new file mode 100644
 +    $req->sessionInfo->{_pamService}     = $service;
 +    $req->sessionInfo->{_pamServerGroup} = $server_group || 'default';
 +
-+    my $rules = $self->conf->{pamAccessServerGroups} || {};
++    my $result = {
++        authorized   => 0,
++        sudo_allowed => 0,
++    };
++
++    # Determine which rule set to use based on service type
++    my $ssh_authorized = $self->_evaluateRule( $req, $server_group, 'ssh' );
++
++    # For SSH service, check SSH rules
++    if ( $service eq 'sshd' || $service eq 'ssh' ) {
++        $result->{authorized} = $ssh_authorized;
++    }
++
++    # For sudo service, check both SSH (must be connected) and sudo rules
++    elsif ( $service eq 'sudo' ) {
++
++        # User must first be authorized for SSH
++        if ($ssh_authorized) {
++            $result->{authorized} = 1;
++            $result->{sudo_allowed} =
++              $self->_evaluateRule( $req, $server_group, 'sudo' );
++        }
++    }
++
++    # For other services, fall back to legacy rules
++    else {
++        $result->{authorized} =
++          $self->_evaluateRule( $req, $server_group, 'legacy' );
++    }
++
++    # Also compute sudo_allowed for SSH requests (for response)
++    if ( $service eq 'sshd' || $service eq 'ssh' ) {
++        $result->{sudo_allowed} =
++          $self->_evaluateRule( $req, $server_group, 'sudo' );
++    }
++
++    return $result;
++}
++
++# Evaluate a specific rule type for a server group
++sub _evaluateRule {
++    my ( $self, $req, $server_group, $rule_type ) = @_;
++
++    $server_group ||= 'default';
++
++    # Select the appropriate rule set
++    my $rules;
++    if ( $rule_type eq 'ssh' ) {
++        $rules = $self->conf->{pamAccessSshRules} || {};
++
++        # Fallback to legacy rules if SSH rules not defined
++        if ( !%$rules ) {
++            $rules = $self->conf->{pamAccessServerGroups} || {};
++        }
++    }
++    elsif ( $rule_type eq 'sudo' ) {
++        $rules = $self->conf->{pamAccessSudoRules} || {};
++
++        # No fallback for sudo - if not defined, sudo is denied
++    }
++    else {
++        # Legacy mode
++        $rules = $self->conf->{pamAccessServerGroups} || {};
++    }
++
 +    my $rule;
 +
 +    # 1. Look for rule matching the requested server_group
-+    if ( $server_group && exists $rules->{$server_group} ) {
++    if ( exists $rules->{$server_group} ) {
 +        $rule = $rules->{$server_group};
-+        $self->logger->debug("PAM authorize: using rule for group '$server_group'");
++        $self->logger->debug(
++            "PAM authorize: using $rule_type rule for group '$server_group'");
 +    }
++
 +    # 2. Fallback to 'default' group
 +    elsif ( exists $rules->{default} ) {
 +        $rule = $rules->{default};
-+        $self->logger->debug("PAM authorize: server_group '$server_group' not found, using 'default' rule");
++        $self->logger->debug(
++"PAM authorize: $rule_type rule for '$server_group' not found, using 'default'"
++        );
 +    }
-+    # 3. No rule found -> deny access
++
++    # 3. No rule found -> deny
 +    else {
-+        $self->logger->warn("PAM authorize: no rule found for group '$server_group' and no 'default' rule");
++        $self->logger->debug(
++            "PAM authorize: no $rule_type rule for '$server_group' or 'default'"
++        );
 +        return 0;
 +    }
 +
 +    # Simple boolean
-+    return $rule if $rule =~ /^[01]$/;
++    return $rule if defined $rule && $rule =~ /^[01]$/;
 +
-+    # Empty rule -> deny
++    # Empty or undefined rule -> deny
 +    return 0 unless defined $rule && $rule ne '';
 +
 +    # Evaluate rule as expression
-+    my $result = $self->p->HANDLER->buildSub(
-+        $self->p->HANDLER->substitute($rule)
-+    )->( $req, $req->sessionInfo );
++    my $result =
++      $self->p->HANDLER->buildSub( $self->p->HANDLER->substitute($rule) )
++      ->( $req, $req->sessionInfo );
++
++    return $result ? 1 : 0;
++}
++
++# Evaluate if offline mode is enabled for this user
++sub _evaluateOfflineMode {
++    my ( $self, $req ) = @_;
++
++    my $rule = $self->conf->{pamAccessOfflineEnabled};
++
++    # Not configured or disabled
++    return 0 unless defined $rule && $rule ne '' && $rule ne '0';
++
++    # Simple boolean true
++    return 1 if $rule eq '1';
++
++    # Evaluate as expression
++    my $result =
++      $self->p->HANDLER->buildSub( $self->p->HANDLER->substitute($rule) )
++      ->( $req, $req->sessionInfo );
 +
 +    return $result ? 1 : 0;
 +}
@@ -1097,7 +1410,7 @@ new file mode 100644
 +    return $self->p->sendJSONresponse(
 +        $req,
 +        { error => $message },
-+        code => 401,
++        code    => 401,
 +        headers => [ 'WWW-Authenticate' => 'Bearer realm="pam"' ],
 +    );
 +}
@@ -1106,22 +1419,16 @@ new file mode 100644
 +    my ( $self, $req, $message ) = @_;
 +    $message ||= 'Forbidden';
 +
-+    return $self->p->sendJSONresponse(
-+        $req,
-+        { error => $message },
-+        code => 403
-+    );
++    return $self->p->sendJSONresponse( $req, { error => $message },
++        code => 403 );
 +}
 +
 +sub _badRequest {
 +    my ( $self, $req, $message ) = @_;
 +    $message ||= 'Bad Request';
 +
-+    return $self->p->sendJSONresponse(
-+        $req,
-+        { error => $message },
-+        code => 400
-+    );
++    return $self->p->sendJSONresponse( $req, { error => $message },
++        code => 400 );
 +}
 +
 +# POST /pam/verify - Verify and consume a one-time PAM token
@@ -1132,22 +1439,23 @@ new file mode 100644
 +    my $server_token = $self->oidc->getEndPointAccessToken($req);
 +    unless ($server_token) {
 +        $self->logger->warn('PAM verify: No server Bearer token provided');
-+        return $self->_unauthorizedResponse( $req, 'Server Bearer token required' );
++        return $self->_unauthorizedResponse( $req,
++            'Server Bearer token required' );
 +    }
 +
 +    my $serverSession = $self->oidc->getAccessToken($server_token);
 +    unless ($serverSession) {
 +        $self->logger->warn('PAM verify: Invalid or expired server token');
-+        return $self->_unauthorizedResponse( $req, 'Invalid or expired server token' );
++        return $self->_unauthorizedResponse( $req,
++            'Invalid or expired server token' );
 +    }
 +
 +    # Verify server token was obtained via Device Authorization Grant
 +    my $grant_type = $serverSession->data->{grant_type} || '';
 +    unless ( $grant_type eq 'device_code' ) {
 +        $self->logger->warn(
-+            "PAM verify: Server token not from Device Authorization Grant "
-+              . "(grant_type: '$grant_type')"
-+        );
++                "PAM verify: Server token not from Device Authorization Grant "
++              . "(grant_type: '$grant_type')" );
 +        return $self->_forbiddenResponse( $req,
 +            'Server not enrolled. Use Device Authorization Grant.' );
 +    }
@@ -1168,7 +1476,8 @@ new file mode 100644
 +    my $server_id = $serverSession->data->{client_id} || 'unknown';
 +
 +    # 3. Retrieve the PAMTOKEN session
-+    my $tokenSession = $self->p->getApacheSession( $user_token, kind => 'PAMTOKEN' );
++    my $tokenSession =
++      $self->p->getApacheSession( $user_token, kind => 'PAMTOKEN' );
 +    unless ($tokenSession) {
 +        $self->logger->info("PAM verify: Invalid or expired token");
 +
@@ -1225,9 +1534,10 @@ new file mode 100644
 +        # Audit log for expired token
 +        $self->p->auditLog(
 +            $req,
-+            code      => 'PAM_AUTH_TOKEN_EXPIRED',
-+            user      => $user,
-+            message   => "PAM authentication failed: token expired for user '$user'",
++            code    => 'PAM_AUTH_TOKEN_EXPIRED',
++            user    => $user,
++            message =>
++              "PAM authentication failed: token expired for user '$user'",
 +            server_id => $server_id,
 +            reason    => 'Token expired',
 +        );
@@ -1244,8 +1554,8 @@ new file mode 100644
 +    }
 +
 +    # 6. Extract user info
-+    my $user   = $tokenSession->data->{_pamUser}   || '';
-+    my $groups = $tokenSession->data->{_pamGroups} || '';
++    my $user      = $tokenSession->data->{_pamUser}   || '';
++    my $groups    = $tokenSession->data->{_pamGroups} || '';
 +    my @groupList = $groups ? split( /[,;\s]+/, $groups ) : ();
 +
 +    # Extract exported attributes (prefixed with _pamAttr_)
@@ -1312,9 +1622,8 @@ new file mode 100644
 +    my $grant_type = $rtSession->data->{grant_type} || '';
 +    unless ( $grant_type eq 'device_code' ) {
 +        $self->logger->warn(
-+            "PAM heartbeat: Token not from Device Authorization Grant "
-+              . "(grant_type: '$grant_type')"
-+        );
++                "PAM heartbeat: Token not from Device Authorization Grant "
++              . "(grant_type: '$grant_type')" );
 +        return $self->_forbiddenResponse( $req,
 +            'Token not from Device Authorization Grant' );
 +    }
@@ -1366,13 +1675,15 @@ new file mode 100644
 +    my $server_token = $self->oidc->getEndPointAccessToken($req);
 +    unless ($server_token) {
 +        $self->logger->warn('PAM userinfo: No server Bearer token provided');
-+        return $self->_unauthorizedResponse( $req, 'Server Bearer token required' );
++        return $self->_unauthorizedResponse( $req,
++            'Server Bearer token required' );
 +    }
 +
 +    my $serverSession = $self->oidc->getAccessToken($server_token);
 +    unless ($serverSession) {
 +        $self->logger->warn('PAM userinfo: Invalid or expired server token');
-+        return $self->_unauthorizedResponse( $req, 'Invalid or expired server token' );
++        return $self->_unauthorizedResponse( $req,
++            'Invalid or expired server token' );
 +    }
 +
 +    # Verify server token was obtained via Device Authorization Grant
@@ -1380,8 +1691,7 @@ new file mode 100644
 +    unless ( $grant_type eq 'device_code' ) {
 +        $self->logger->warn(
 +            "PAM userinfo: Server token not from Device Authorization Grant "
-+              . "(grant_type: '$grant_type')"
-+        );
++              . "(grant_type: '$grant_type')" );
 +        return $self->_forbiddenResponse( $req,
 +            'Server not enrolled. Use Device Authorization Grant.' );
 +    }
@@ -1402,16 +1712,16 @@ new file mode 100644
 +    $req->user($user);
 +    $req->data->{_pamUserinfo} = 1;
 +    $req->steps( [
-+        'getUser',
-+        'setSessionInfo',
-+        $self->p->groupsAndMacros,
-+        'setLocalGroups'
-+    ] );
++            'getUser',                 'setSessionInfo',
++            $self->p->groupsAndMacros, 'setLocalGroups'
++        ]
++    );
 +
 +    my $error = $self->p->process($req);
 +
 +    if ( $error != PE_OK ) {
-+        $self->logger->debug("PAM userinfo: User '$user' not found (error: $error)");
++        $self->logger->debug(
++            "PAM userinfo: User '$user' not found (error: $error)");
 +        return $self->p->sendJSONresponse(
 +            $req,
 +            {
@@ -1427,13 +1737,13 @@ new file mode 100644
 +    my %attrs;
 +
 +    for my $key ( keys %$exportedVars ) {
-+        my $attr = $exportedVars->{$key};
++        my $attr  = $exportedVars->{$key};
 +        my $value = $req->sessionInfo->{$attr};
 +        $attrs{$key} = $value if defined $value && $value ne '';
 +    }
 +
 +    # Always include basic info
-+    my $groups = $req->sessionInfo->{groups} || '';
++    my $groups    = $req->sessionInfo->{groups} || '';
 +    my @groupList = split /[,;\s]+/, $groups;
 +
 +    $self->logger->debug("PAM userinfo: Found user '$user'");
@@ -1643,6 +1953,1157 @@ new file mode 100644
 +
 +=cut
 new file mode 100644
+--- /dev/null
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/SSHCA.pm
+@@ -0,0 +1,1317 @@
++# SSH Certificate Authority plugin for LemonLDAP::NG
++#
++# This plugin provides SSH certificate signing functionality:
++# - /ssh/ca : Public CA key endpoint (no auth required)
++# - /ssh/revoked : Key Revocation List (KRL) endpoint (no auth required)
++# - /ssh/sign : Sign user's SSH public key (auth required)
++# - /ssh/certs : List/search issued certificates (auth required, admin only)
++# - /ssh/revoke : Revoke a certificate (auth required, admin only)
++#
++# Requires configuration of SSH CA key in LLNG keys store.
++
++package Lemonldap::NG::Portal::Plugins::SSHCA;
++
++use strict;
++use Mouse;
++use JSON qw(from_json to_json);
++use Lemonldap::NG::Common::Apache::Session;
++use Lemonldap::NG::Portal::Main::Constants qw(
++  PE_OK
++  PE_ERROR
++  PE_SENDRESPONSE
++);
++
++our $VERSION = '2.22.0';
++
++extends 'Lemonldap::NG::Portal::Main::Plugin';
++
++use constant name => 'SSHCA';
++
++# MenuTab configuration - rule for displaying the tab
++has rule => (
++    is      => 'ro',
++    lazy    => 1,
++    builder => sub { $_[0]->conf->{portalDisplaySshCa} // 0 },
++);
++with 'Lemonldap::NG::Portal::MenuTab';
++
++# INITIALIZATION
++
++sub init {
++    my ($self) = @_;
++
++    # Check that SSH CA is enabled
++    unless ( $self->conf->{sshCaActivation} ) {
++        $self->logger->debug('SSH CA plugin not enabled');
++        return 1;
++    }
++
++    $self->logger->debug('SSH CA plugin initialized');
++
++    # GET /ssh/ca - Public CA key (no auth required)
++    $self->addUnauthRoute(
++        ssh => { ca => 'sshCaPublicKey' },
++        ['GET']
++    );
++
++    # GET /ssh/revoked - Key Revocation List (no auth required)
++    $self->addUnauthRoute(
++        ssh => { revoked => 'sshCaKrl' },
++        ['GET']
++    );
++
++    # POST /ssh/sign - Sign user's SSH key (auth required)
++    $self->addAuthRoute(
++        ssh => { sign => 'sshCaSign' },
++        ['POST']
++    );
++
++    # GET /ssh/admin - Display the revocation interface (auth required, admin)
++    $self->addAuthRoute(
++        ssh => { admin => 'sshAdminInterface' },
++        ['GET']
++    );
++
++    # GET /ssh/certs - List/search certificates (auth required, admin)
++    $self->addAuthRoute(
++        ssh => { certs => 'sshCertsList' },
++        ['GET']
++    );
++
++    # POST /ssh/revoke - Revoke a certificate (auth required, admin)
++    $self->addAuthRoute(
++        ssh => { revoke => 'sshCertRevoke' },
++        ['POST']
++    );
++
++    # GET /ssh/* - Display the signing interface (auth required, wildcard route)
++    $self->addAuthRoute( ssh => { '*' => 'sshInterface' }, ['GET'] );
++
++    return 1;
++}
++
++# MENUTAB - Display method for the portal menu tab
++
++sub display {
++    my ( $self, $req ) = @_;
++
++    # Max validity in days (default 365 days = 1 year)
++    my $maxValidityDays = $self->conf->{sshCaCertMaxValidity} || 365;
++
++    return {
++        logo => 'certificate',
++        name => 'SSHCA',
++        id   => 'sshca',
++        html => $self->loadTemplate(
++            $req, 'sshca',
++            params => {
++                MAX_VALIDITY_DAYS => $maxValidityDays,
++                js => "$self->{p}->{staticPrefix}/common/js/sshca.js",
++            }
++        ),
++    };
++}
++
++# GET /ssh - Display the signing interface
++sub sshInterface {
++    my ( $self, $req ) = @_;
++
++    return $self->p->do( $req, [ sub { PE_OK } ] );
++}
++
++# =============================================================================
++# ROUTE HANDLERS
++# =============================================================================
++
++# GET /ssh/ca.pub - Return SSH CA public key
++sub sshCaPublicKey {
++    my ( $self, $req ) = @_;
++
++    # Get the key reference from config
++    my $keyRef = $self->conf->{sshCaKeyRef};
++    unless ($keyRef) {
++        $self->logger->error(
++            'SSH CA: No key reference configured (sshCaKeyRef)');
++        return $self->p->sendError( $req, 'SSH CA not configured', 500 );
++    }
++
++    # Get the key from LLNG keys store
++    my $keys    = $self->conf->{keys} || {};
++    my $keyData = $keys->{$keyRef};
++    unless ($keyData) {
++        $self->logger->error("SSH CA: Key '$keyRef' not found in keys store");
++        return $self->p->sendError( $req, 'SSH CA key not found', 500 );
++    }
++
++    # Get the public key
++    my $publicKey = $keyData->{keyPublic};
++    unless ($publicKey) {
++        $self->logger->error("SSH CA: No public key for '$keyRef'");
++        return $self->p->sendError( $req, 'SSH CA public key not found', 500 );
++    }
++
++    # Convert PEM public key to SSH format
++    my $sshPubKey = $self->_pemToSshPublicKey( $publicKey, $keyRef );
++    unless ($sshPubKey) {
++        $self->logger->error(
++            'SSH CA: Failed to convert public key to SSH format');
++        return $self->p->sendError( $req, 'Failed to convert key', 500 );
++    }
++
++    $self->logger->debug('SSH CA: Serving public key');
++
++    return [
++        200,
++        [
++            'Content-Type'  => 'text/plain; charset=utf-8',
++            'Cache-Control' => 'public, max-age=3600',
++        ],
++        [$sshPubKey]
++    ];
++}
++
++# GET /ssh/revoked - Return SSH Key Revocation List (KRL)
++sub sshCaKrl {
++    my ( $self, $req ) = @_;
++
++    my $krlPath = $self->conf->{sshCaKrlPath};
++    unless ($krlPath) {
++        $self->logger->error('SSH CA: No KRL path configured');
++        return $self->p->sendError( $req, 'KRL not configured', 500 );
++    }
++
++    # Read KRL file if it exists
++    if ( -f $krlPath ) {
++        open my $fh, '<:raw', $krlPath or do {
++            $self->logger->error("SSH CA: Cannot read KRL file: $!");
++            return $self->p->sendError( $req, 'Cannot read KRL', 500 );
++        };
++        local $/;
++        my $krlData = <$fh>;
++        close $fh;
++
++        $self->logger->debug('SSH CA: Serving KRL');
++
++        return [
++            200,
++            [
++                'Content-Type'  => 'application/octet-stream',
++                'Cache-Control' => 'public, max-age=300',
++            ],
++            [$krlData]
++        ];
++    }
++    else {
++        # Return empty KRL if file doesn't exist
++        $self->logger->debug(
++            'SSH CA: KRL file not found, returning empty response');
++        return [
++            200,
++            [
++                'Content-Type'  => 'application/octet-stream',
++                'Cache-Control' => 'public, max-age=300',
++            ],
++            ['']
++        ];
++    }
++}
++
++# POST /ssh/sign - Sign user's SSH public key
++sub sshCaSign {
++    my ( $self, $req ) = @_;
++
++    # Parse JSON request body
++    my $body = eval { from_json( $req->content ) };
++    if ($@) {
++        $self->logger->error("SSH CA sign: Invalid JSON body: $@");
++        return $self->_badRequest( $req, 'Invalid JSON' );
++    }
++
++    my $userPubKey = $body->{public_key};
++    unless ($userPubKey) {
++        return $self->_badRequest( $req, 'public_key parameter required' );
++    }
++
++   # Validate SSH public key format: type, base64, optional comment, single line
++   # Strict validation to prevent injection attacks
++    unless ( $userPubKey =~
++        /\A(ssh-\w+|ecdsa-sha2-\w+)\s+[A-Za-z0-9+\/]+={0,2}(?:\s+[^\r\n]*)?\z/ )
++    {
++        return $self->_badRequest( $req, 'Invalid SSH public key format' );
++    }
++
++    # Get validity from request (in days) or default to 30 days
++    my $validityDays = $body->{validity_days} || 30;
++
++    # Enforce maximum validity (in days, default 365)
++    my $maxValidityDays = $self->conf->{sshCaCertMaxValidity} || 365;
++    $validityDays = $maxValidityDays if $validityDays > $maxValidityDays;
++
++    # Convert to minutes for ssh-keygen
++    my $validityMinutes = $validityDays * 24 * 60;
++
++ # SECURITY: Always derive principals from the authenticated user's session
++ # Never trust principals from the request body to prevent impersonation attacks
++    my @principals;
++
++    # Evaluate principal sources from config (e.g., '$uid' or '$uid $mail')
++    my $principalSources = $self->conf->{sshCaPrincipalSources} || '$uid';
++
++    # Safe variable substitution without using /e to avoid eval-like behavior
++    my $principal = '';
++    my $template  = $principalSources;
++    my $pos       = 0;
++
++    while ( $template =~ /\$(\w+)/g ) {
++        my $match_start = $-[0];
++        my $match_end   = $+[0];
++
++        # Append text before the match
++        $principal .= substr( $template, $pos, $match_start - $pos );
++
++        # Get value from userData or sessionInfo
++        my $key = $1;
++        my $val = $req->userData->{$key};
++        $val = $req->sessionInfo->{$key} if !defined $val || $val eq '';
++        $val = ''                        if !defined $val;
++
++        $principal .= $val;
++        $pos = $match_end;
++    }
++
++    # Append remaining text after last match
++    $principal .= substr( $template, $pos ) if $pos < length($template);
++    $principal =~ s/^\s+|\s+$//g;    # trim
++
++    # Split on whitespace if multiple principals
++    @principals = grep { $_ ne '' } split /\s+/, $principal;
++
++  # Log warning if client tried to specify principals (potential attack attempt)
++    if ( $body->{principals} && ref $body->{principals} eq 'ARRAY' ) {
++        $self->logger->warn(
++                "SSH CA sign: Ignoring 'principals' parameter from request "
++              . "(user: "
++              . ( $req->user || 'unknown' ) . "). "
++              . "Principals are always derived from session for security." );
++    }
++
++    unless (@principals) {
++        $self->logger->error('SSH CA sign: No principals available');
++        return $self->_badRequest( $req, 'No principals available' );
++    }
++
++    # Get user info for key_id
++    my $whatToTrace = $self->conf->{whatToTrace} || 'uid';
++    my $user =
++         $req->userData->{$whatToTrace}
++      || $req->sessionInfo->{$whatToTrace}
++      || $req->userData->{uid}
++      || $req->sessionInfo->{uid}
++      || $req->user
++      || 'unknown';
++
++    # Generate serial number
++    my $serial = $self->_getNextSerial();
++
++    # Generate key_id
++    my $timestamp = time();
++    my $keyId     = sprintf( "%s\@llng-%d-%06d", $user, $timestamp, $serial );
++
++    # Sign the certificate
++    my $result =
++      $self->_signSshKey( $userPubKey, \@principals, $validityMinutes, $serial,
++        $keyId );
++
++    unless ( $result && $result->{certificate} ) {
++        $self->logger->error('SSH CA sign: Failed to sign key');
++        return $self->p->sendJSONresponse(
++            $req,
++            { error => 'Failed to sign SSH key' },
++            code => 500
++        );
++    }
++
++    # Calculate expiration time
++    my $validUntil    = time() + ( $validityMinutes * 60 );
++    my @t             = gmtime($validUntil);
++    my $validUntilISO = sprintf(
++        "%04d-%02d-%02dT%02d:%02d:%02dZ",
++        $t[5] + 1900,
++        $t[4] + 1,
++        $t[3], $t[2], $t[1], $t[0]
++    );
++
++    $self->logger->info( "SSH CA: Certificate issued for user '$user', "
++          . "principals: "
++          . join( ',', @principals ) . ", "
++          . "validity: ${validityMinutes}min, serial: $serial" );
++
++    # Store certificate in persistent session for revocation tracking
++    $self->_storeCertificate(
++        $req,
++        serial     => $serial,
++        key_id     => $keyId,
++        user       => $user,
++        principals => \@principals,
++        issued_at  => $timestamp,
++        expires_at => $validUntil,
++    );
++
++    # Audit log
++    $self->p->auditLog(
++        $req,
++        code       => 'SSH_CERT_ISSUED',
++        user       => $user,
++        message    => "SSH certificate issued for user '$user'",
++        principals => \@principals,
++        serial     => $serial,
++        key_id     => $keyId,
++        validity   => $validityMinutes,
++    );
++
++    return $self->p->sendJSONresponse(
++        $req,
++        {
++            certificate => $result->{certificate},
++            serial      => $serial,
++            valid_until => $validUntilISO,
++            principals  => \@principals,
++            key_id      => $keyId,
++        }
++    );
++}
++
++# =============================================================================
++# HELPER METHODS
++# =============================================================================
++
++sub _badRequest {
++    my ( $self, $req, $message ) = @_;
++    $message ||= 'Bad Request';
++
++    return $self->p->sendJSONresponse( $req, { error => $message },
++        code => 400 );
++}
++
++# HELPER: Get next serial number (atomic increment)
++sub _getNextSerial {
++    my ($self) = @_;
++
++    my $serialPath = $self->conf->{sshCaSerialPath}
++      || '/var/lib/lemonldap-ng/ssh/serial';
++
++    # Ensure directory exists
++    my $dir = $serialPath;
++    $dir =~ s|/[^/]+$||;
++    unless ( -d $dir ) {
++        require File::Path;
++        File::Path::make_path($dir);
++    }
++
++    # Read current serial, increment, and write back atomically using flock
++    use Fcntl qw(:flock);
++
++    my $serial = 1;
++
++  # Open file in append+read mode to ensure file is created if it doesn't exist.
++  # We then seek to beginning to read/write. This avoids a TOCTOU race when
++  # checking existence separately from opening.
++    if ( open my $fh, '+>>', $serialPath ) {
++
++        # Acquire exclusive lock to prevent race conditions
++        flock( $fh, LOCK_EX ) or do {
++            $self->logger->warn("SSH CA: Cannot lock serial file: $!");
++            close $fh;
++            return $serial;
++        };
++
++        # Seek to beginning to read current value
++        seek( $fh, 0, 0 );
++        my $current = <$fh>;
++        if ( defined $current ) {
++            chomp $current;
++            $serial = int($current) + 1 if $current =~ /^\d+$/;
++        }
++
++        # Truncate and write new serial
++        seek( $fh, 0, 0 );
++        truncate( $fh, 0 );
++        print $fh "$serial\n";
++
++        # Lock is released when file handle is closed
++        close $fh;
++    }
++    else {
++        $self->logger->warn("SSH CA: Cannot open serial file: $!");
++    }
++
++    return $serial;
++}
++
++# HELPER: Sign SSH key using ssh-keygen
++sub _signSshKey {
++    my ( $self, $userPubKey, $principals, $validityMinutes, $serial, $keyId ) =
++      @_;
++
++    require File::Temp;
++
++    # Get CA private key
++    my $keyRef = $self->conf->{sshCaKeyRef};
++    unless ($keyRef) {
++        $self->logger->error('SSH CA: No key reference configured');
++        return undef;
++    }
++
++    my $keys    = $self->conf->{keys} || {};
++    my $keyData = $keys->{$keyRef};
++    unless ( $keyData && $keyData->{keyPrivate} ) {
++        $self->logger->error(
++            "SSH CA: Key '$keyRef' not found or has no private key");
++        return undef;
++    }
++
++    # Create temp directory for key files
++    my $tmpdir = File::Temp::tempdir( CLEANUP => 1 );
++
++    # Write CA private key to temp file (convert PEM to OpenSSH format)
++    my $caKeyFile    = "$tmpdir/ca_key";
++    my $caKeyOpenSSH = $self->_pemToOpenSSHPrivateKey( $keyData->{keyPrivate} );
++    unless ($caKeyOpenSSH) {
++        $self->logger->error('SSH CA: Failed to convert CA key');
++        return undef;
++    }
++
++    open my $fh, '>', $caKeyFile or do {
++        $self->logger->error("SSH CA: Cannot write CA key: $!");
++        return undef;
++    };
++    print $fh $caKeyOpenSSH;
++    print $fh "\n" unless $caKeyOpenSSH =~ /\n$/;
++    close $fh;
++    chmod 0600, $caKeyFile;
++
++    # Write user's public key to temp file
++    my $userKeyFile = "$tmpdir/user_key.pub";
++    open $fh, '>', $userKeyFile or do {
++        $self->logger->error("SSH CA: Cannot write user key: $!");
++        return undef;
++    };
++    print $fh $userPubKey;
++    print $fh "\n" unless $userPubKey =~ /\n$/;
++    close $fh;
++
++    # Build ssh-keygen command
++    my @cmd = (
++        'ssh-keygen',
++        '-s', $caKeyFile,                   # CA key
++        '-I', $keyId,                       # Key identity
++        '-n', join( ',', @$principals ),    # Principals
++        '-V', "+${validityMinutes}m",       # Validity
++        '-z', $serial,                      # Serial number
++        $userKeyFile                        # User's public key to sign
++    );
++
++    $self->logger->debug( "SSH CA: Running: " . join( ' ', @cmd ) );
++
++    # Execute ssh-keygen
++    my $output = '';
++    my $pid    = open my $pipe, '-|';
++    if ( !defined $pid ) {
++        $self->logger->error("SSH CA: Cannot fork: $!");
++        return undef;
++    }
++    elsif ( $pid == 0 ) {
++
++        # Child process
++        open STDERR, '>&', \*STDOUT;
++        exec @cmd;
++        exit 1;
++    }
++    else {
++        # Parent process
++        local $/;
++        $output = <$pipe>;
++        close $pipe;
++    }
++
++    my $exitCode = $? >> 8;
++    if ( $exitCode != 0 ) {
++        $self->logger->error(
++            "SSH CA: ssh-keygen failed (exit $exitCode): $output");
++        return undef;
++    }
++
++    # Read the generated certificate
++    my $certFile = "$tmpdir/user_key-cert.pub";
++    unless ( -f $certFile ) {
++        $self->logger->error("SSH CA: Certificate file not created");
++        return undef;
++    }
++
++    open $fh, '<', $certFile or do {
++        $self->logger->error("SSH CA: Cannot read certificate: $!");
++        return undef;
++    };
++    my $certificate = <$fh>;
++    close $fh;
++    chomp $certificate;
++
++    return { certificate => $certificate };
++}
++
++# HELPER: Convert PEM private key to OpenSSH format
++sub _pemToOpenSSHPrivateKey {
++    my ( $self, $pemKey ) = @_;
++
++    # First, try to detect if it's already in OpenSSH format
++    if ( $pemKey =~ /^-----BEGIN OPENSSH PRIVATE KEY-----/ ) {
++        return $pemKey;
++    }
++
++    # RSA keys in traditional format - ssh-keygen can read these directly
++    if ( $pemKey =~ /BEGIN RSA PRIVATE KEY/ ) {
++        return $pemKey;
++    }
++
++    # For Ed25519 PEM keys, we need to convert to OpenSSH format
++    # because ssh-keygen cannot read Ed25519 PEM keys
++    if (   $pemKey =~ /BEGIN PRIVATE KEY/
++        || $pemKey =~ /BEGIN ED25519 PRIVATE KEY/ )
++    {
++        eval {
++            require Crypt::PK::Ed25519;
++            require MIME::Base64;
++
++            my $pk = Crypt::PK::Ed25519->new( \$pemKey );
++
++            # Get raw keys
++            my $privRaw = $pk->export_key_raw('private');    # 32 bytes
++            my $pubRaw  = $pk->export_key_raw('public');     # 32 bytes
++
++            # Build OpenSSH private key format
++            my $opensshKey =
++              $self->_buildOpenSSHPrivateKey( $privRaw, $pubRaw, '' );
++            return $opensshKey if $opensshKey;
++        };
++        if ($@) {
++            $self->logger->error("SSH CA: Failed to convert Ed25519 key: $@");
++        }
++    }
++
++    # EC keys - ssh-keygen can typically read these
++    if ( $pemKey =~ /BEGIN EC PRIVATE KEY/ ) {
++        return $pemKey;
++    }
++
++    # Fallback: return as-is and let ssh-keygen try
++    return $pemKey;
++}
++
++# HELPER: Build OpenSSH private key format from raw Ed25519 key material
++sub _buildOpenSSHPrivateKey {
++    my ( $self, $privRaw, $pubRaw, $comment ) = @_;
++
++    require MIME::Base64;
++
++    # OpenSSH private key format for Ed25519 (unencrypted):
++    # - Magic: "openssh-key-v1\0"
++    # - Cipher name: "none" (string with length prefix)
++    # - KDF name: "none" (string with length prefix)
++    # - KDF options: empty string (length 0)
++    # - Number of keys: 1 (uint32)
++    # - Public key section (length-prefixed)
++    # - Private/encrypted section (length-prefixed)
++
++    my $keytype = 'ssh-ed25519';
++
++    # Build public key blob
++    my $pubBlob = pack( 'N', length($keytype) ) . $keytype;
++    $pubBlob .= pack( 'N', length($pubRaw) ) . $pubRaw;
++
++    # Build private section
++    # Generate random check integers (must match)
++    my $checkInt = int( rand(0xFFFFFFFF) );
++
++    my $privSection = '';
++    $privSection .= pack( 'N', $checkInt );    # check-int 1
++    $privSection .= pack( 'N', $checkInt );    # check-int 2 (must match)
++
++    # Key type
++    $privSection .= pack( 'N', length($keytype) ) . $keytype;
++
++    # Public key (32 bytes)
++    $privSection .= pack( 'N', length($pubRaw) ) . $pubRaw;
++
++    # Secret buffer: private key (32 bytes) + public key (32 bytes) = 64 bytes
++    my $secretBuf = $privRaw . $pubRaw;
++    $privSection .= pack( 'N', length($secretBuf) ) . $secretBuf;
++
++    # Comment
++    $comment //= '';
++    $privSection .= pack( 'N', length($comment) ) . $comment;
++
++    # Padding to 8-byte block size (for "none" cipher)
++    my $blockSize = 8;
++    my $padLen    = $blockSize - ( length($privSection) % $blockSize );
++    $padLen = 0 if $padLen == $blockSize;
++    for my $i ( 1 .. $padLen ) {
++        $privSection .= chr($i);
++    }
++
++    # Build full key
++    my $key = '';
++
++    # Magic header
++    $key .= "openssh-key-v1\0";
++
++    # Cipher name: "none"
++    my $cipher = 'none';
++    $key .= pack( 'N', length($cipher) ) . $cipher;
++
++    # KDF name: "none"
++    my $kdf = 'none';
++    $key .= pack( 'N', length($kdf) ) . $kdf;
++
++    # KDF options: empty
++    $key .= pack( 'N', 0 );
++
++    # Number of keys
++    $key .= pack( 'N', 1 );
++
++    # Public key section
++    $key .= pack( 'N', length($pubBlob) ) . $pubBlob;
++
++    # Private section
++    $key .= pack( 'N', length($privSection) ) . $privSection;
++
++    # Encode as PEM
++    my $b64    = MIME::Base64::encode_base64( $key, '' );
++    my $pem    = "-----BEGIN OPENSSH PRIVATE KEY-----\n";
++    my $offset = 0;
++    while ( $offset < length($b64) ) {
++        $pem .= substr( $b64, $offset, 70 ) . "\n";
++        $offset += 70;
++    }
++    $pem .= "-----END OPENSSH PRIVATE KEY-----\n";
++
++    return $pem;
++}
++
++# HELPER: Convert PEM public key to SSH format
++sub _pemToSshPublicKey {
++    my ( $self, $pemKey, $comment ) = @_;
++
++    require MIME::Base64;
++
++    my $sshKey;
++
++    # Try Ed25519 first
++    eval {
++        require Crypt::PK::Ed25519;
++        my $pk     = Crypt::PK::Ed25519->new( \$pemKey );
++        my $rawKey = $pk->export_key_raw('public');
++
++        # Build SSH format: string "ssh-ed25519" + string <32 bytes key>
++        my $keyType = 'ssh-ed25519';
++        my $blob =
++            pack( 'N', length($keyType) )
++          . $keyType
++          . pack( 'N', length($rawKey) )
++          . $rawKey;
++
++        $sshKey = "$keyType " . MIME::Base64::encode_base64( $blob, '' );
++    };
++
++    # Try RSA if Ed25519 failed
++    if ( $@ || !$sshKey ) {
++        eval {
++            require Crypt::PK::RSA;
++            my $pk = Crypt::PK::RSA->new( \$pemKey );
++
++            # RSA keys can use export_key_openssh
++            $sshKey = $pk->export_key_openssh;
++        };
++    }
++
++    unless ($sshKey) {
++        $self->logger->error("SSH CA: Failed to convert key to SSH format: $@");
++        return undef;
++    }
++
++    # Add comment (SSH key has format: type base64 [comment])
++    chomp($sshKey);
++    my @parts = split /\s+/, $sshKey;
++    if ( @parts == 2 ) {
++
++        # No comment yet, add one
++        $sshKey .= " LLNG-SSH-CA-$comment";
++    }
++
++    return "$sshKey\n";
++}
++
++# =============================================================================
++# ADMIN INTERFACE METHODS
++# =============================================================================
++
++# GET /ssh/admin - Display the revocation interface
++# Access control is handled by locationRules on the portal vhost
++sub sshAdminInterface {
++    my ( $self, $req ) = @_;
++
++    return $self->p->sendHtml( $req, 'sshcaadmin' );
++}
++
++# GET /ssh/certs - List/search certificates from persistent sessions
++# Access control is handled by locationRules on the portal vhost
++sub sshCertsList {
++    my ( $self, $req ) = @_;
++
++    # Get search parameters
++    my $userFilter   = $req->param('user')   || '';
++    my $serialFilter = $req->param('serial') || '';
++    my $keyIdFilter  = $req->param('key_id') || '';
++    my $statusFilter = $req->param('status') || '';   # active, revoked, expired
++    my $limit        = int( $req->param('limit')  || 100 );
++    my $offset       = int( $req->param('offset') || 0 );
++
++    $limit = 1000 if $limit > 1000;
++
++    # Search in persistent sessions
++    my $moduleOptions = {
++        backend => $self->conf->{persistentStorage}
++          || $self->conf->{globalStorage},
++        %{
++                 $self->conf->{persistentStorageOptions}
++              || $self->conf->{globalStorageOptions}
++              || {}
++        },
++    };
++
++    my @fields = qw( _session_kind _session_uid _sshCerts );
++
++    # Search for all persistent sessions that have _sshCerts
++    my $res =
++      Lemonldap::NG::Common::Apache::Session->searchOnExpr( $moduleOptions,
++        '_session_kind', 'Persistent', @fields );
++
++    my @certs;
++    my $now = time();
++
++    for my $sessionId ( keys %{ $res || {} } ) {
++        my $session = $res->{$sessionId};
++
++        # Skip if no SSH certs
++        next unless $session->{_sshCerts};
++
++        my $user     = $session->{_session_uid} || '';
++        my $sshCerts = eval { from_json( $session->{_sshCerts} ) };
++        next if $@ || ref($sshCerts) ne 'ARRAY';
++
++        # Apply user filter at session level
++        if ( $userFilter && $user !~ /\Q$userFilter\E/i ) {
++            next;
++        }
++
++        for my $cert (@$sshCerts) {
++
++            # Apply filters
++            if ( $serialFilter && $cert->{serial} ne $serialFilter ) {
++                next;
++            }
++            if ( $keyIdFilter
++                && ( $cert->{key_id} || '' ) !~ /\Q$keyIdFilter\E/i )
++            {
++                next;
++            }
++
++            # Determine status
++            my $certStatus = 'active';
++            if ( $cert->{revoked_at} ) {
++                $certStatus = 'revoked';
++            }
++            elsif ( $cert->{expires_at} && $cert->{expires_at} < $now ) {
++                $certStatus = 'expired';
++            }
++
++            # Apply status filter
++            if ( $statusFilter && $certStatus ne $statusFilter ) {
++                next;
++            }
++
++            push @certs,
++              {
++                session_id    => $sessionId,
++                serial        => $cert->{serial},
++                key_id        => $cert->{key_id},
++                user          => $user,
++                principals    => $cert->{principals},
++                issued_at     => $cert->{issued_at},
++                expires_at    => $cert->{expires_at},
++                revoked_at    => $cert->{revoked_at},
++                revoked_by    => $cert->{revoked_by},
++                revoke_reason => $cert->{revoke_reason},
++                status        => $certStatus,
++              };
++        }
++    }
++
++    # Sort by issued_at descending (newest first)
++    @certs =
++      sort { ( $b->{issued_at} || 0 ) <=> ( $a->{issued_at} || 0 ) } @certs;
++
++    my $total = scalar @certs;
++
++    # Apply pagination
++    if ( $offset > 0 || $limit < $total ) {
++        @certs = splice( @certs, $offset, $limit );
++    }
++
++    return $self->p->sendJSONresponse(
++        $req,
++        {
++            certificates => \@certs,
++            total        => $total,
++            limit        => $limit,
++            offset       => $offset,
++        }
++    );
++}
++
++# POST /ssh/revoke - Revoke a certificate in persistent session
++# Access control is handled by locationRules on the portal vhost
++sub sshCertRevoke {
++    my ( $self, $req ) = @_;
++
++    # Parse request body
++    my $body = eval { from_json( $req->content ) };
++    if ($@) {
++        $self->logger->error("SSH revoke: Invalid JSON body: $@");
++        return $self->_badRequest( $req, 'Invalid JSON' );
++    }
++
++    my $sessionId = $body->{session_id};
++    my $serial    = $body->{serial};
++    my $reason    = $body->{reason} || '';
++
++    unless ( $sessionId && $serial ) {
++        return $self->_badRequest( $req, 'session_id and serial required' );
++    }
++
++    # Get current admin user
++    my $adminUser =
++         $req->userData->{ $self->conf->{whatToTrace} }
++      || $req->userData->{uid}
++      || $req->user
++      || 'unknown';
++
++    # Load the persistent session
++    my $moduleOptions = {
++        storageModule => $self->conf->{persistentStorage}
++          || $self->conf->{globalStorage},
++        storageModuleOptions => $self->conf->{persistentStorageOptions}
++          || $self->conf->{globalStorageOptions}
++          || {},
++    };
++
++    my $psession = Lemonldap::NG::Common::Session->new( {
++            %$moduleOptions,
++            id    => $sessionId,
++            force => 1,
++        }
++    );
++
++    unless ( $psession && !$psession->error ) {
++        return $self->p->sendJSONresponse(
++            $req,
++            { error => 'Session not found' },
++            code => 404
++        );
++    }
++
++    # Get SSH certs from session
++    my $sshCerts = [];
++    if ( $psession->data->{_sshCerts} ) {
++        $sshCerts = eval { from_json( $psession->data->{_sshCerts} ) };
++        if ($@) {
++            $self->logger->error("SSH revoke: Corrupted _sshCerts: $@");
++            return $self->p->sendJSONresponse(
++                $req,
++                { error => 'Corrupted certificate data' },
++                code => 500
++            );
++        }
++    }
++
++    # Find and update the certificate
++    my $found = 0;
++    my $user  = $psession->data->{_session_uid} || '';
++    my $keyId;
++
++    for my $cert (@$sshCerts) {
++        if ( $cert->{serial} eq $serial ) {
++            if ( $cert->{revoked_at} ) {
++                return $self->p->sendJSONresponse(
++                    $req,
++                    { error => 'Certificate already revoked' },
++                    code => 400
++                );
++            }
++            $cert->{revoked_at}    = time();
++            $cert->{revoked_by}    = $adminUser;
++            $cert->{revoke_reason} = $reason;
++            $keyId                 = $cert->{key_id};
++            $found                 = 1;
++            last;
++        }
++    }
++
++    unless ($found) {
++        return $self->p->sendJSONresponse(
++            $req,
++            { error => 'Certificate not found' },
++            code => 404
++        );
++    }
++
++    # Update session
++    $psession->update( { _sshCerts => to_json($sshCerts) } );
++
++    # Update the KRL file
++    my $krlUpdated = $self->_updateKrl($serial);
++
++    $self->logger->info( "SSH CA: Certificate revoked by '$adminUser': "
++          . "serial=$serial, key_id=$keyId, user=$user, reason=$reason" );
++
++    # Audit log
++    $self->p->auditLog(
++        $req,
++        code    => 'SSH_CERT_REVOKED',
++        user    => $user,
++        admin   => $adminUser,
++        message => "SSH certificate revoked for user '$user' by '$adminUser'",
++        serial  => $serial,
++        key_id  => $keyId,
++        reason  => $reason,
++        krl_update => $krlUpdated ? 'success' : 'failed',
++    );
++
++    return $self->p->sendJSONresponse(
++        $req,
++        {
++            result      => 1,
++            serial      => $serial,
++            key_id      => $keyId,
++            user        => $user,
++            revoked_at  => time(),
++            revoked_by  => $adminUser,
++            krl_updated => $krlUpdated ? JSON::true : JSON::false,
++        }
++    );
++}
++
++# HELPER: Store certificate in user's persistent session
++sub _storeCertificate {
++    my ( $self, $req, %args ) = @_;
++
++    # Build certificate record
++    my $certRecord = {
++        serial     => $args{serial},
++        key_id     => $args{key_id},
++        principals => join( ',', @{ $args{principals} || [] } ),
++        issued_at  => $args{issued_at},
++        expires_at => $args{expires_at},
++    };
++
++    # Get existing certificates from persistent session
++    my $sshCerts = [];
++    if ( $req->sessionInfo->{_sshCerts} ) {
++        $sshCerts = eval { from_json( $req->sessionInfo->{_sshCerts} ) };
++        if ( $@ || ref($sshCerts) ne 'ARRAY' ) {
++            $self->logger->warn("SSH CA: Corrupted _sshCerts, resetting: $@");
++            $sshCerts = [];
++        }
++    }
++
++    # Add new certificate
++    push @$sshCerts, $certRecord;
++
++    # Update persistent session
++    $self->p->updatePersistentSession( $req,
++        { _sshCerts => to_json($sshCerts) } );
++
++    $self->logger->debug(
++        "SSH CA: Stored certificate serial=$args{serial} in persistent session"
++    );
++    return 1;
++}
++
++# HELPER: Update KRL file with revoked serial
++sub _updateKrl {
++    my ( $self, $serial ) = @_;
++
++    my $krlPath = $self->conf->{sshCaKrlPath}
++      || '/var/lib/lemonldap-ng/ssh/revoked_keys';
++
++    # Ensure directory exists
++    my $dir = $krlPath;
++    $dir =~ s|/[^/]+$||;
++    unless ( -d $dir ) {
++        require File::Path;
++        File::Path::make_path($dir);
++    }
++
++    # Get CA public key for KRL
++    my $keyRef = $self->conf->{sshCaKeyRef};
++    unless ($keyRef) {
++        $self->logger->error('SSH CA: No key reference configured for KRL');
++        return 0;
++    }
++
++    my $keys    = $self->conf->{keys} || {};
++    my $keyData = $keys->{$keyRef};
++    unless ( $keyData && $keyData->{keyPublic} ) {
++        $self->logger->error("SSH CA: Key '$keyRef' not found for KRL");
++        return 0;
++    }
++
++    my $caPubKey = $self->_pemToSshPublicKey( $keyData->{keyPublic}, $keyRef );
++    unless ($caPubKey) {
++        $self->logger->error('SSH CA: Failed to convert CA public key for KRL');
++        return 0;
++    }
++
++    require File::Temp;
++    my $tmpdir = File::Temp::tempdir( CLEANUP => 1 );
++
++    # Write CA public key
++    my $caPubFile = "$tmpdir/ca.pub";
++    open my $fh, '>', $caPubFile or do {
++        $self->logger->error("SSH CA: Cannot write CA public key: $!");
++        return 0;
++    };
++    print $fh $caPubKey;
++    close $fh;
++
++    # Create KRL spec file with serial to revoke
++    my $specFile = "$tmpdir/revoke_spec";
++    open $fh, '>', $specFile or do {
++        $self->logger->error("SSH CA: Cannot write revoke spec: $!");
++        return 0;
++    };
++    print $fh "serial: $serial\n";
++    close $fh;
++
++    # Build ssh-keygen command to update KRL
++    # -k: Generate a KRL
++    # -u: Update existing KRL (only if file exists)
++    # -s: CA public key
++    # -f: KRL file
++    my @cmd = ( 'ssh-keygen', '-k' );
++
++    # Only use -u if KRL file already exists
++    push @cmd, '-u' if -f $krlPath;
++
++    push @cmd, '-s', $caPubFile, '-f', $krlPath, $specFile;
++
++    $self->logger->debug( "SSH CA: Updating KRL: " . join( ' ', @cmd ) );
++
++    # Execute ssh-keygen
++    my $output = '';
++    my $pid    = open my $pipe, '-|';
++    if ( !defined $pid ) {
++        $self->logger->error("SSH CA: Cannot fork for KRL update: $!");
++        return 0;
++    }
++    elsif ( $pid == 0 ) {
++        open STDERR, '>&', \*STDOUT;
++        exec @cmd;
++        exit 1;
++    }
++    else {
++        local $/;
++        $output = <$pipe>;
++        close $pipe;
++    }
++
++    my $exitCode = $? >> 8;
++    if ( $exitCode != 0 ) {
++        $self->logger->error(
++            "SSH CA: KRL update failed (exit $exitCode): $output");
++        return 0;
++    }
++
++    $self->logger->info("SSH CA: KRL updated with revoked serial $serial");
++    return 1;
++}
++
++1;
 --- /dev/null
 +++ b/usr/share/lemonldap-ng/portal/htdocs/static/common/js/pamaccess.js
 @@ -0,0 +1,63 @@
@@ -3089,6 +4550,431 @@ new file mode 100644
 +})();
 new file mode 100644
 --- /dev/null
++++ b/usr/share/lemonldap-ng/portal/js-src/sshca.js
+@@ -0,0 +1,100 @@
++(function() {
++  $(window).on("load", function() {
++    var form = document.getElementById('sshCaForm');
++    if (!form) return;
++
++    var resultDiv = document.getElementById('sshCaResult');
++    var errorDiv = document.getElementById('sshCaError');
++    var certTextarea = document.getElementById('sshCertificate');
++    var keyIdSpan = document.getElementById('sshKeyId');
++    var principalsSpan = document.getElementById('sshPrincipals');
++    var validUntilSpan = document.getElementById('sshValidUntil');
++    var copyBtn = document.getElementById('copySshCert');
++    var errorMsg = document.getElementById('sshCaErrorMessage');
++    var validitySelect = document.getElementById('sshValidity');
++
++    // Filter validity options based on max validity
++    if (validitySelect) {
++      var maxValidity = parseInt(validitySelect.dataset.maxValidity) || 365;
++      var options = validitySelect.querySelectorAll('option');
++      var lastValidOption = null;
++
++      options.forEach(function(option) {
++        var value = parseInt(option.value);
++        if (value > maxValidity) {
++          option.remove();
++        } else {
++          lastValidOption = option;
++        }
++      });
++
++      // Select the highest valid option if the default was removed
++      var selectedOption = validitySelect.querySelector('option[selected]');
++      if (!selectedOption && lastValidOption) {
++        lastValidOption.selected = true;
++      }
++    }
++
++    form.addEventListener('submit', function(e) {
++      e.preventDefault();
++      resultDiv.classList.add('d-none');
++      errorDiv.classList.add('d-none');
++
++      var publicKey = document.getElementById('sshPublicKey').value.trim();
++      var validityDays = parseInt(validitySelect.value);
++
++      if (!publicKey) {
++        errorMsg.textContent = 'Please paste your SSH public key';
++        errorDiv.classList.remove('d-none');
++        return;
++      }
++
++      $.ajax({
++        type: "POST",
++        url: scriptname + 'ssh/sign',
++        contentType: "application/json",
++        data: JSON.stringify({
++          public_key: publicKey,
++          validity_days: validityDays
++        }),
++        dataType: "json",
++        success: function(data) {
++          if (data.error) {
++            errorMsg.textContent = data.error;
++            errorDiv.classList.remove('d-none');
++          } else {
++            certTextarea.value = data.certificate;
++            keyIdSpan.textContent = data.key_id;
++            principalsSpan.textContent = data.principals.join(', ');
++            validUntilSpan.textContent = data.valid_until;
++            resultDiv.classList.remove('d-none');
++          }
++        },
++        error: function(xhr, status, error) {
++          var msg = error || status;
++          try {
++            var resp = JSON.parse(xhr.responseText);
++            if (resp.error) msg = resp.error;
++          } catch(e) {}
++          errorMsg.textContent = msg;
++          errorDiv.classList.remove('d-none');
++        }
++      });
++    });
++
++    // Copy button
++    if (copyBtn) {
++      copyBtn.addEventListener('click', function() {
++        certTextarea.select();
++        certTextarea.setSelectionRange(0, 99999);
++        navigator.clipboard.writeText(certTextarea.value).then(function() {
++          var originalHtml = copyBtn.innerHTML;
++          copyBtn.innerHTML = '<span class="fa fa-check"></span> Copied!';
++          setTimeout(function() {
++            copyBtn.innerHTML = originalHtml;
++          }, 2000);
++        });
++      });
++    }
++  });
++})();
+new file mode 100644
+--- /dev/null
++++ b/usr/share/lemonldap-ng/portal/js-src/sshcaadmin.js
+@@ -0,0 +1,317 @@
++(function() {
++  'use strict';
++
++  var currentPage = 0;
++  var pageSize = 20;
++  var totalCerts = 0;
++  var revokeModal = null;
++  var alertToast = null;
++
++  // Escape HTML to prevent XSS
++  function escapeHtml(str) {
++    if (str === null || str === undefined) return '';
++    return String(str)
++      .replace(/&/g, '&amp;')
++      .replace(/</g, '&lt;')
++      .replace(/>/g, '&gt;')
++      .replace(/"/g, '&quot;')
++      .replace(/'/g, '&#039;');
++  }
++
++  // Get the base URL (script name without trailing slash)
++  function getBaseUrl() {
++    var path = window.location.pathname;
++    // Remove /ssh/admin from the path to get the base
++    return path.replace(/\/ssh\/admin\/?$/, '');
++  }
++
++  // Format timestamp to readable date
++  function formatDate(timestamp) {
++    if (!timestamp) return '-';
++    var d = new Date(timestamp * 1000);
++    return d.toLocaleString();
++  }
++
++  // Get status badge HTML
++  function getStatusBadge(status) {
++    var badgeClass = 'bg-secondary';
++    var text = status;
++
++    switch(status) {
++      case 'active':
++        badgeClass = 'bg-success';
++        break;
++      case 'expired':
++        badgeClass = 'bg-secondary';
++        break;
++      case 'revoked':
++        badgeClass = 'bg-danger';
++        break;
++    }
++
++    return '<span class="badge ' + badgeClass + '">' + text + '</span>';
++  }
++
++  // Show toast notification
++  function showToast(message, type) {
++    var toastEl = document.getElementById('alertToast');
++    var toastIcon = document.getElementById('toastIcon');
++    var toastTitle = document.getElementById('toastTitle');
++    var toastMessage = document.getElementById('toastMessage');
++
++    toastMessage.textContent = message;
++
++    if (type === 'success') {
++      toastIcon.className = 'fa fa-check-circle me-2 text-success';
++      toastTitle.textContent = 'Success';
++    } else if (type === 'error') {
++      toastIcon.className = 'fa fa-exclamation-circle me-2 text-danger';
++      toastTitle.textContent = 'Error';
++    } else {
++      toastIcon.className = 'fa fa-info-circle me-2 text-info';
++      toastTitle.textContent = 'Info';
++    }
++
++    if (!alertToast) {
++      alertToast = new bootstrap.Toast(toastEl);
++    }
++    alertToast.show();
++  }
++
++  // Load certificates from API
++  function loadCertificates(page) {
++    currentPage = page || 0;
++    var offset = currentPage * pageSize;
++
++    var params = new URLSearchParams();
++    params.set('limit', pageSize);
++    params.set('offset', offset);
++
++    var user = document.getElementById('searchUser').value.trim();
++    var serial = document.getElementById('searchSerial').value.trim();
++    var keyId = document.getElementById('searchKeyId').value.trim();
++    var status = document.getElementById('searchStatus').value;
++
++    if (user) params.set('user', user);
++    if (serial) params.set('serial', serial);
++    if (keyId) params.set('key_id', keyId);
++    if (status) params.set('status', status);
++
++    var tableBody = document.getElementById('certsTable');
++    var loadingRow = document.getElementById('loadingRow');
++    var noResultsRow = document.getElementById('noResultsRow');
++    var searchPromptRow = document.getElementById('searchPromptRow');
++
++    // Show loading
++    loadingRow.classList.remove('d-none');
++    noResultsRow.classList.add('d-none');
++    if (searchPromptRow) searchPromptRow.classList.add('d-none');
++
++    // Remove existing cert rows
++    var existingRows = tableBody.querySelectorAll('.cert-row');
++    existingRows.forEach(function(row) { row.remove(); });
++
++    var baseUrl = getBaseUrl();
++
++    $.ajax({
++      type: 'GET',
++      url: baseUrl + '/ssh/certs?' + params.toString(),
++      dataType: 'json',
++      success: function(data) {
++        loadingRow.classList.add('d-none');
++
++        totalCerts = data.total || 0;
++        document.getElementById('resultCount').textContent = totalCerts;
++
++        if (!data.certificates || data.certificates.length === 0) {
++          noResultsRow.classList.remove('d-none');
++          updatePagination();
++          return;
++        }
++
++        noResultsRow.classList.add('d-none');
++
++        data.certificates.forEach(function(cert) {
++          var row = document.createElement('tr');
++          row.className = 'cert-row';
++          row.innerHTML =
++            '<td>' + escapeHtml(cert.serial || '-') + '</td>' +
++            '<td>' + escapeHtml(cert.user || '-') + '</td>' +
++            '<td><code>' + escapeHtml(cert.principals || '-') + '</code></td>' +
++            '<td>' + escapeHtml(formatDate(cert.issued_at)) + '</td>' +
++            '<td>' + escapeHtml(formatDate(cert.expires_at)) + '</td>' +
++            '<td>' + getStatusBadge(cert.status) + '</td>' +
++            '<td>' + getActionButtons(cert) + '</td>';
++          tableBody.appendChild(row);
++        });
++
++        // Bind revoke buttons
++        tableBody.querySelectorAll('.btn-revoke').forEach(function(btn) {
++          btn.addEventListener('click', function(e) {
++            e.preventDefault();
++            showRevokeModal(
++              this.dataset.sessionId,
++              this.dataset.serial,
++              this.dataset.user,
++              this.dataset.keyId
++            );
++          });
++        });
++
++        updatePagination();
++      },
++      error: function(xhr, status, error) {
++        loadingRow.classList.add('d-none');
++        noResultsRow.classList.remove('d-none');
++        noResultsRow.querySelector('td').textContent = 'Error loading certificates: ' + (error || status);
++        showToast('Failed to load certificates', 'error');
++      }
++    });
++  }
++
++  // Get action buttons HTML for a certificate
++  function getActionButtons(cert) {
++    if (cert.status === 'revoked') {
++      return '<span class="text-muted" title="Revoked by ' + escapeHtml(cert.revoked_by || 'unknown') +
++             ' at ' + escapeHtml(formatDate(cert.revoked_at)) + '">' +
++             '<span class="fa fa-ban"></span> Revoked</span>';
++    }
++
++    return '<button class="btn btn-sm btn-outline-danger btn-revoke" ' +
++           'data-session-id="' + escapeHtml(cert.session_id) + '" ' +
++           'data-serial="' + escapeHtml(cert.serial || '') + '" ' +
++           'data-user="' + escapeHtml(cert.user || '') + '" ' +
++           'data-key-id="' + escapeHtml(cert.key_id || '') + '">' +
++           '<span class="fa fa-ban"></span> Revoke</button>';
++  }
++
++  // Update pagination
++  function updatePagination() {
++    var pagination = document.getElementById('pagination');
++    pagination.innerHTML = '';
++
++    var totalPages = Math.ceil(totalCerts / pageSize);
++    if (totalPages <= 1) return;
++
++    // Previous button
++    var prevLi = document.createElement('li');
++    prevLi.className = 'page-item' + (currentPage === 0 ? ' disabled' : '');
++    prevLi.innerHTML = '<a class="page-link" href="#" data-page="' + (currentPage - 1) + '">&laquo;</a>';
++    pagination.appendChild(prevLi);
++
++    // Page numbers
++    var startPage = Math.max(0, currentPage - 2);
++    var endPage = Math.min(totalPages - 1, currentPage + 2);
++
++    for (var i = startPage; i <= endPage; i++) {
++      var li = document.createElement('li');
++      li.className = 'page-item' + (i === currentPage ? ' active' : '');
++      li.innerHTML = '<a class="page-link" href="#" data-page="' + i + '">' + (i + 1) + '</a>';
++      pagination.appendChild(li);
++    }
++
++    // Next button
++    var nextLi = document.createElement('li');
++    nextLi.className = 'page-item' + (currentPage >= totalPages - 1 ? ' disabled' : '');
++    nextLi.innerHTML = '<a class="page-link" href="#" data-page="' + (currentPage + 1) + '">&raquo;</a>';
++    pagination.appendChild(nextLi);
++
++    // Bind click handlers
++    pagination.querySelectorAll('.page-link').forEach(function(link) {
++      link.addEventListener('click', function(e) {
++        e.preventDefault();
++        var page = parseInt(this.dataset.page);
++        if (!isNaN(page) && page >= 0 && page < totalPages) {
++          loadCertificates(page);
++        }
++      });
++    });
++  }
++
++  // Show revoke modal
++  function showRevokeModal(sessionId, serial, user, keyId) {
++    document.getElementById('revokeSessionId').value = sessionId;
++    document.getElementById('revokeSerialInput').value = serial;
++    document.getElementById('revokeSerial').textContent = serial;
++    document.getElementById('revokeUser').textContent = user;
++    document.getElementById('revokeKeyId').textContent = keyId;
++    document.getElementById('revokeReason').value = '';
++
++    if (!revokeModal) {
++      revokeModal = new bootstrap.Modal(document.getElementById('revokeModal'));
++    }
++    revokeModal.show();
++  }
++
++  // Perform revocation
++  function revokeCertificate() {
++    var sessionId = document.getElementById('revokeSessionId').value;
++    var serial = document.getElementById('revokeSerialInput').value;
++    var reason = document.getElementById('revokeReason').value.trim();
++    var baseUrl = getBaseUrl();
++
++    $.ajax({
++      type: 'POST',
++      url: baseUrl + '/ssh/revoke',
++      contentType: 'application/json',
++      data: JSON.stringify({
++        session_id: sessionId,
++        serial: serial,
++        reason: reason
++      }),
++      dataType: 'json',
++      success: function(data) {
++        revokeModal.hide();
++        if (data.result) {
++          showToast('Certificate revoked successfully', 'success');
++          loadCertificates(currentPage);
++        } else {
++          showToast(data.error || 'Failed to revoke certificate', 'error');
++        }
++      },
++      error: function(xhr, status, error) {
++        revokeModal.hide();
++        var msg = error || status;
++        try {
++          var resp = JSON.parse(xhr.responseText);
++          if (resp.error) msg = resp.error;
++        } catch(e) {}
++        showToast('Failed to revoke certificate: ' + msg, 'error');
++      }
++    });
++  }
++
++  // Initialize on page load
++  $(window).on('load', function() {
++    // Search form submit
++    document.getElementById('searchForm').addEventListener('submit', function(e) {
++      e.preventDefault();
++      loadCertificates(0);
++    });
++
++    // Reset search - clear form and show search prompt
++    document.getElementById('resetSearch').addEventListener('click', function() {
++      document.getElementById('searchUser').value = '';
++      document.getElementById('searchSerial').value = '';
++      document.getElementById('searchKeyId').value = '';
++      document.getElementById('searchStatus').value = '';
++      // Clear results
++      var tableBody = document.getElementById('certsTable');
++      var existingRows = tableBody.querySelectorAll('.cert-row');
++      existingRows.forEach(function(row) { row.remove(); });
++      document.getElementById('loadingRow').classList.add('d-none');
++      document.getElementById('noResultsRow').classList.add('d-none');
++      var searchPromptRow = document.getElementById('searchPromptRow');
++      if (searchPromptRow) searchPromptRow.classList.remove('d-none');
++      document.getElementById('resultCount').textContent = '0';
++      document.getElementById('pagination').innerHTML = '';
++      totalCerts = 0;
++    });
++
++    // Confirm revoke button
++    document.getElementById('confirmRevoke').addEventListener('click', revokeCertificate);
++
++    // No initial load - wait for user to search
++    document.getElementById('loadingRow').classList.add('d-none');
++  });
++})();
+new file mode 100644
+--- /dev/null
 +++ b/usr/share/lemonldap-ng/portal/templates/bootstrap/device.tpl
 @@ -0,0 +1,113 @@
 +<TMPL_INCLUDE NAME="header.tpl">
@@ -3268,5 +5154,250 @@ new file mode 100644
 +    </div>
 +  </div>
 +</div>
+new file mode 100644
+--- /dev/null
++++ b/usr/share/lemonldap-ng/portal/templates/bootstrap/sshca.tpl
+@@ -0,0 +1,82 @@
++<script type="text/javascript" src="<TMPL_VAR NAME="js">"></script>
++<div class="card border-secondary">
++  <div class="card-header text-white bg-secondary">
++    <h4 class="card-title" trspan="sshCaTitle">SSH Certificate</h4>
++  </div>
++  <div class="card-body">
++    <p trspan="sshCaInfo">Sign your SSH public key to obtain a short-lived certificate for passwordless authentication.</p>
++
++    <form id="sshCaForm" class="mb-4">
++      <div class="form-group mb-3">
++        <label for="sshPublicKey" trspan="sshPublicKey">SSH Public Key</label>
++        <textarea class="form-control font-monospace" id="sshPublicKey" name="public_key" rows="4"
++                  placeholder="ssh-ed25519 AAAA... user@host" required></textarea>
++        <small class="form-text text-muted" trspan="sshPublicKeyHelp">Paste the contents of your ~/.ssh/id_ed25519.pub or ~/.ssh/id_rsa.pub file</small>
++      </div>
++      <div class="form-group row mb-3">
++        <label class="col-sm-4 col-form-label" for="sshValidity" trspan="sshCertValidity">Certificate validity</label>
++        <div class="col-sm-8">
++          <select class="form-control" id="sshValidity" name="validity_days" data-max-validity="<TMPL_VAR NAME="MAX_VALIDITY_DAYS">">
++            <option value="1" data-trspan="oneDay">1 day</option>
++            <option value="7" data-trspan="oneWeek">1 week</option>
++            <option value="30" data-trspan="oneMonth" selected>1 month</option>
++            <option value="90" data-trspan="threeMonths">3 months</option>
++            <option value="180" data-trspan="sixMonths">6 months</option>
++            <option value="365" data-trspan="oneYear">1 year</option>
++          </select>
++          <small class="form-text text-muted">
++            <span trspan="sshCaMaxValidity">Maximum allowed</span>: <span id="maxValidityDisplay"><TMPL_VAR NAME="MAX_VALIDITY_DAYS"></span> <span trspan="days">days</span>
++          </small>
++        </div>
++      </div>
++      <div class="form-group row">
++        <div class="col-sm-8 offset-sm-4">
++          <button type="submit" class="btn btn-primary" id="signSshKey">
++            <span class="fa fa-certificate"></span>
++            <span trspan="signSshKey">Sign Key</span>
++          </button>
++        </div>
++      </div>
++    </form>
++
++    <div id="sshCaResult" class="d-none">
++      <div class="alert alert-success">
++        <h5 trspan="sshCertGenerated">Your SSH Certificate</h5>
++        <div class="mb-3">
++          <textarea class="form-control font-monospace" id="sshCertificate" rows="3" readonly></textarea>
++          <button class="btn btn-outline-secondary btn-sm mt-2" type="button" id="copySshCert">
++            <span class="fa fa-copy"></span>
++            <span trspan="copyCertificate">Copy certificate</span>
++          </button>
++        </div>
++        <p class="mb-1">
++          <strong trspan="sshKeyId">Key ID:</strong>
++          <code id="sshKeyId"></code>
++        </p>
++        <p class="mb-1">
++          <strong trspan="sshPrincipals">Principals:</strong>
++          <code id="sshPrincipals"></code>
++        </p>
++        <p class="mb-0">
++          <strong trspan="sshValidUntil">Valid until:</strong>
++          <span id="sshValidUntil"></span>
++        </p>
++      </div>
++      <div class="alert alert-info">
++        <h6 trspan="sshCaInstructions">How to use this certificate</h6>
++        <ol class="mb-0">
++          <li trspan="sshCaStep1">Save the certificate to a file next to your private key:</li>
++          <pre class="bg-light p-2 mt-1 mb-2"><code>~/.ssh/id_ed25519-cert.pub</code></pre>
++          <li trspan="sshCaStep2">SSH will automatically use the certificate when connecting:</li>
++          <pre class="bg-light p-2 mt-1 mb-2"><code>ssh user@server</code></pre>
++          <li trspan="sshCaStep3">Or specify it explicitly:</li>
++          <pre class="bg-light p-2 mt-1 mb-0"><code>ssh -i ~/.ssh/id_ed25519 user@server</code></pre>
++        </ol>
++      </div>
++    </div>
++
++    <div id="sshCaError" class="alert alert-danger d-none">
++      <span trspan="sshCaSignError">Failed to sign key</span>: <span id="sshCaErrorMessage"></span>
++    </div>
++  </div>
++</div>
+new file mode 100644
+--- /dev/null
++++ b/usr/share/lemonldap-ng/portal/templates/bootstrap/sshcaadmin.tpl
+@@ -0,0 +1,155 @@
++<TMPL_INCLUDE NAME="header.tpl">
++
++<div id="sshcaadmin" class="container">
++  <h3 class="mb-4">
++    <span class="fa fa-certificate"></span>
++    <span trspan="sshCaAdminTitle">SSH Certificate Administration</span>
++  </h3>
++
++  <!-- Search Form -->
++  <div class="card mb-4">
++    <div class="card-header">
++      <h5 class="card-title mb-0" trspan="sshCaSearchTitle">Search Certificates</h5>
++    </div>
++    <div class="card-body">
++      <form id="searchForm" class="row g-3">
++        <div class="col-md-3">
++          <label for="searchUser" class="form-label" trspan="user">User</label>
++          <input type="text" class="form-control" id="searchUser" name="user" trplaceholder="user">
++        </div>
++        <div class="col-md-3">
++          <label for="searchSerial" class="form-label" trspan="serial">Serial</label>
++          <input type="text" class="form-control" id="searchSerial" name="serial" placeholder="12345">
++        </div>
++        <div class="col-md-3">
++          <label for="searchKeyId" class="form-label" trspan="keyId">Key ID</label>
++          <input type="text" class="form-control" id="searchKeyId" name="key_id" placeholder="user@llng-...">
++        </div>
++        <div class="col-md-3">
++          <label for="searchStatus" class="form-label" trspan="status">Status</label>
++          <select class="form-select" id="searchStatus" name="status">
++            <option value="" trspan="allStatuses">All</option>
++            <option value="active" trspan="active">Active</option>
++            <option value="expired" trspan="expired">Expired</option>
++            <option value="revoked" trspan="revoked">Revoked</option>
++          </select>
++        </div>
++        <div class="col-12">
++          <button type="submit" class="btn btn-primary">
++            <span class="fa fa-search"></span>
++            <span trspan="search">Search</span>
++          </button>
++          <button type="button" class="btn btn-outline-secondary" id="resetSearch">
++            <span class="fa fa-times"></span>
++            <span trspan="reset">Reset</span>
++          </button>
++        </div>
++      </form>
++    </div>
++  </div>
++
++  <!-- Results -->
++  <div class="card">
++    <div class="card-header d-flex justify-content-between align-items-center">
++      <h5 class="card-title mb-0" trspan="certificates">Certificates</h5>
++      <span id="resultCount" class="badge bg-secondary">0</span>
++    </div>
++    <div class="card-body p-0">
++      <div class="table-responsive">
++        <table class="table table-striped mb-0">
++          <thead>
++            <tr>
++              <th trspan="serial">Serial</th>
++              <th trspan="user">User</th>
++              <th trspan="principals">Principals</th>
++              <th trspan="issuedAt">Issued</th>
++              <th trspan="expiresAt">Expires</th>
++              <th trspan="status">Status</th>
++              <th trspan="actions">Actions</th>
++            </tr>
++          </thead>
++          <tbody id="certsTable">
++            <tr id="loadingRow" class="d-none">
++              <td colspan="7" class="text-center">
++                <span class="spinner-border spinner-border-sm" role="status"></span>
++                <span trspan="loading">Loading...</span>
++              </td>
++            </tr>
++            <tr id="noResultsRow" class="d-none">
++              <td colspan="7" class="text-center text-muted" trspan="noResults">No certificates found</td>
++            </tr>
++            <tr id="searchPromptRow">
++              <td colspan="7" class="text-center text-muted" trspan="sshCaSearchPrompt">Enter search criteria and click Search</td>
++            </tr>
++          </tbody>
++        </table>
++      </div>
++    </div>
++    <div class="card-footer">
++      <nav>
++        <ul class="pagination justify-content-center mb-0" id="pagination">
++        </ul>
++      </nav>
++    </div>
++  </div>
++
++  <!-- Back link -->
++  <div class="buttons mt-4">
++    <a href="<TMPL_VAR NAME="PORTAL_URL">" class="btn btn-primary" role="button">
++      <span class="fa fa-home"></span>
++      <span trspan="goToPortal">Go to portal</span>
++    </a>
++  </div>
++</div>
++
++<!-- Revoke Modal -->
++<div class="modal fade" id="revokeModal" tabindex="-1" aria-labelledby="revokeModalLabel" aria-hidden="true">
++  <div class="modal-dialog">
++    <div class="modal-content">
++      <div class="modal-header">
++        <h5 class="modal-title" id="revokeModalLabel" trspan="revokeCertificate">Revoke Certificate</h5>
++        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
++      </div>
++      <div class="modal-body">
++        <p trspan="revokeConfirm">Are you sure you want to revoke this certificate?</p>
++        <dl>
++          <dt trspan="serial">Serial</dt>
++          <dd id="revokeSerial"></dd>
++          <dt trspan="user">User</dt>
++          <dd id="revokeUser"></dd>
++          <dt trspan="keyId">Key ID</dt>
++          <dd id="revokeKeyId" class="text-break"></dd>
++        </dl>
++        <div class="mb-3">
++          <label for="revokeReason" class="form-label" trspan="revokeReason">Reason (optional)</label>
++          <textarea class="form-control" id="revokeReason" rows="2" trplaceholder="revokeReason"></textarea>
++        </div>
++        <input type="hidden" id="revokeSessionId">
++        <input type="hidden" id="revokeSerialInput">
++      </div>
++      <div class="modal-footer">
++        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" trspan="cancel">Cancel</button>
++        <button type="button" class="btn btn-danger" id="confirmRevoke">
++          <span class="fa fa-ban"></span>
++          <span trspan="revoke">Revoke</span>
++        </button>
++      </div>
++    </div>
++  </div>
++</div>
++
++<!-- Alert Toast -->
++<div class="toast-container position-fixed bottom-0 end-0 p-3">
++  <div id="alertToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
++    <div class="toast-header">
++      <span id="toastIcon" class="fa fa-info-circle me-2"></span>
++      <strong class="me-auto" id="toastTitle">Notification</strong>
++      <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
++    </div>
++    <div class="toast-body" id="toastMessage"></div>
++  </div>
++</div>
++
++<script type="text/javascript" src="<TMPL_VAR NAME="STATIC_PREFIX">common/js/sshcaadmin.js"></script>
++
++<TMPL_INCLUDE NAME="footer.tpl">
 new file mode 100644
 --- /dev/null

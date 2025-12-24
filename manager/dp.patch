@@ -1,6 +1,6 @@
 --- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
-@@ -1551,6 +1551,63 @@ sub attributes {
+@@ -1551,6 +1551,95 @@ sub attributes {
              documentation => 'OIDC personnal offline token removal',
          },
  
@@ -27,7 +27,26 @@
 +            test          => sub { return perlExpr(@_) },
 +            msgFail       => '__badExpression__',
 +            default       => { default => 1 },
-+            documentation => 'Authorization rules per PAM server group',
++            documentation =>
++'Authorization rules per PAM server group (legacy, use SSH/Sudo rules)',
++        },
++        pamAccessSshRules => {
++            type          => 'keyTextContainer',
++            keyTest       => qr/^[\w\-]+$/,
++            keyMsgFail    => '__badPamServerGroupName__',
++            test          => sub { return perlExpr(@_) },
++            msgFail       => '__badExpression__',
++            default       => {},
++            documentation => 'SSH authorization rules per server group',
++        },
++        pamAccessSudoRules => {
++            type          => 'keyTextContainer',
++            keyTest       => qr/^[\w\-]+$/,
++            keyMsgFail    => '__badPamServerGroupName__',
++            test          => sub { return perlExpr(@_) },
++            msgFail       => '__badExpression__',
++            default       => {},
++            documentation => 'Sudo authorization rules per server group',
 +        },
 +        pamAccessRp => {
 +            type          => 'text',
@@ -37,7 +56,8 @@
 +        pamAccessHeartbeatInterval => {
 +            type          => 'int',
 +            default       => 300,
-+            documentation => 'Expected heartbeat interval from PAM servers (seconds)',
++            documentation =>
++              'Expected heartbeat interval from PAM servers (seconds)',
 +        },
 +        pamAccessInactiveThreshold => {
 +            type          => 'int',
@@ -60,11 +80,23 @@
 +            default       => {},
 +            documentation => 'Exported variables for PAM user provisioning',
 +        },
++        pamAccessOfflineEnabled => {
++            type          => 'boolOrExpr',
++            default       => 0,
++            documentation =>
++              'Enable offline mode for PAM authorization caching',
++        },
++        pamAccessOfflineTtl => {
++            type          => 'int',
++            default       => 86400,
++            documentation =>
++              'Default offline authorization cache TTL (seconds)',
++        },
 +
          # History
          failedLoginNumber => {
              default       => 5,
-@@ -1610,6 +1667,11 @@ sub attributes {
+@@ -1610,6 +1699,16 @@ sub attributes {
              'default' => '$_auth eq \'OIDC\'',
              'type'    => 'boolOrExpr'
          },
@@ -73,10 +105,15 @@
 +            default       => 0,
 +            documentation => 'Display PAM access token tab in portal',
 +        },
++        portalDisplaySshCa => {
++            type          => 'boolOrExpr',
++            default       => 0,
++            documentation => 'Display SSH CA signing tab in portal',
++        },
          portalDisplayOidcConsents => {
              type          => 'boolOrExpr',
              default       => '$_oidcConsents && $_oidcConsents =~ /\w+/',
-@@ -5150,6 +5212,24 @@ m{^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
+@@ -5150,6 +5249,24 @@ m{^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
              default       => 2592000,
              documentation => 'OpenID Connect global offline session TTL',
          },
@@ -101,7 +138,7 @@
          oidcStorage => {
              type          => 'PerlModule',
              documentation => 'Apache::Session module to store OIDC user data',
-@@ -5432,6 +5512,12 @@ m{^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
+@@ -5432,6 +5549,12 @@ m{^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
              default       => 0,
              documentation => 'Allow OAuth2 Client Credentials Grant',
          },
@@ -114,6 +151,55 @@
          oidcRPMetaDataOptionsRefreshToken => {
              type          => 'bool',
              default       => 0,
+@@ -5575,6 +5698,48 @@ m{^(?:ldapi://[^/]*/?|\w[\w\-\.]*(?::\d{1,5})?|ldap(?:s|\+tls)?://\w[\w\-\.]*(?:
+ 'Shall OIDC/SAML/CAS protected apps access be recorded to session?'
+         },
+ 
++        # SSH CA
++        sshCaActivation => {
++            type          => 'bool',
++            default       => 0,
++            documentation => 'SSH CA activation',
++        },
++        sshCaKeyType => {
++            type   => 'select',
++            select => [
++                { k => 'ed25519', v => 'Ed25519' },
++                { k => 'ecdsa',   v => 'ECDSA' },
++                { k => 'rsa',     v => 'RSA' },
++            ],
++            default       => 'ed25519',
++            documentation => 'SSH CA key type',
++        },
++        sshCaKeyRef => {
++            type          => 'text',
++            documentation => 'SSH CA key reference (key ID from LLNG keys)',
++        },
++        sshCaCertMaxValidity => {
++            type          => 'int',
++            default       => 365,
++            documentation => 'SSH certificate max validity (days)',
++        },
++        sshCaPrincipalSources => {
++            type          => 'text',
++            default       => '$uid',
++            documentation =>
++              'SSH certificate principal sources (Perl expression)',
++        },
++        sshCaKrlPath => {
++            type          => 'text',
++            default       => '/var/lib/lemonldap-ng/ssh/revoked_keys',
++            documentation => 'Path to SSH Key Revocation List file',
++        },
++        sshCaSerialPath => {
++            type          => 'text',
++            default       => '/var/lib/lemonldap-ng/ssh/serial',
++            documentation => 'Path to SSH certificate serial number file',
++        },
++
+         # Fake attribute: used by manager REST API to agglomerate all other
+         # nodes
+         keyNodes => {
 --- a/usr/share/perl5/Lemonldap/NG/Manager/Build/CTrees.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/CTrees.pm
 @@ -274,6 +274,7 @@ sub cTrees {
@@ -126,15 +212,16 @@
                              'oidcRPMetaDataOptionsRule',
 --- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Tree.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Tree.pm
-@@ -38,6 +38,7 @@
+@@ -38,6 +38,8 @@
                                          'portalDisplayAppslist',
                                          'portalDisplayLoginHistory',
                                          'portalDisplayChangePassword',
 +                                        'portalDisplayPamAccess',
++                                        'portalDisplaySshCa',
                                          'portalDisplayOidcConsents',
                                          'portalDisplayLogout',
                                          'portalDisplayOrder'
-@@ -961,6 +962,22 @@
+@@ -961,6 +962,46 @@
                              title => 'adminLogoutServer',
                              nodes => ['adminLogoutServerSecret']
                          },
@@ -146,12 +233,36 @@
 +                                'pamAccessActivation',
 +                                'pamAccessTokenDuration',
 +                                'pamAccessMaxDuration',
-+                                'pamAccessServerGroups',
++                                {
++                                    title => 'pamAccessAuthzRules',
++                                    form  => 'simpleInputContainer',
++                                    nodes => [
++                                        'pamAccessServerGroups',
++                                        'pamAccessSshRules',
++                                        'pamAccessSudoRules',
++                                    ]
++                                },
 +                                'pamAccessRp',
 +                                'pamAccessHeartbeatInterval',
 +                                'pamAccessInactiveThreshold',
 +                                'pamAccessHeartbeatRequired',
 +                                'pamAccessExportedVars',
++                                'pamAccessOfflineEnabled',
++                                'pamAccessOfflineTtl',
++                            ]
++                        },
++                        {
++                            title => 'sshCa',
++                            help  => 'sshca.html',
++                            form  => 'simpleInputContainer',
++                            nodes => [
++                                'sshCaActivation',
++                                'sshCaKeyType',
++                                'sshCaKeyRef',
++                                'sshCaCertMaxValidity',
++                                'sshCaPrincipalSources',
++                                'sshCaKrlPath',
++                                'sshCaSerialPath',
 +                            ]
 +                        },
                      ]
@@ -162,7 +273,7 @@
                  },
                  {
 +                    title => 'oidcServiceMetaDataDeviceAuthorization',
-+                    help  => 'openidconnectservice.html#device-authorization',
++                    help  => 'oidcdeviceauthorization.html',
 +                    form  => 'simpleInputContainer',
 +                    nodes => [
 +                        'oidcServiceDeviceAuthorizationExpiration',
