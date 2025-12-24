@@ -26,6 +26,7 @@ LABEL maintainer="Yadd yadd@debian.org>" \
       version="v1.0"
 
 ENV SSODOMAIN=example.com \
+    STRICT_SERVER_NAME= \
     CROWDSEC_SERVER= \
     CROWDSEC_POLICY=reject \
     CROWDSEC_KEY= \

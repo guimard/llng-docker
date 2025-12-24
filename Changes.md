@@ -4,6 +4,7 @@
 * Fix updateConf script when value is multiline
 * Improve Patroni patch
 * Add device-pam
+* Add `STRICT_SERVER_NAME`
 
 ## v2.21.3-2 _(2025-11-14)_
 * Add Twake app-accounts plugin
