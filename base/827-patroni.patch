@@ -155,3 +155,29 @@
 +}
  
  1;
+--- a/usr/share/perl5/Lemonldap/NG/Common/Conf/Backends/_DBI.pm
++++ b/usr/share/perl5/Lemonldap/NG/Common/Conf/Backends/_DBI.pm
+@@ -56,21 +56,12 @@
+ sub _dbh {
+     my $self = shift;
+     $self->{dbiTable} ||= "lmConfig";
+-
+-    # Check if existing connection is still valid
+-    # Handle can become unblessed after Patroni failover or connection loss
+-    if ( $self->{_dbh} ) {
+-        my $ok = eval { $self->{_dbh}->ping };
+-        return $self->{_dbh} if $ok;
+-
+-        # Connection is dead, clean up before reconnecting
+-        eval { $self->{_dbh}->disconnect };
+-        delete $self->{_dbh};
+-    }
++    return $self->{_dbh} if eval { $self->{_dbh} and $self->{_dbh}->ping };
+     eval {
+         $self->{_dbh} =
+           DBI->connect_cached( $self->{dbiChain}, $self->{dbiUser},
+             $self->{dbiPassword}, { RaiseError => 1, AutoCommit => 1, } );
++        die unless $self->{_dbh}->ping;
+     };
+     if ( $@ and &{ $self->{type} . "::beforeRetry" }($self) ) {
+         eval {
