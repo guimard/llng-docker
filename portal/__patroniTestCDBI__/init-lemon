@@ -1,0 +1,7 @@
+#!/bin/bash
+
+/usr/share/lemonldap-ng/bin/convertConfig --new=/etc/lemonldap-ng/lemonldap-ng.ini --current=/etc/lemonldap-ng/lemonldap-ng.init
+
+# Sessions use Apache::Session::Browseable::PgJSON with DBD::Patroni via DSN
+/usr/share/docker-llng/updateConf set globalStorage "Apache::Session::Browseable::PgJSON"
+/usr/share/docker-llng/updateConf set globalStorageOptions '{"DataSource":"DBI:Patroni:dbname=lemonldapng;patroni_url=http://patroni1:8008/cluster,http://patroni2:8008/cluster,http://patroni3:8008/cluster","UserName":"lemonldap","Password":"lemonldap","Commit":1}'
