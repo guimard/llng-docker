@@ -126,6 +126,40 @@ sub _is_connection_error {
     return 0;
 }
 
+# Execute with automatic retry on failure (shared helper)
+sub _with_retry {
+    my ( $dbh, $target, $code ) = @_;
+    my $result;
+    my $wantarray = wantarray;
+
+    foreach my $attempt ( 0 .. 1 ) {
+        my @results;
+        eval {
+            if ($wantarray) {
+                @results = $code->();
+            }
+            else {
+                $result = $code->();
+            }
+        };
+
+        if ($@) {
+            my $error = $@;
+
+            # Only retry on connection errors, not SQL errors
+            if ( _is_connection_error($error) && $attempt == 0 ) {
+                warn
+"DBD::Patroni: Connection error on $target, rediscovering cluster...\n";
+                if ( DBD::Patroni::db::_rediscover_cluster($dbh) ) {
+                    next;
+                }
+            }
+            die $error;
+        }
+        return $wantarray ? @results : $result;
+    }
+}
+
 1;
 
 # ====== DRIVER ======
@@ -359,16 +393,31 @@ sub do {
     my $is_readonly = DBD::Patroni::_is_readonly($statement);
     my $target      = $is_readonly ? 'replica' : 'leader';
 
-    return $dbh->_with_retry(
+    my $result = DBD::Patroni::_with_retry(
+        $dbh,
         $target,
         sub {
             my $handle =
                 $is_readonly
               ? $dbh->{patroni_replica_dbh}
               : $dbh->{patroni_leader_dbh};
-            return $handle->do( $statement, $attr, @bind );
+            my $rv = $handle->do( $statement, $attr, @bind );
+
+            # Propagate error state from underlying handle
+            unless ( defined $rv ) {
+                my $err = $handle->errstr;
+                if ( $err && DBD::Patroni::_is_connection_error($err) ) {
+                    die $err;    # Will trigger retry
+                }
+
+                # Propagate error to our dbh
+                $dbh->set_err( $handle->err, $err, $handle->state );
+            }
+            return $rv;
         }
     );
+
+    return $result;
 }
 
 sub ping {
@@ -456,10 +505,20 @@ sub get_info {
 sub STORE {
     my ( $dbh, $attr, $val ) = @_;
 
+    # Handle DBI standard attributes
     if ( $attr eq 'AutoCommit' ) {
         $dbh->{patroni_leader_dbh}->{AutoCommit} = $val
           if $dbh->{patroni_leader_dbh};
-        return $dbh->SUPER::STORE( $attr, $val );
+        $dbh->{patroni_replica_dbh}->{AutoCommit} = $val
+          if $dbh->{patroni_replica_dbh}
+          && $dbh->{patroni_replica_dbh} ne $dbh->{patroni_leader_dbh};
+        $dbh->{AutoCommit} = $val;
+        return 1;
+    }
+
+    if ( $attr eq 'Active' ) {
+        $dbh->{Active} = $val;
+        return 1;
     }
 
     if ( $attr =~ /^patroni_/ ) {
@@ -467,11 +526,14 @@ sub STORE {
         return 1;
     }
 
-    # Forward to leader dbh
+    # Forward to leader dbh for other attributes
     if ( $dbh->{patroni_leader_dbh} ) {
         $dbh->{patroni_leader_dbh}->{$attr} = $val;
     }
-    return $dbh->SUPER::STORE( $attr, $val );
+
+    # Store in our hash for DBI attributes
+    $dbh->{$attr} = $val;
+    return 1;
 }
 
 sub FETCH {
@@ -481,11 +543,22 @@ sub FETCH {
         return $dbh->{$attr};
     }
 
-    if ( $attr eq 'AutoCommit' && $dbh->{patroni_leader_dbh} ) {
-        return $dbh->{patroni_leader_dbh}->{AutoCommit};
+    # Handle DBI standard attributes
+    if ( $attr eq 'AutoCommit' ) {
+        return $dbh->{AutoCommit};
     }
 
-    return $dbh->SUPER::FETCH($attr);
+    if ( $attr eq 'Active' ) {
+        return $dbh->{Active};
+    }
+
+    # Forward to leader for other common attributes
+    if ( $dbh->{patroni_leader_dbh} ) {
+        return $dbh->{patroni_leader_dbh}->{$attr}
+          if exists $dbh->{patroni_leader_dbh}->{$attr};
+    }
+
+    return $dbh->{$attr};
 }
 
 sub DESTROY {
@@ -505,7 +578,8 @@ sub execute {
     my $dbh    = $sth->{Database};
     my $target = $sth->{patroni_target};
 
-    return $dbh->_with_retry(
+    return DBD::Patroni::_with_retry(
+        $dbh,
         $target,
         sub {
             my $real_sth = $sth->{patroni_real_sth};
@@ -525,6 +599,17 @@ sub execute {
                 $real_sth = $sth->{patroni_real_sth};
             }
             my $rv = $real_sth->execute(@bind);
+
+            # Check for connection errors that need retry
+            unless ( defined $rv ) {
+                my $err = $real_sth->errstr;
+                if ( $err && DBD::Patroni::_is_connection_error($err) ) {
+                    die $err;    # Will trigger retry
+                }
+
+                # Propagate error to our dbh
+                $dbh->set_err( $real_sth->err, $err, $real_sth->state );
+            }
 
             # Copy NUM_OF_FIELDS to our sth for DBI
             if ( $real_sth->{NUM_OF_FIELDS} ) {
