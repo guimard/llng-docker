@@ -1,0 +1,125 @@
+services:
+
+  portal:
+    image: yadd/lemonldap-ng-portal
+    ports:
+      - 80:80
+    depends_on:
+      patroni1:
+        condition: service_healthy
+      patroni2:
+        condition: service_healthy
+      patroni3:
+        condition: service_healthy
+    networks:
+      - patroni-network
+    environment:
+      - LOGGER=stderr
+      - USERLOGGER=stderr
+      - LOGLEVEL=debug
+    volumes:
+      - ./lemonldap-ng.ini:/etc/lemonldap-ng/lemonldap-ng.ini:ro
+      - ./lemonldap-ng.init:/etc/lemonldap-ng/lemonldap-ng.init:ro
+      - ./init-lemon:/etc/cont-init.d/init-lemon
+
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.17
+    hostname: etcd
+    command:
+      - etcd
+      - --name=etcd
+      - --initial-advertise-peer-urls=http://etcd:2380
+      - --listen-peer-urls=http://0.0.0.0:2380
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --advertise-client-urls=http://etcd:2379
+      - --initial-cluster=etcd=http://etcd:2380
+      - --initial-cluster-state=new
+      - --initial-cluster-token=patroni-cluster
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - patroni-network
+
+  patroni1:
+    image: ghcr.io/zalando/spilo-16:3.3-p1
+    hostname: patroni1
+    environment:
+      - SCOPE=llng-cluster
+      - ETCD3_HOSTS=etcd:2379
+      - PGPASSWORD_SUPERUSER=postgres
+      - PGPASSWORD_ADMIN=admin
+      - PGPASSWORD_STANDBY=standby
+      - POST_INIT=/scripts/init-db.sh
+    volumes:
+      - patroni1_data:/home/postgres/pgdata
+      - ./init-db.sh:/scripts/init-db.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - patroni-network
+    depends_on:
+      etcd:
+        condition: service_healthy
+
+  patroni2:
+    image: ghcr.io/zalando/spilo-16:3.3-p1
+    hostname: patroni2
+    environment:
+      - SCOPE=llng-cluster
+      - ETCD3_HOSTS=etcd:2379
+      - PGPASSWORD_SUPERUSER=postgres
+      - PGPASSWORD_ADMIN=admin
+      - PGPASSWORD_STANDBY=standby
+      - POST_INIT=/scripts/init-db.sh
+    volumes:
+      - patroni2_data:/home/postgres/pgdata
+      - ./init-db.sh:/scripts/init-db.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - patroni-network
+    depends_on:
+      etcd:
+        condition: service_healthy
+
+  patroni3:
+    image: ghcr.io/zalando/spilo-16:3.3-p1
+    hostname: patroni3
+    environment:
+      - SCOPE=llng-cluster
+      - ETCD3_HOSTS=etcd:2379
+      - PGPASSWORD_SUPERUSER=postgres
+      - PGPASSWORD_ADMIN=admin
+      - PGPASSWORD_STANDBY=standby
+      - POST_INIT=/scripts/init-db.sh
+    volumes:
+      - patroni3_data:/home/postgres/pgdata
+      - ./init-db.sh:/scripts/init-db.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - patroni-network
+    depends_on:
+      etcd:
+        condition: service_healthy
+
+volumes:
+  patroni1_data:
+  patroni2_data:
+  patroni3_data:
+
+networks:
+  patroni-network:
+    driver: bridge
