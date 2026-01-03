@@ -1955,7 +1955,7 @@ new file mode 100644
 new file mode 100644
 --- /dev/null
 +++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/SSHCA.pm
-@@ -0,0 +1,1296 @@
+@@ -0,0 +1,1297 @@
 +# SSH Certificate Authority plugin for LemonLDAP::NG
 +#
 +# This plugin provides SSH certificate signing functionality:
@@ -2447,7 +2447,8 @@ new file mode 100644
 +        $self->logger->error("SSH CA: Cannot write user key: $!");
 +        return undef;
 +    };
-+    print $fh $self->sshPubKey;
++    print $fh $self->userPubKey;
++    print $fh "\n" unless $userPubKey =~ /\n$/;
 +    close $fh;
 +
 +    # Build ssh-keygen command
