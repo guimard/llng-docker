@@ -105,7 +105,7 @@
 diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm /home/yadd/dev/lemonldap/lemonldap-ng-portal/lib/Lemonldap/NG/Portal/Lib/CrowdSec.pm
 --- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm	1970-01-01 01:00:00.000000000 +0100
 +++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm	2025-12-26 11:04:24.106166932 +0100
-@@ -0,0 +1,260 @@
+@@ -0,0 +1,282 @@
 +package Lemonldap::NG::Portal::Lib::CrowdSec;
 +
 +use strict;
@@ -299,7 +299,8 @@ diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm /home/yadd/dev/l
 +
 +sub _banPayload {
 +    my ( $self, $ip, $msg, $data ) = @_;
-+    $msg ||= 'Banned by LLNG Crowdsec plugin';
++    $msg  ||= 'Banned by LLNG Crowdsec plugin';
++    $data ||= {};
 +    foreach my $k ( keys %$defaultBanValues ) {
 +        $data->{$k} //= $defaultBanValues->{$k};
 +    }
@@ -308,29 +309,50 @@ diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm /home/yadd/dev/l
 +    $data->{stop_at}  ||= $timestamp;
 +    $data->{source}   ||= { scope => 'ip', value => $ip };
 +    my $reason = delete( $data->{reason} ) || 'Banned by LLNG';
++    my $login  = delete( $data->{login} );
++    my $uri    = delete( $data->{uri} );
 +    $data->{scenario_hash} = sha256_hex( $data->{scenario} );
-+    return to_json( [ {
-+                %$data,
-+                message => $msg,
-+                events  => [ {
-+                        timestamp => $data->{start_at},
-+                        meta      => [
-+                            { key => 'log_type', value => 'llng-auth' },
-+                            { key => 'reason',   value => $reason }
-+                        ],
-+                        source => $data->{source},
-+                    }
-+                ],
-+            }
-+        ]
++    my @meta = (
++        { key => 'log_type', value => 'llng-auth' },
++        { key => 'reason',   value => $reason }
 +    );
++    push @meta, { key => 'login', value => $login } if $login;
++    push @meta, { key => 'uri',   value => $uri }   if $uri;
++
++    my $alert = {
++        %$data,
++        message => $msg,
++        events  => [ {
++                timestamp => $data->{start_at},
++                meta      => \@meta,
++                source    => $data->{source},
++            }
++        ],
++    };
++
++    # Add decisions array when remediation is requested
++    # This ensures the IP is immediately banned by CrowdSec
++    if ( $data->{remediation} ) {
++        my $duration = $self->conf->{crowdsecBanDuration} || '4h';
++        $alert->{decisions} = [ {
++                duration => $duration,
++                type     => 'ban',
++                scope    => 'ip',
++                value    => $ip,
++                origin   => 'llng',
++                scenario => $data->{scenario},
++            }
++        ];
++    }
++
++    return to_json( [$alert] );
 +}
 +
 +sub getToken {
 +    my ($self) = @_;
 +
 +    # Use token if available
-+    return $self->token if $self->token and $self->tokenExp > time - 10;
++    return $self->token if $self->token and $self->tokenExp > time + 10;
 +
 +    # Get new token
 +    my ( $user, $pwd ) =
@@ -469,7 +491,7 @@ diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm /home/yadd/dev/l
 +    my $msg = 'Authentication failed: '
 +      . &Lemonldap::NG::Portal::Main::Constants::portalConsts->{$ret};
 +    $self->alert( $req->address, $msg,
-+        { scenario => 'llng/badcredentials', reason => $msg, } )
++        { scenario => 'llng/badcredentials', reason => $msg, login => ( $req->user // '' ) } )
 +      ? $self->auditLog(
 +        $req,
 +        code    => 200,
@@ -497,7 +519,7 @@ diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm /home/yadd/dev/l
 +    {
 +        my $msg = 'Bad URI detected: ' . $req->env->{REQUEST_URI};
 +        $self->alert( $req->address, $msg,
-+            { scenario => 'llng/urlscan', reason => $msg, } )
++            { scenario => 'llng/urlscan', reason => $msg, uri => $req->env->{REQUEST_URI} } )
 +          ? $self->auditLog(
 +            $req,
 +            code         => 200,
