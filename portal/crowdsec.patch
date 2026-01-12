@@ -105,7 +105,7 @@
 diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm /home/yadd/dev/lemonldap/lemonldap-ng-portal/lib/Lemonldap/NG/Portal/Lib/CrowdSec.pm
 --- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm	1970-01-01 01:00:00.000000000 +0100
 +++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm	2025-12-26 11:04:24.106166932 +0100
-@@ -0,0 +1,282 @@
+@@ -0,0 +1,405 @@
 +package Lemonldap::NG::Portal::Lib::CrowdSec;
 +
 +use strict;
@@ -245,8 +245,13 @@ diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm /home/yadd/dev/l
 +    my ($notBanned) = $self->bouncer($ip);
 +
 +    $data ||= {};
-+    my $max   = $self->conf->{crowdsecMaxFailures};
-+    my $count = $self->getAlertsByIp( $ip, $data->{scenario} ) || 0;
++    my $max = $self->conf->{crowdsecMaxFailures};
++
++    # Get both count and previous alerts for enrichment
++    my ( $count, $prevAlerts ) =
++      $self->getAlertsByIp( $ip, $data->{scenario} );
++    $count ||= 0;
++
 +    $data->{remediation} =
 +      ( $max and $count >= ( $max - 1 ) and $notBanned )
 +      ? JSON::true
@@ -254,7 +259,62 @@ diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm /home/yadd/dev/l
 +    $self->logger->debug("Crowdsec alerts count is $count for $ip");
 +    $data->{reason} ||= 'Reported by LLNG';
 +    $msg ||= 'Reported by LLNG';
++
++    # Pass previous alerts for enrichment when ban decision is made
++    $data->{_prevAlerts} = $prevAlerts
++      if $data->{remediation}
++      and $prevAlerts
++      and @$prevAlerts;
++
 +    return $self->ban( $ip, $msg, $data );
++}
++
++# Extract context from previous alerts for enrichment
++sub _extractAlertContext {
++    my ( $self, $prevAlerts ) = @_;
++    return unless $prevAlerts and @$prevAlerts;
++
++    my ( @logins, @uris, @timestamps );
++    my ( %seen_logins, %seen_uris );
++
++    foreach my $alert (@$prevAlerts) {
++
++        # Extract timestamp
++        push @timestamps, $alert->{start_at} if $alert->{start_at};
++
++        # Extract login and uri from events meta
++        if ( $alert->{events} and @{ $alert->{events} } ) {
++            foreach my $event ( @{ $alert->{events} } ) {
++                if ( $event->{meta} and @{ $event->{meta} } ) {
++                    foreach my $m ( @{ $event->{meta} } ) {
++                        if (    $m->{key} eq 'login'
++                            and $m->{value}
++                            and !$seen_logins{ $m->{value} }++ )
++                        {
++                            push @logins, $m->{value};
++                        }
++                        if (    $m->{key} eq 'uri'
++                            and $m->{value}
++                            and !$seen_uris{ $m->{value} }++ )
++                        {
++                            push @uris, $m->{value};
++                        }
++                    }
++                }
++            }
++        }
++    }
++
++    # Sort timestamps chronologically
++    @timestamps = sort @timestamps if @timestamps;
++
++    return {
++        logins      => \@logins,
++        uris        => \@uris,
++        first_alert => $timestamps[0],
++        last_alert  => $timestamps[-1],
++        count       => scalar @$prevAlerts,
++    };
 +}
 +
 +sub getAlertsByIp {
@@ -289,7 +349,9 @@ diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm /home/yadd/dev/l
 +              and $_->{scenario} eq $scenario
 +              and str2time( $_->{start_at} ) > $timeLimit
 +          } @$alerts;
-+        return ( scalar @ipAlerts );
++
++        # In list context, return both count and alerts for enrichment
++        return wantarray ? ( scalar @ipAlerts, \@ipAlerts ) : scalar @ipAlerts;
 +    }
 +    else {
 +        $self->logger->error('Unable to push Crowdsec decision');
@@ -301,6 +363,10 @@ diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm /home/yadd/dev/l
 +    my ( $self, $ip, $msg, $data ) = @_;
 +    $msg  ||= 'Banned by LLNG Crowdsec plugin';
 +    $data ||= {};
++
++    # Extract and remove internal data
++    my $prevAlerts = delete $data->{_prevAlerts};
++
 +    foreach my $k ( keys %$defaultBanValues ) {
 +        $data->{$k} //= $defaultBanValues->{$k};
 +    }
@@ -318,6 +384,63 @@ diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm /home/yadd/dev/l
 +    );
 +    push @meta, { key => 'login', value => $login } if $login;
 +    push @meta, { key => 'uri',   value => $uri }   if $uri;
++
++    # Enrich with historical context when ban decision is made
++    if ( $data->{remediation} and $prevAlerts ) {
++        my $context = $self->_extractAlertContext($prevAlerts);
++        if ($context) {
++            my @msg_parts;
++
++            # Add historical metadata
++            if ( @{ $context->{logins} } ) {
++                my $all_logins = join ', ', @{ $context->{logins} };
++                push @meta, { key => 'previous_logins', value => $all_logins };
++
++                # Truncate for message display
++                my $login_summary =
++                  @{ $context->{logins} } <= 3
++                  ? $all_logins
++                  : join( ', ', @{ $context->{logins} }[ 0 .. 2 ] ) . '...';
++                push @msg_parts, "attempted logins: $login_summary";
++            }
++
++            if ( @{ $context->{uris} } ) {
++                my $all_uris = join ', ', @{ $context->{uris} };
++                push @meta, { key => 'previous_uris', value => $all_uris };
++
++                # Truncate for message display
++                my $uri_summary =
++                  @{ $context->{uris} } <= 3
++                  ? $all_uris
++                  : join( ', ', @{ $context->{uris} }[ 0 .. 2 ] ) . '...';
++                push @msg_parts, "scanned URIs: $uri_summary";
++            }
++
++            if ( $context->{count} ) {
++                push @meta,
++                  { key => 'previous_alert_count', value => $context->{count} };
++            }
++
++            if ( $context->{first_alert} ) {
++                push @meta,
++                  { key => 'first_alert', value => $context->{first_alert} };
++            }
++
++            if ( $context->{last_alert} ) {
++                push @meta,
++                  { key => 'last_alert', value => $context->{last_alert} };
++            }
++
++            # Enrich human-readable message
++            if ( $context->{count} ) {
++                $msg .= sprintf "; after %d previous alert(s)",
++                  $context->{count};
++            }
++            if (@msg_parts) {
++                $msg .= "; " . join( "; ", @msg_parts );
++            }
++        }
++    }
 +
 +    my $alert = {
 +        %$data,
