@@ -105,7 +105,7 @@
 diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm /home/yadd/dev/lemonldap/lemonldap-ng-portal/lib/Lemonldap/NG/Portal/Lib/CrowdSec.pm
 --- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm	1970-01-01 01:00:00.000000000 +0100
 +++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm	2025-12-26 11:04:24.106166932 +0100
-@@ -0,0 +1,405 @@
+@@ -0,0 +1,422 @@
 +package Lemonldap::NG::Portal::Lib::CrowdSec;
 +
 +use strict;
@@ -261,10 +261,22 @@ diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm /home/yadd/dev/l
 +    $msg ||= 'Reported by LLNG';
 +
 +    # Pass previous alerts for enrichment when ban decision is made
-+    $data->{_prevAlerts} = $prevAlerts
-+      if $data->{remediation}
-+      and $prevAlerts
-+      and @$prevAlerts;
++    # Only include alerts that contributed to the decision (max - 1), capped at 30
++    if ( $data->{remediation} and $prevAlerts and @$prevAlerts ) {
++        my $limit = ( $max && $max > 1 ) ? $max - 1 : 30;
++        $limit = 30 if $limit > 30;
++        if ( @$prevAlerts > $limit ) {
++
++            # Take most recent alerts (sorted by start_at desc)
++            my @sorted =
++              sort { ( $b->{start_at} || '' ) cmp( $a->{start_at} || '' ) }
++              @$prevAlerts;
++            $data->{_prevAlerts} = [ @sorted[ 0 .. $limit - 1 ] ];
++        }
++        else {
++            $data->{_prevAlerts} = $prevAlerts;
++        }
++    }
 +
 +    return $self->ban( $ip, $msg, $data );
 +}
@@ -377,6 +389,11 @@ diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm /home/yadd/dev/l
 +    my $reason = delete( $data->{reason} ) || 'Banned by LLNG';
 +    my $login  = delete( $data->{login} );
 +    my $uri    = delete( $data->{uri} );
++
++    # Include login in message for CAPI transmission
++    # (events[].meta is NOT forwarded by LAPI to CAPI)
++    $msg .= " (login: $login)" if $login;
++
 +    $data->{scenario_hash} = sha256_hex( $data->{scenario} );
 +    my @meta = (
 +        { key => 'log_type', value => 'llng-auth' },
@@ -418,7 +435,7 @@ diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm /home/yadd/dev/l
 +
 +            if ( $context->{count} ) {
 +                push @meta,
-+                  { key => 'previous_alert_count', value => $context->{count} };
++                  { key => 'previous_alert_count', value => "" . $context->{count} };
 +            }
 +
 +            if ( $context->{first_alert} ) {
