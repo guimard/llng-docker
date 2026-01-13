@@ -181,3 +181,30 @@
      };
      if ( $@ and &{ $self->{type} . "::beforeRetry" }($self) ) {
          eval {
+--- a/usr/share/perl5/Lemonldap/NG/Common/Conf/Backends/_DBI.pm
++++ b/usr/share/perl5/Lemonldap/NG/Common/Conf/Backends/_DBI.pm
+@@ -62,7 +62,10 @@ sub _dbh {
+           DBI->connect_cached( $self->{dbiChain}, $self->{dbiUser},
+             $self->{dbiPassword}, { RaiseError => 1, AutoCommit => 1, } );
+     };
+-    if ( $@ and &{ $self->{type} . "::beforeRetry" }($self) ) {
++    if (    $@
++        and $self->{type}->can('beforeRetry')
++        and $self->{type}->can('beforeRetry')->($self) )
++    {
+         eval {
+             $self->{_dbh} =
+               DBI->connect_cached( $self->{dbiChain}, $self->{dbiUser},
+@@ -125,7 +128,10 @@ sub _execute {
+         return UNKNOWN_ERROR;
+     }
+     my $execute = eval { $req->execute(@prms) };
+-    if ( !$execute and &{ $self->{type} . "::beforeRetry" }($self) ) {
++    if (   !$execute
++        and $self->{type}->can('beforeRetry')
++        and $self->{type}->can('beforeRetry')->($self) )
++    {
+         $req     = $self->_dbh->prepare($query);
+         $execute = eval { $req->execute(@prms) };
+     }
+
