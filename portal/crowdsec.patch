@@ -105,7 +105,7 @@
 diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm /home/yadd/dev/lemonldap/lemonldap-ng-portal/lib/Lemonldap/NG/Portal/Lib/CrowdSec.pm
 --- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm	1970-01-01 01:00:00.000000000 +0100
 +++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm	2025-12-26 11:04:24.106166932 +0100
-@@ -0,0 +1,422 @@
+@@ -0,0 +1,427 @@
 +package Lemonldap::NG::Portal::Lib::CrowdSec;
 +
 +use strict;
@@ -333,7 +333,14 @@ diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm /home/yadd/dev/l
 +    my ( $self, $ip, $scenario ) = @_;
 +    $scenario ||= $defaultBanValues->{scenario};
 +    if ( my $token = $self->getToken ) {
-+        my $url     = $self->crowdsecUrl . '/v1/alerts';
++
++        # Use API filters to avoid default 50 alerts limit
++        my $url =
++            $self->crowdsecUrl
++          . '/v1/alerts?scope=ip&value='
++          . $ip
++          . '&scenario='
++          . $scenario;
 +        my $request = HTTP::Request->new(
 +            GET => $url,
 +            [
@@ -355,12 +362,10 @@ diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm /home/yadd/dev/l
 +            return;
 +        }
 +        my $timeLimit = time - ( $self->conf->{crowdsecBlockDelay} || 180 );
++
++        # API already filters by IP and scenario, just filter by time
 +        my @ipAlerts =
-+          grep {
-+                  $_->{source}->{value} eq $ip
-+              and $_->{scenario} eq $scenario
-+              and str2time( $_->{start_at} ) > $timeLimit
-+          } @$alerts;
++          grep { str2time( $_->{start_at} ) > $timeLimit } @$alerts;
 +
 +        # In list context, return both count and alerts for enrichment
 +        return wantarray ? ( scalar @ipAlerts, \@ipAlerts ) : scalar @ipAlerts;
