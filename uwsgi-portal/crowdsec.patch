@@ -846,7 +846,8 @@ diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Plugins/CrowdSec.pm /home/yadd/d
 +                ip      => $ip,
 +            );
                      $req->env->{CROWDSEC_REJECT} = 1;
-                     return PE_OK;
+-                    return PE_OK;
++                    return $sub->($req);
                  }
              }
 -        }
