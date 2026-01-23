@@ -1,111 +1,6 @@
---- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSecFilter.pm	1970-01-01 01:00:00.000000000 +0100
-+++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSecFilter.pm	2025-12-26 11:03:15.513262743 +0100
-@@ -0,0 +1,101 @@
-+package Lemonldap::NG::Portal::Lib::CrowdSecFilter;
-+
-+use strict;
-+use Mouse::Role;
-+use Regexp::Assemble;
-+
-+use constant knownCat      => (qw(url urlskip));
-+use constant knownSuffixes => (qw(re txt));
-+
-+# Initialization functions for CrowdsecFilter feature
-+
-+sub initializeFilters {
-+    my ($self) = @_;
-+    my $filters = $self->parseFilters( $self->conf->{crowdsecFilters} );
-+    if ( $filters and %$filters ) {
-+        foreach my $cat ( keys %$filters ) {
-+            my $re = Regexp::Assemble->new;
-+            eval {
-+                $re->add( map { qr/(?i)$_/ } @{ $filters->{$cat}->{re} } )
-+                  if $filters->{$cat}->{re};
-+                $re->add( map { qr/(?i)\Q$_\E/ } @{ $filters->{$cat}->{txt} } )
-+                  if $filters->{$cat}->{txt};
-+            };
-+            if ($@) {
-+                $self->logger->error("Unable to parst category $cat: $@");
-+            }
-+            else {
-+                $self->filters->{$cat} = $re->re;
-+                $self->logger->debug("RE $cat: $re");
-+            }
-+        }
-+    }
-+}
-+
-+sub parseFilters {
-+    my ( $self, $dirname, $res, $cat ) = @_;
-+    $self->logger->debug("Crowdsec filters, parsing $dirname");
-+    $res //= {};
-+    my $fh;
-+    unless ( opendir $fh, $dirname ) {
-+        $self->logger->error("Unable to read directory $dirname: $!");
-+        return $res;
-+    }
-+    my @files = grep /\w/, readdir $fh;
-+    closedir $fh;
-+  LOOP: foreach my $file (@files) {
-+
-+        # Sub-directories fixes the category
-+        my $path = "$dirname/$file";
-+        if ( -d $path ) {
-+            if ($cat) {
-+                $self->parseFilters( $path, $res, $cat );
-+            }
-+            elsif ( my ($t) = grep { $file =~ m/^${_}(?:[_\s-]|$)/ } knownCat ) {
-+                $self->parseFilters( $path, $res, $t );
-+            }
-+            else {
-+                $self->logger->error("Unknwon category for directory $path");
-+            }
-+            next LOOP;
-+        }
-+        $file =~ s/\.([^\.]+)$//;
-+        my $type = $1;
-+        unless ( $type and grep { $_ eq $type } knownSuffixes ) {
-+            $self->logger->error("Bad suffix for $path, skipping");
-+            next LOOP;
-+        }
-+        my $lcat = $cat;
-+        unless ($lcat) {
-+            $file =~ s/\.([^\.]+)$//;
-+            $lcat = $1;
-+            unless ($lcat) {
-+                $self->logger->error("Malformed file $path (missing category)");
-+                next LOOP;
-+            }
-+            unless ( grep { $_ eq $lcat } knownCat ) {
-+                $self->logger->error("Unknown category $lcat for $path");
-+                next LOOP;
-+            }
-+        }
-+        unless ( open $fh, '<', $path ) {
-+            $self->logger->error("Unable to read file $path: $!");
-+            next LOOP;
-+        }
-+        $self->logger->debug(
-+"Crowdsec filters, adding content of $path into category $lcat, type $type"
-+        );
-+        my $c = 0;
-+        foreach (<$fh>) {
-+            next if /^\s*#/;
-+            next unless /\w/;
-+            s/[\r\n]//g;
-+            push @{ $res->{$lcat}->{$type} }, $_;
-+            $c++;
-+        }
-+        $self->logger->debug("  -> $c lines added");
-+    }
-+    return $res;
-+}
-+
-+1;
-diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm /home/yadd/dev/lemonldap/lemonldap-ng-portal/lib/Lemonldap/NG/Portal/Lib/CrowdSec.pm
---- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm	1970-01-01 01:00:00.000000000 +0100
-+++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm	2025-12-26 11:04:24.106166932 +0100
-@@ -0,0 +1,427 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm
+@@ -0,0 +1,438 @@
 +package Lemonldap::NG::Portal::Lib::CrowdSec;
 +
 +use strict;
@@ -248,33 +143,32 @@ diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm /home/yadd/dev/l
 +    my $max = $self->conf->{crowdsecMaxFailures};
 +
 +    # Get both count and previous alerts for enrichment
-+    my ( $count, $prevAlerts ) =
-+      $self->getAlertsByIp( $ip, $data->{scenario} );
-+    $count ||= 0;
++    my @prevAlerts = $self->getAlertsByIp( $ip, $data->{scenario} );
 +
 +    $data->{remediation} =
-+      ( $max and $count >= ( $max - 1 ) and $notBanned )
++      ( $max and @prevAlerts >= ( $max - 1 ) and $notBanned )
 +      ? JSON::true
 +      : JSON::false;
-+    $self->logger->debug("Crowdsec alerts count is $count for $ip");
++    $self->logger->debug(
++        "Crowdsec alerts count is " . scalar(@prevAlerts) . " for $ip" );
 +    $data->{reason} ||= 'Reported by LLNG';
 +    $msg ||= 'Reported by LLNG';
 +
-+    # Pass previous alerts for enrichment when ban decision is made
-+    # Only include alerts that contributed to the decision (max - 1), capped at 30
-+    if ( $data->{remediation} and $prevAlerts and @$prevAlerts ) {
++  # Pass previous alerts for enrichment when ban decision is made
++  # Only include alerts that contributed to the decision (max - 1), capped at 30
++    if ( $data->{remediation} and @prevAlerts ) {
 +        my $limit = ( $max && $max > 1 ) ? $max - 1 : 30;
 +        $limit = 30 if $limit > 30;
-+        if ( @$prevAlerts > $limit ) {
++        if ( @prevAlerts > $limit ) {
 +
 +            # Take most recent alerts (sorted by start_at desc)
 +            my @sorted =
 +              sort { ( $b->{start_at} || '' ) cmp( $a->{start_at} || '' ) }
-+              @$prevAlerts;
++              @prevAlerts;
 +            $data->{_prevAlerts} = [ @sorted[ 0 .. $limit - 1 ] ];
 +        }
 +        else {
-+            $data->{_prevAlerts} = $prevAlerts;
++            $data->{_prevAlerts} = \@prevAlerts;
 +        }
 +    }
 +
@@ -353,14 +247,23 @@ diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm /home/yadd/dev/l
 +                join ' ',           'Unable to get alerts',
 +                $resp->status_line, $resp->decoded_content
 +            );
-+            return;
++            return ();
 +        }
-+        my $alerts = eval { from_json( $resp->decoded_content ) };
-+        if ( $@ or !$alerts ) {
++        my $content = $resp->decoded_content;
++
++        # CrowdSec returns "null" when there are no alerts
++        if ( !$content or $content eq 'null' ) {
++            $self->logger->debug("No alerts found for $ip");
++            return ();
++        }
++        my $alerts = eval { from_json($content) };
++        if ($@) {
 +            $self->logger->error( join ' ', 'Unable to read Crowdsec response:',
-+                $@, $resp->decoded_content );
-+            return;
++                $@, ", $content" );
++            return ();
 +        }
++
++        # Default: 3 hours
 +        my $timeLimit = time - ( $self->conf->{crowdsecBlockDelay} || 180 );
 +
 +        # API already filters by IP and scenario, just filter by time
@@ -368,11 +271,11 @@ diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm /home/yadd/dev/l
 +          grep { str2time( $_->{start_at} ) > $timeLimit } @$alerts;
 +
 +        # In list context, return both count and alerts for enrichment
-+        return wantarray ? ( scalar @ipAlerts, \@ipAlerts ) : scalar @ipAlerts;
++        return @ipAlerts;
 +    }
 +    else {
-+        $self->logger->error('Unable to push Crowdsec decision');
-+        return;
++        $self->logger->error('Unable to query Crowdsec');
++        return ();
 +    }
 +}
 +
@@ -440,7 +343,10 @@ diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm /home/yadd/dev/l
 +
 +            if ( $context->{count} ) {
 +                push @meta,
-+                  { key => 'previous_alert_count', value => "" . $context->{count} };
++                  {
++                    key   => 'previous_alert_count',
++                    value => "" . $context->{count}
++                  };
 +            }
 +
 +            if ( $context->{first_alert} ) {
@@ -533,8 +439,112 @@ diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm /home/yadd/dev/l
 +}
 +
 +1;
---- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm	2026-01-05 15:56:22.000000000 +0100
-+++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm	2025-12-26 11:03:15.517261686 +0100
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSecFilter.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSecFilter.pm
+@@ -0,0 +1,101 @@
++package Lemonldap::NG::Portal::Lib::CrowdSecFilter;
++
++use strict;
++use Mouse::Role;
++use Regexp::Assemble;
++
++use constant knownCat      => (qw(url urlskip));
++use constant knownSuffixes => (qw(re txt));
++
++# Initialization functions for CrowdsecFilter feature
++
++sub initializeFilters {
++    my ($self) = @_;
++    my $filters = $self->parseFilters( $self->conf->{crowdsecFilters} );
++    if ( $filters and %$filters ) {
++        foreach my $cat ( keys %$filters ) {
++            my $re = Regexp::Assemble->new;
++            eval {
++                $re->add( map { qr/(?i)$_/ } @{ $filters->{$cat}->{re} } )
++                  if $filters->{$cat}->{re};
++                $re->add( map { qr/(?i)\Q$_\E/ } @{ $filters->{$cat}->{txt} } )
++                  if $filters->{$cat}->{txt};
++            };
++            if ($@) {
++                $self->logger->error("Unable to parst category $cat: $@");
++            }
++            else {
++                $self->filters->{$cat} = $re->re;
++                $self->logger->debug("RE $cat: $re");
++            }
++        }
++    }
++}
++
++sub parseFilters {
++    my ( $self, $dirname, $res, $cat ) = @_;
++    $self->logger->debug("Crowdsec filters, parsing $dirname");
++    $res //= {};
++    my $fh;
++    unless ( opendir $fh, $dirname ) {
++        $self->logger->error("Unable to read directory $dirname: $!");
++        return $res;
++    }
++    my @files = grep /\w/, readdir $fh;
++    closedir $fh;
++  LOOP: foreach my $file (@files) {
++
++        # Sub-directories fixes the category
++        my $path = "$dirname/$file";
++        if ( -d $path ) {
++            if ($cat) {
++                $self->parseFilters( $path, $res, $cat );
++            }
++            elsif ( my ($t) = grep { $file =~ m/^${_}(?:[_\s-]|$)/ } knownCat ) {
++                $self->parseFilters( $path, $res, $t );
++            }
++            else {
++                $self->logger->error("Unknwon category for directory $path");
++            }
++            next LOOP;
++        }
++        $file =~ s/\.([^\.]+)$//;
++        my $type = $1;
++        unless ( $type and grep { $_ eq $type } knownSuffixes ) {
++            $self->logger->error("Bad suffix for $path, skipping");
++            next LOOP;
++        }
++        my $lcat = $cat;
++        unless ($lcat) {
++            $file =~ s/\.([^\.]+)$//;
++            $lcat = $1;
++            unless ($lcat) {
++                $self->logger->error("Malformed file $path (missing category)");
++                next LOOP;
++            }
++            unless ( grep { $_ eq $lcat } knownCat ) {
++                $self->logger->error("Unknown category $lcat for $path");
++                next LOOP;
++            }
++        }
++        unless ( open $fh, '<', $path ) {
++            $self->logger->error("Unable to read file $path: $!");
++            next LOOP;
++        }
++        $self->logger->debug(
++"Crowdsec filters, adding content of $path into category $lcat, type $type"
++        );
++        my $c = 0;
++        foreach (<$fh>) {
++            next if /^\s*#/;
++            next unless /\w/;
++            s/[\r\n]//g;
++            push @{ $res->{$lcat}->{$type} }, $_;
++            $c++;
++        }
++        $self->logger->debug("  -> $c lines added");
++    }
++    return $res;
++}
++
++1;
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm
 @@ -47,6 +47,7 @@
        '::Plugins::AdaptativeAuthenticationLevel',
      refreshSessions         => '::Plugins::Refresh',
@@ -543,9 +553,157 @@ diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm /home/yadd/dev/l
      locationDetect          => '::Plugins::LocationDetect',
      globalLogoutRule        => '::Plugins::GlobalLogout',
      samlFederationFiles     => '::Plugins::SamlFederation',
---- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CrowdSecAgent.pm	1970-01-01 01:00:00.000000000 +0100
-+++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CrowdSecAgent.pm	2025-12-26 11:04:24.106166932 +0100
-@@ -0,0 +1,168 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CrowdSec.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CrowdSec.pm
+@@ -2,101 +2,72 @@
+ 
+ use strict;
+ use Mouse;
+-use JSON qw(from_json);
+-use Lemonldap::NG::Common::UserAgent;
+ use Lemonldap::NG::Portal::Main::Constants qw(
+   PE_OK
+-  PE_ERROR
+   PE_SESSIONNOTGRANTED
+ );
+ 
+-our $VERSION = '2.19.0';
++our $VERSION = '2.22.0';
+ 
+ extends 'Lemonldap::NG::Portal::Main::Plugin';
++with 'Lemonldap::NG::Portal::Lib::CrowdSec';
+ 
+ # Entrypoint
+-use constant beforeAuth => 'check';
++use constant aroundSub => { controlUrl => 'checkCrowdsec' };
+ 
+-has ua => (
+-    is      => 'rw',
+-    lazy    => 1,
+-    builder => sub {
+-
+-        # TODO : LWP options to use a proxy for example
+-        my $ua = Lemonldap::NG::Common::UserAgent->new( $_[0]->{conf} );
+-        $ua->env_proxy();
+-        return $ua;
+-    }
+-);
+-has crowdsecUrl => ( is => 'rw' );
++has rule => ( is => 'rw', default => sub { 0 } );
+ 
+ sub init {
+     my ($self) = @_;
+-    if ( $self->conf->{crowdsecUrl} ) {
+-        my $tmp = $self->conf->{crowdsecUrl};
+-        $tmp =~ s#/+$##;
+-        $self->crowdsecUrl($tmp);
+-    }
+-    else {
+-        $self->logger->warn(
+-            "crowdsecUrl isn't set, fallback to http://localhost:8080");
+-        $self->crowdsecUrl('http://localhost:8080');
++    $self->_init or return 0;
++
++    # Parse activation rule
++    unless ( $self->conf->{crowdsecKey} ) {
++        $self->logger->error('Missing Crowdsec Bouncer key');
++        return 0;
+     }
+-    $self->logger->info( 'CrowdSec policy is: '
+-          . ( $self->conf->{crowdsecAction} ? 'reject' : 'warn' ) );
++    $self->logger->info(
++        'CrowdSec policy is: ' . ( $self->conf->{crowdsecAction} || 'warn' ) );
++    $self->rule( $self->p->buildRule( $self->conf->{crowdsec}, 'crowdsec' ) );
+     return 1;
+ }
+ 
+-sub check {
+-    my ( $self, $req ) = @_;
+-    my $ip   = $req->address;
+-    my $resp = $self->ua->get(
+-        $self->crowdsecUrl . "/v1/decisions?ip=$ip",
+-        'Accept'    => 'application/json',
+-        'X-Api-Key' => $self->conf->{crowdsecKey},
+-    );
+-    if ( $resp->is_error and not !$self->conf->{crowdsecIgnoreFailures} ) {
+-        $self->logger->error( 'Bad CrowdSec response: ' . $resp->message );
+-        $self->logger->debug( $resp->content );
+-        return PE_ERROR;
+-    }
+-    my $content = $resp->decoded_content;
+-    if ( !$content or $content eq 'null' ) {
+-        $self->userLogger->debug("$ip isn't known by CrowdSec");
+-        return PE_OK;
++sub checkCrowdsec {
++    my ( $self, $sub, $req ) = @_;
++    if ( !$self->rule->( $req, $req->sessionInfo ) ) {
++        $self->logger->debug('Crowdsec disabled for this env');
++        return $sub->($req);
+     }
+-    my $json_hash;
+-    eval { $json_hash = from_json( $content, { allow_nonref => 1 } ); };
+-    if ($@) {
+-        $self->logger->error("Unable to decode CrowdSec response: $content");
+-        $self->logger->debug($@);
+-        return PE_ERROR;
+-    }
+-    $self->logger->debug("CrowdSec response: $content");
++    my $ip = $req->address;
++    my ( $ok, $err ) = $self->bouncer($ip);
+ 
+-    # Response is "null" when IP is unknown
+-    if ($json_hash) {
++    # bouncer() answer $ok=0 only when Crowdsec response rejects the given IP
++    return $sub->($req)
++      if ( $ok and $err and $self->conf->{crowdsecIgnoreFailures} );
+ 
+-        # CrowdSec may return more than one decision
+-        foreach my $decision (@$json_hash) {
+-            if ( $decision->{type} and $decision->{type} eq 'ban' ) {
+-                $self->userLogger->warn( "$ip banned by CrowdSec ('"
+-                      . $decision->{scenario}
+-                      . "' for $decision->{duration})" );
+-                if ( $self->conf->{crowdsecAction} eq 'reject' ) {
+-                    $self->userLogger->error("$ip rejected by CrowdSec");
+-                    return PE_SESSIONNOTGRANTED;
+-                }
+-                else {
+-                    $self->userLogger->error("$ip is banned by CrowdSec");
+-                    $req->env->{CROWDSEC_REJECT} = 1;
+-                    return PE_OK;
+-                }
+-            }
++    # When $ok==0, $err contains the Crowdsec decision
++    unless ($ok) {
++        if ( $self->conf->{crowdsecAction} eq 'reject' ) {
++            $self->auditLog(
++                $req,
++                code    => 403,
++                message => $err,
++                ip      => $ip,
++            );
++            return PE_SESSIONNOTGRANTED;
++        }
++        else {
++            $self->auditLog(
++                $req,
++                code    => 200,
++                message => "$err (ignored)",
++                ip      => $ip,
++            );
++            $req->env->{CROWDSEC_REJECT} = 1;
++            return $sub->($req);
+         }
+-        $self->userLogger->info("$ip not banned by CrowdSec");
+-        return PE_OK;
+     }
++    return $err ? $err : $sub->($req);
+ }
+ 
+ 1;
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CrowdSecAgent.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CrowdSecAgent.pm
+@@ -0,0 +1,174 @@
 +package Lemonldap::NG::Portal::Plugins::CrowdSecAgent;
 +
 +use strict;
@@ -635,8 +793,9 @@ diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm /home/yadd/dev/l
 +    }
 +    my $msg = 'Authentication failed: '
 +      . &Lemonldap::NG::Portal::Main::Constants::portalConsts->{$ret};
++    my $login = $req->user // '';
 +    $self->alert( $req->address, $msg,
-+        { scenario => 'llng/badcredentials', reason => $msg, login => ( $req->user // '' ) } )
++        { scenario => 'llng/badcredentials', reason => $msg, login => $login } )
 +      ? $self->auditLog(
 +        $req,
 +        code    => 200,
@@ -659,12 +818,17 @@ diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm /home/yadd/dev/l
 +    }
 +
 +    return $ret unless $self->filters;
-+    if (    $self->filters->{url}
-+        and $req->env->{REQUEST_URI} =~ $self->filters->{url} )
++    if (
++            $self->filters->{url}
++        and $req->env->{REQUEST_URI} =~ $self->filters->{url}
++        and not($self->filters->{urlskip}
++            and $req->env->{REQUEST_URI} =~ $self->filters->{urlskip} )
++      )
 +    {
-+        my $msg = 'Bad URI detected: ' . $req->env->{REQUEST_URI};
++        my $uri = $req->env->{REQUEST_URI};
++        my $msg = "Bad URI detected: $uri";
 +        $self->alert( $req->address, $msg,
-+            { scenario => 'llng/urlscan', reason => $msg, uri => $req->env->{REQUEST_URI} } )
++            { scenario => 'llng/urlscan', reason => $msg, uri => $uri } )
 +          ? $self->auditLog(
 +            $req,
 +            code         => 200,
@@ -714,147 +878,3 @@ diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm /home/yadd/dev/l
 +}
 +
 +1;
-diff -aburN usr/share/perl5/Lemonldap/NG/Portal/Plugins/CrowdSec.pm /home/yadd/dev/lemonldap/lemonldap-ng-portal/lib/Lemonldap/NG/Portal/Plugins/CrowdSec.pm
---- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CrowdSec.pm	2025-05-21 10:24:46.000000000 +0200
-+++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CrowdSec.pm	2025-12-26 11:04:24.106166932 +0100
-@@ -2,101 +2,71 @@
- 
- use strict;
- use Mouse;
--use JSON qw(from_json);
--use Lemonldap::NG::Common::UserAgent;
- use Lemonldap::NG::Portal::Main::Constants qw(
-   PE_OK
--  PE_ERROR
-   PE_SESSIONNOTGRANTED
- );
- 
--our $VERSION = '2.19.0';
-+our $VERSION = '2.22.0';
- 
- extends 'Lemonldap::NG::Portal::Main::Plugin';
-+with 'Lemonldap::NG::Portal::Lib::CrowdSec';
- 
- # Entrypoint
--use constant beforeAuth => 'check';
-+use constant aroundSub => { controlUrl => 'checkCrowdsec' };
- 
--has ua => (
--    is      => 'rw',
--    lazy    => 1,
--    builder => sub {
--
--        # TODO : LWP options to use a proxy for example
--        my $ua = Lemonldap::NG::Common::UserAgent->new( $_[0]->{conf} );
--        $ua->env_proxy();
--        return $ua;
--    }
--);
--has crowdsecUrl => ( is => 'rw' );
-+has rule => ( is => 'rw', default => sub { 0 } );
- 
- sub init {
-     my ($self) = @_;
--    if ( $self->conf->{crowdsecUrl} ) {
--        my $tmp = $self->conf->{crowdsecUrl};
--        $tmp =~ s#/+$##;
--        $self->crowdsecUrl($tmp);
--    }
--    else {
--        $self->logger->warn(
--            "crowdsecUrl isn't set, fallback to http://localhost:8080");
--        $self->crowdsecUrl('http://localhost:8080');
--    }
--    $self->logger->info( 'CrowdSec policy is: '
--          . ( $self->conf->{crowdsecAction} ? 'reject' : 'warn' ) );
-+    $self->_init or return 0;
-+
-+    # Parse activation rule
-+    unless ( $self->conf->{crowdsecKey} ) {
-+        $self->logger->error('Missing Crowdsec Bouncer key');
-+        return 0;
-+    }
-+    $self->logger->info(
-+        'CrowdSec policy is: ' . ( $self->conf->{crowdsecAction} || 'warn' ) );
-+    $self->rule( $self->p->buildRule( $self->conf->{crowdsec}, 'crowdsec' ) );
-     return 1;
- }
- 
--sub check {
-+sub checkCrowdsec {
--    my ( $self, $req ) = @_;
--    my $ip   = $req->address;
--    my $resp = $self->ua->get(
--        $self->crowdsecUrl . "/v1/decisions?ip=$ip",
--        'Accept'    => 'application/json',
--        'X-Api-Key' => $self->conf->{crowdsecKey},
--    );
--    if ( $resp->is_error and not !$self->conf->{crowdsecIgnoreFailures} ) {
--        $self->logger->error( 'Bad CrowdSec response: ' . $resp->message );
--        $self->logger->debug( $resp->content );
--        return PE_ERROR;
--    }
--    my $content = $resp->decoded_content;
--    if ( !$content or $content eq 'null' ) {
--        $self->userLogger->debug("$ip isn't known by CrowdSec");
-+    my ( $self, $sub, $req ) = @_;
-+    if ( !$self->rule->( $req, $req->sessionInfo ) ) {
-+        $self->logger->debug('Crowdsec disabled for this env');
--        return PE_OK;
-+        return $sub->($req);
-     }
--    my $json_hash;
--    eval { $json_hash = from_json( $content, { allow_nonref => 1 } ); };
--    if ($@) {
--        $self->logger->error("Unable to decode CrowdSec response: $content");
--        $self->logger->debug($@);
--        return PE_ERROR;
--    }
--    $self->logger->debug("CrowdSec response: $content");
-+    my $ip = $req->address;
-+    my ( $ok, $err ) = $self->bouncer($ip);
- 
--    # Response is "null" when IP is unknown
--    if ($json_hash) {
-+    # bouncer() answer $ok=0 only when Crowdsec response rejects the given IP
-+    return $sub->($req) if ( $ok and $err and $self->conf->{crowdsecIgnoreFailures} );
- 
--        # CrowdSec may return more than one decision
--        foreach my $decision (@$json_hash) {
--            if ( $decision->{type} and $decision->{type} eq 'ban' ) {
--                $self->userLogger->warn( "$ip banned by CrowdSec ('"
--                      . $decision->{scenario}
--                      . "' for $decision->{duration})" );
-+    # When $ok==0, $err contains the Crowdsec decision
-+    unless ($ok) {
-                 if ( $self->conf->{crowdsecAction} eq 'reject' ) {
--                    $self->userLogger->error("$ip rejected by CrowdSec");
-+            $self->auditLog(
-+                $req,
-+                code    => 403,
-+                message => $err,
-+                ip      => $ip,
-+            );
-                     return PE_SESSIONNOTGRANTED;
-                 }
-                 else {
--                    $self->userLogger->error("$ip is banned by CrowdSec");
-+            $self->auditLog(
-+                $req,
-+                code    => 200,
-+                message => "$err (ignored)",
-+                ip      => $ip,
-+            );
-                     $req->env->{CROWDSEC_REJECT} = 1;
--                    return PE_OK;
-+                    return $sub->($req);
-                 }
-             }
--        }
--        $self->userLogger->info("$ip not banned by CrowdSec");
--        return PE_OK;
--    }
-+    return $err ? $err : $sub->($req);
- }
- 
- 1;
