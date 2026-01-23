@@ -167,6 +167,18 @@
          # SOAP server
          soapSessionServer => {
              default       => 0,
+@@ -4921,6 +4927,6 @@
+             default       => 'introspect',
+             documentation => 'OpenID Connect introspection endpoint',
+         },
++        oidcServiceMetaDataRevokeURI => {
++            type          => 'text',
++            default       => 'revoke',
++            documentation => 'OpenID Connect token revocation endpoint',
++        },
+ 
+         # Logout endpoints
+         oidcServiceMetaDataEndSessionURI => {
 --- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Tree.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Tree.pm
 @@ -957,6 +957,10 @@ sub tree {
@@ -180,6 +192,14 @@
                      ]
                  },
                  {
+@@ -1562,6 +1566,7 @@
+                         'oidcServiceMetaDataJWKSURI',
+                         'oidcServiceMetaDataRegistrationURI',
+                         'oidcServiceMetaDataIntrospectionURI',
++                        'oidcServiceMetaDataRevokeURI',
+                         'oidcServiceMetaDataEndSessionURI',
+                         'oidcServiceMetaDataCheckSessionURI',
+                         'oidcServiceMetaDataFrontChannelURI',
 --- a/usr/share/perl5/Lemonldap/NG/Manager/Sessions.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Manager/Sessions.pm
 @@ -8,6 +8,7 @@ use Lemonldap::NG::Common::Session;
