@@ -46,6 +46,7 @@ RUN set -e && for p in appgrid.patch app-scope.patch ignorepollers.patch \
     dp.patch \
     crowdsec.patch \
     874-geoip.patch \
+    875-externalMenu.patch \
     ; do echo patch $p && patch -p1 < $p; done && \
     cp -f /usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.js /usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.min.js && \
     rm -f /*.patch && \

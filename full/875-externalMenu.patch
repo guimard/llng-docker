@@ -1,0 +1,165 @@
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
+@@ -426,6 +426,12 @@ sub attributes {
+             default       => 0,
+             documentation => 'Use javascript for redirections',
+         },
++        externalMenu => {
++            type          => 'text',
++            default       => '',
++            documentation =>
++'URL to redirect authenticated users to instead of showing menu. Supports session variables like $uid, $mail, etc.',
++        },
+         logoutServices => {
+             type          => 'keyTextContainer',
+             help          => 'logoutforward.html',
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Tree.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Tree.pm
+@@ -1329,6 +1329,7 @@ sub tree {
+                             form  => 'simpleInputContainer',
+                             nodes => [
+                                 'jsRedirect',
++                                'externalMenu',
+                                 'noAjaxHook',
+                                 'skipRenewConfirmation',
+                                 'skipUpgradeConfirmation',
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json
+@@ -393,6 +393,7 @@
+ "ext2fLabel":"Label",
+ "ext2fLogo":"شعار",
+ "ext2fResendInterval":"Re-send interval",
++"externalMenu":"External menu URL",
+ "facebookAppId":"هوية تطبيق فاسيبوك",
+ "facebookAppSecret":"كلمة السرلتطبيق فاسيبوك",
+ "facebookAuthnLevel":"مستوى إثبات الهوية",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json
+@@ -393,6 +393,7 @@
+ "ext2fLabel":"Label",
+ "ext2fLogo":"Logo",
+ "ext2fResendInterval":"Re-send interval",
++"externalMenu":"External menu URL",
+ "facebookAppId":"Facebook application ID",
+ "facebookAppSecret":"Facebook application secret",
+ "facebookAuthnLevel":"Authentication level",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json
+@@ -393,6 +393,7 @@
+ "ext2fLabel":"Etiqueta",
+ "ext2fLogo":"Logo",
+ "ext2fResendInterval":"Re-send interval",
++"externalMenu":"External menu URL",
+ "facebookAppId":"Facebook application ID",
+ "facebookAppSecret":"Facebook application secret",
+ "facebookAuthnLevel":"Nivel de autentificación",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json
+@@ -393,6 +393,7 @@
+ "ext2fLabel":"Label",
+ "ext2fLogo":"Logo",
+ "ext2fResendInterval":"Intervalle de retransmission",
++"externalMenu":"URL du menu externe",
+ "facebookAppId":"ID de l'application Facebook",
+ "facebookAppSecret":"Secret de l'application Facebook",
+ "facebookAuthnLevel":"Niveau d'authentification",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json
+@@ -393,6 +393,7 @@
+ "ext2fLabel":"תווית",
+ "ext2fLogo":"לוגו",
+ "ext2fResendInterval":"מרווח בין שליחות חוזרות",
++"externalMenu":"External menu URL",
+ "facebookAppId":"מזהה יישום פייסבוק",
+ "facebookAppSecret":"סוג יישום פייסבוק",
+ "facebookAuthnLevel":"דרגת אימות",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json
+@@ -393,6 +393,7 @@
+ "ext2fLabel":"Label",
+ "ext2fLogo":"Logo",
+ "ext2fResendInterval":"Re-send interval",
++"externalMenu":"External menu URL",
+ "facebookAppId":"ID dell'applicazione Facebook",
+ "facebookAppSecret":"Segreto dell'applicazione Facebook",
+ "facebookAuthnLevel":"Livello di autenticazione",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json
+@@ -393,6 +393,7 @@
+ "ext2fLabel":"Etykieta",
+ "ext2fLogo":"Logo",
+ "ext2fResendInterval":"Interwał ponownego wysyłania",
++"externalMenu":"External menu URL",
+ "facebookAppId":"Identyfikator aplikacji na Facebooku",
+ "facebookAppSecret":"Sekret aplikacji na Facebooku",
+ "facebookAuthnLevel":"Poziom uwierzytelnienia",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json
+@@ -393,6 +393,7 @@
+ "ext2fLabel":"Etiqueta",
+ "ext2fLogo":"Logo",
+ "ext2fResendInterval":"Intervalo de reenvio",
++"externalMenu":"External menu URL",
+ "facebookAppId":"Facebook application ID",
+ "facebookAppSecret":"Facebook application secret",
+ "facebookAuthnLevel":"Nível de autenticação",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json
+@@ -393,6 +393,7 @@
+ "ext2fLabel":"Etiqueta",
+ "ext2fLogo":"Logo",
+ "ext2fResendInterval":"Intervalo de reenvio",
++"externalMenu":"External menu URL",
+ "facebookAppId":"ID de aplicação Facebook",
+ "facebookAppSecret":"segredo de aplicação Facebook",
+ "facebookAuthnLevel":"Nível de autenticação",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json
+@@ -393,6 +393,7 @@
+ "ext2fLabel":"Метка",
+ "ext2fLogo":"Лого",
+ "ext2fResendInterval":"Заново отправить интервал",
++"externalMenu":"External menu URL",
+ "facebookAppId":"Идентификатор приложения Facebook",
+ "facebookAppSecret":"Секрет приложения Facebook",
+ "facebookAuthnLevel":"Уровень аутентификации",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json
+@@ -393,6 +393,7 @@
+ "ext2fLabel":"Etiket",
+ "ext2fLogo":"Logo",
+ "ext2fResendInterval":"Yeniden gönderme aralığı",
++"externalMenu":"External menu URL",
+ "facebookAppId":"Facebook uygulama ID",
+ "facebookAppSecret":"Facebook uygulama gizli anahtar",
+ "facebookAuthnLevel":"Doğrulama seviyesi",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json
+@@ -393,6 +393,7 @@
+ "ext2fLabel":"Nhãn",
+ "ext2fLogo":"Logo",
+ "ext2fResendInterval":"Gửi lại khoảng thời gian",
++"externalMenu":"External menu URL",
+ "facebookAppId":"ID ứng dụng Facebook ",
+ "facebookAppSecret":"Ứng dụng Facebook bí mật",
+ "facebookAuthnLevel":"Mức xác thực",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json
+@@ -393,6 +393,7 @@
+ "ext2fLabel":"標籤",
+ "ext2fLogo":"圖示",
+ "ext2fResendInterval":"Re-send interval",
++"externalMenu":"External menu URL",
+ "facebookAppId":"Facebook 應用程式 ID",
+ "facebookAppSecret":"Facebook 應用程式祕密",
+ "facebookAuthnLevel":"驗證等級",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json
+@@ -393,6 +393,7 @@
+ "ext2fLabel":"標籤",
+ "ext2fLogo":"圖示",
+ "ext2fResendInterval":"Re-send interval",
++"externalMenu":"External menu URL",
+ "facebookAppId":"Facebook 應用程式 ID",
+ "facebookAppSecret":"Facebook 應用程式祕密",
+ "facebookAuthnLevel":"驗證等級",

@@ -8,6 +8,7 @@
 * Add DBD::Patroni
 * Update Crowdsec plugins
 * Add patch for LocationDetect to use any compatible DB
+* Add externalMenu plugin
 
 ## v2.21.3-2 _(2025-11-14)_
 * Add Twake app-accounts plugin

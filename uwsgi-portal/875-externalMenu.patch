@@ -1,0 +1,65 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm
+@@ -46,6 +46,7 @@ our @pList = (
+     refreshSessions         => '::Plugins::Refresh',
+     crowdsec                => '::Plugins::CrowdSec',
+     crowdsecAgent           => '::Plugins::CrowdSecAgent',
++    externalMenu            => '::Plugins::ExternalMenu',
+     locationDetect          => '::Plugins::LocationDetect',
+     globalLogoutRule        => '::Plugins::GlobalLogout',
+     samlFederationFiles     => '::Plugins::SamlFederation',
+new file mode 100644
+--- /dev/null
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/ExternalMenu.pm
+@@ -0,0 +1,51 @@
++package Lemonldap::NG::Portal::Plugins::ExternalMenu;
++
++use strict;
++use Mouse;
++use Lemonldap::NG::Portal::Main::Constants qw(PE_OK);
++
++our $VERSION = '2.22.0';
++
++extends 'Lemonldap::NG::Portal::Main::Plugin';
++
++# INTERFACE
++use constant endAuth     => 'setExternalMenu';
++use constant forAuthUser => 'setExternalMenu';
++
++# Compiled URL sub
++has externalMenuUrl => ( is => 'rw' );
++
++# INITIALIZATION
++sub init {
++    my ($self) = @_;
++
++    # Compile URL with variable substitution
++    my $url = $self->conf->{externalMenu};
++    my $sub =
++      $self->p->HANDLER->buildSub( $self->p->HANDLER->substitute("qq{$url}") );
++    unless ($sub) {
++        $self->logger->error( 'externalMenu URL compilation error: '
++              . $self->p->HANDLER->tsv->{jail}->error );
++        return 0;
++    }
++    $self->externalMenuUrl($sub);
++    return 1;
++}
++
++# RUNNING METHOD
++sub setExternalMenu {
++    my ( $self, $req ) = @_;
++
++    # Only set urldc if:
++    # - Authentication succeeded (PE_OK)
++    # - urldc is not already set
++    unless ( $req->{urldc} ) {
++        if ( my $url = $self->externalMenuUrl->( $req, $req->sessionInfo ) ) {
++            $self->logger->debug("ExternalMenu: redirecting to $url");
++            $req->{urldc} = $url;
++        }
++    }
++    return PE_OK;
++}
++
++1;
