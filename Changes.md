@@ -1,6 +1,6 @@
 # Changes
 
-## v2.21.3-3 _(dev)_
+## v2.21.3-3 _(2026-03-04)_
 * Fix updateConf script when value is multiline
 * Improve Patroni patch
 * Add device-pam
