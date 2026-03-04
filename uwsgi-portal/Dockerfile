@@ -50,6 +50,7 @@ RUN set -e && for p in appgrid.patch app-scope.patch ignorepollers.patch \
     ; do echo patch $p && patch -p1 < $p; done && \
     cp -f /usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.js /usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.min.js && \
     rm -f /*.patch && \
+    find /usr/share/perl5/Lemonldap -name '*.orig' -delete && \
     echo "# Install nginx configuration files" && \
     rm -f /etc/nginx/sites-enabled/* && \
     ln -s ../../lemonldap-ng/portal-nginx.conf /etc/nginx/sites-enabled/ && \

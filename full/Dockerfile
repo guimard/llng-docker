@@ -34,8 +34,9 @@ RUN \
 	dp.patch \
 	875-externalMenu.patch \
 	better-cfgAuthor.patch \
-    ; do echo patch $p && patch -p1 < $p; done && \
+    ; do echo patch $p && patch -p1 < $p || exit 1; done && \
     rm -f *.patch && \
+    find /usr/share/perl5/Lemonldap -name '*.orig' -delete && \
     LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini \
     perl -MLemonldap::NG::Manager::Build -e 'Lemonldap::NG::Manager::Build->run( \
       structFile   => "/usr/share/lemonldap-ng/manager/htdocs/static/struct.json", \

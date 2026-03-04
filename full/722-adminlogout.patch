@@ -167,7 +167,7 @@
          # SOAP server
          soapSessionServer => {
              default       => 0,
-@@ -4921,6 +4927,6 @@
+@@ -4921,6 +4927,11 @@
              default       => 'introspect',
              documentation => 'OpenID Connect introspection endpoint',
          },
