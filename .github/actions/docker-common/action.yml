@@ -141,14 +141,3 @@ runs:
           platforms: ${{ steps.platforms.outputs.platforms }}
           push: true
           tags: ${{ steps.gentagsnonroot.outputs.tags }}
-      - name: push README to Dockerhub
-        if: inputs.SHORT_DESCRIPTION != 'no'
-        uses: christian-korneck/update-container-description-action@v1
-        env:
-          DOCKER_USER: ${{ inputs.DOCKER_USERNAME }}
-          DOCKER_PASS: ${{ inputs.DOCKER_PASSWORD }}
-        with:
-          destination_container_repo: ${{ inputs.DOCKER_IMAGE }}
-          provider: dockerhub
-          short_description: ${{ inputs.SHORT_DESCRIPTION }}
-          readme_file: ${{ inputs.DIRNAME }}/README.md
