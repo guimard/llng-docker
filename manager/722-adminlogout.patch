@@ -326,3 +326,17 @@
                      my $session = Lemonldap::NG::Common::Session->new(
                          storageModule        => $storageModule,
                          storageModuleOptions => $opts,
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Sessions.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Sessions.pm
+@@ -124,8 +124,10 @@ sub userLogout {
+                             token      => $sid,
+                             raw        => 1,
+                         );
++                        my $portal = $self->{portal};
++                        $portal =~ s#/+$##;
+                         my $lreq = HTTP::Request->new(
+-                            POST => "$self->{portal}/admintokenrevoke",
++                            POST => "$portal/admintokenrevoke",
+                             [
+                                 Authorization =>
+                                   "Bearer $self->{tokenRevokeSecret}",
