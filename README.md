@@ -6,7 +6,7 @@ PostgreSQL server to share configuration. See docker-compose example.
 
 List:
  - [yadd/lemonldap-ng-portal](./portal): the portal
-   * [yadd/lemonldap-ng-portal-hiperf](./uwsgi-portal): portal with better performances
+   * [yadd/lemonldap-ng-portal:\<tag>-hiperf](./uwsgi-portal): portal with better performances
  - [yadd/lemonldap-ng-manager](./manager): the manager
  - [yadd/lemonldap-ng-full](./full): the portal and the manager in the same image
  - [yadd/lemonldap-ng-ssoaas-fastcgi-server](./ssoaas-fastcgi-server): a FastCGI
