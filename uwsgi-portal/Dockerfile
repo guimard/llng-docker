@@ -43,6 +43,7 @@ RUN set -e && for p in appgrid.patch app-scope.patch ignorepollers.patch \
     722-adminlogout.patch \
     808-oidc-fix.patch \
     twake-wellknown.patch \
+    dp.patch \
     crowdsec.patch \
     874-geoip.patch \
     875-externalMenu.patch \
