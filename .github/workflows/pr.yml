@@ -2,7 +2,7 @@ name: Build and test Docker Images
 
 on:
   push:
-    branches-ignore: [master,stable,experimental]
+    branches-ignore: [master,stable,experimental,lts-2.21]
 
 jobs:
   test:
