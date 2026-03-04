@@ -31,7 +31,6 @@ RUN \
 	787-CrowdsecAgent.patch \
 	797-crowdsec-agent.patch \
 	twake-plugins.patch \
-	dp.patch \
 	875-externalMenu.patch \
 	better-cfgAuthor.patch \
     ; do echo patch $p && patch -p1 < $p || exit 1; done && \
