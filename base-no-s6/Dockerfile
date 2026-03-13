@@ -19,7 +19,7 @@ FROM debian-backports-updated AS llng-client
 ADD https://github.com/linagora/simple-oidc-client/archive/refs/heads/master.zip /tmp
 RUN apt-get install -y zip && cd /tmp && unzip master.zip
 
-FROM debian-updated
+FROM debian-backports-updated
 
 ENV DEBIAN_VERSION="trixie"
 #ENV LLNGDIST="/trixie-backports"
