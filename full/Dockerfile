@@ -11,6 +11,7 @@ RUN echo "# Install nginx and portal and manager libs" && \
     apt-get -y update && \
     apt-get -y upgrade && \
     apt-get -y --no-install-recommends install nginx \
+      libnginx-mod-http-host-normalize \
       liblemonldap-ng-manager-perl${LLNGDIST} apache2-utils && \
     mv /etc/dpkg/dpkg.cfg.d /tmp/ && \
     apt-get -y --no-install-recommends install \
@@ -31,8 +32,11 @@ RUN \
 	787-CrowdsecAgent.patch \
 	797-crowdsec-agent.patch \
 	twake-plugins.patch \
-    ; do echo patch $p && patch -p1 < $p; done && \
+	875-externalMenu.patch \
+	better-cfgAuthor.patch \
+    ; do echo patch $p && patch -p1 < $p || exit 1; done && \
     rm -f *.patch && \
+    find /usr/share/perl5/Lemonldap -name '*.orig' -delete && \
     LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini \
     perl -MLemonldap::NG::Manager::Build -e 'Lemonldap::NG::Manager::Build->run( \
       structFile   => "/usr/share/lemonldap-ng/manager/htdocs/static/struct.json", \

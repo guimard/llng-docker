@@ -15,7 +15,7 @@
          },
          crowdsecAction => {
              type   => 'select',
-@@ -1489,9 +1490,39 @@ sub attributes {
+@@ -1489,9 +1504,57 @@ sub attributes {
              documentation => 'CrowdSec API key',
          },
          crowdsecIgnoreFailures => {
@@ -46,6 +46,24 @@
 +            type          => 'int',
 +            documentation => 'Crowdsec-Agent check delay',
 +        },
++        crowdsecBanDuration => {
++            type          => 'text',
++            default       => '4h',
++            documentation => 'Crowdsec-Agent ban duration (e.g. 4h, 1d)',
++        },
++        crowdsecFilters => {
++            type          => 'text',
++            documentation => 'Crowdsec filters directory',
++        },
++        crowdSecAgentResponseCode => {
++            type          => 'int',
++            default       => 404,
++            documentation => 'Crowdsec ban response code',
++        },
++        crowdSecAgentResponseValue => {
++            type          => 'text',
++            documentation => 'Crowdsec ban response text',
++        },
 +
 +        # OIDC personnal offline token removal
 +        oidcOfflineTokens => {
@@ -57,7 +75,7 @@
          failedLoginNumber => {
 --- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Tree.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Tree.pm
-@@ -1175,15 +1175,30 @@ sub tree {
+@@ -1175,15 +1175,34 @@ sub tree {
                                  'strictTransportSecurityMax_Age',
                                  'hashedSessionStore',
                                  {
@@ -91,6 +109,10 @@
 +                                                'crowdsecPassword',
 +                                                'crowdsecMaxFailures',
 +                                                'crowdsecBlockDelay',
++                                                'crowdsecBanDuration',
++                                                'crowdsecFilters',
++                                                'crowdSecAgentResponseCode',
++                                                'crowdSecAgentResponseValue',
 +                                            ],
 +                                        },
                                      ],

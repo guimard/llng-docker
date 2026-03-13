@@ -167,6 +167,18 @@
          # SOAP server
          soapSessionServer => {
              default       => 0,
+@@ -4921,6 +4927,11 @@
+             default       => 'introspect',
+             documentation => 'OpenID Connect introspection endpoint',
+         },
++        oidcServiceMetaDataRevokeURI => {
++            type          => 'text',
++            default       => 'revoke',
++            documentation => 'OpenID Connect token revocation endpoint',
++        },
+ 
+         # Logout endpoints
+         oidcServiceMetaDataEndSessionURI => {
 --- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Tree.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Tree.pm
 @@ -957,6 +957,10 @@ sub tree {
@@ -180,6 +192,14 @@
                      ]
                  },
                  {
+@@ -1562,6 +1566,7 @@
+                         'oidcServiceMetaDataJWKSURI',
+                         'oidcServiceMetaDataRegistrationURI',
+                         'oidcServiceMetaDataIntrospectionURI',
++                        'oidcServiceMetaDataRevokeURI',
+                         'oidcServiceMetaDataEndSessionURI',
+                         'oidcServiceMetaDataCheckSessionURI',
+                         'oidcServiceMetaDataFrontChannelURI',
 --- a/usr/share/perl5/Lemonldap/NG/Manager/Sessions.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Manager/Sessions.pm
 @@ -8,6 +8,7 @@ use Lemonldap::NG::Common::Session;
@@ -277,3 +297,46 @@
                      my $session = Lemonldap::NG::Common::Session->new(
                          storageModule        => $storageModule,
                          storageModuleOptions => $opts,
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Sessions.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Sessions.pm
+@@ -106,6 +106,7 @@ sub userLogout {
+                 @keys = keys %$sessions;
+                 foreach my $sid (@keys) {
+                     my $kind = $sessions->{$sid}->{_session_kind};
++                    my $deletedByPortal = 0;
+                     if (
+                         $self->{tokenRevokeSecret}
+                         and (
+@@ -139,6 +140,8 @@ sub userLogout {
+                         if ( $resp->is_success ) {
+                             $self->logger->info(
+                                 "Session $type/$sid deleted by portal");
++                            $deletedByPortal = 1;
++                            $count++;
+                         }
+                         else {
+                             $self->logger->error(
+@@ -147,6 +150,9 @@ sub userLogout {
+                         }
+                     }
+ 
++                    # Skip manual removal if already deleted by portal
++                    next if $deletedByPortal;
++
+                     my $session = Lemonldap::NG::Common::Session->new(
+                         storageModule        => $storageModule,
+                         storageModuleOptions => $opts,
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Sessions.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Sessions.pm
+@@ -124,8 +124,10 @@ sub userLogout {
+                             token      => $sid,
+                             raw        => 1,
+                         );
++                        my $portal = $self->{portal};
++                        $portal =~ s#/+$##;
+                         my $lreq = HTTP::Request->new(
+-                            POST => "$self->{portal}/admintokenrevoke",
++                            POST => "$portal/admintokenrevoke",
+                             [
+                                 Authorization =>
+                                   "Bearer $self->{tokenRevokeSecret}",

@@ -1,15 +1,21 @@
 ARG DEBIANVERSION=trixie
 
-FROM debian:${DEBIANVERSION}-slim as debian-updated
+FROM debian:${DEBIANVERSION}-slim AS debian-backports-updated
 
 ENV DEBIAN_VERSION=trixie
 
 RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
     apt-get -y update && \
-    apt-get -y install xz-utils && \
-    apt-get -y upgrade
+    apt-get -y install xz-utils curl gpg && \
+    apt-get -y upgrade && \
+    echo "deb http://deb.debian.org/debian" ${DEBIAN_VERSION}"-backports main" > /etc/apt/sources.list.d/backports.list && \
+    curl -fsSL https://linagora.github.io/ngx-http-host-normalize/KEY.gpg | \
+    gpg --dearmor -o /etc/apt/keyrings/ngx-http-host-normalize.gpg && \
+    echo "deb [signed-by=/etc/apt/keyrings/ngx-http-host-normalize.gpg] https://linagora.github.io/ngx-http-host-normalize trixie main" \
+    > /etc/apt/sources.list.d/ngx-http-host-normalize.list && \
+    apt-get -y update
 
-FROM debian-updated as debian-updated-with-s6
+FROM debian-backports-updated AS debian-backports-updated-with-s6
 
 ARG S6_OVERLAY_VERSION=3.1.3.0
 
@@ -21,7 +27,7 @@ RUN tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz && rm /tmp/s6-overlay-noarch.ta
     tar -C / -Jxpf /tmp/s6-overlay-x86_64.tar.xz && rm /tmp/s6-overlay-x86_64.tar.xz && \
     tar -C / -Jxpf /tmp/syslogd-overlay-noarch.tar.xz && rm /tmp/syslogd-overlay-noarch.tar.xz
 
-FROM debian-updated as llng-client
+FROM debian-backports-updated AS llng-client
 ADD https://github.com/linagora/simple-oidc-client/archive/refs/heads/master.zip /tmp
 RUN apt-get install -y zip && cd /tmp && unzip master.zip
 
@@ -36,6 +42,7 @@ LABEL maintainer="Yadd yadd@debian.org>" \
       version="v1.0"
 
 ENV SSODOMAIN=example.com \
+    STRICT_SERVER_NAME= \
     CROWDSEC_SERVER= \
     CROWDSEC_POLICY=reject \
     CROWDSEC_KEY= \
@@ -106,6 +113,8 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     echo "# 769-loki.patch" && patch -p1 <769-loki.patch && \
     echo "# 784-Crowdsec.patch" && patch -p1 < 784-Crowdsec.patch && \
     echo "# 2.22.0-patroni.patch" && patch -p1 < 2.22.0-patroni.patch && \
+    echo "# 2.22.2-patroni.patch" && patch -p1 < 2.22.2-patroni.patch && \
+    echo "# 827-patroni.patch" && patch -p1 < 827-patroni.patch && \
     perl -000 -MJSON -i -ne '$_=JSON::from_json($_);$_->{reloadUrls}={};print JSON->new->pretty->canonical->encode($_)' /var/lib/lemonldap-ng/conf/lmConf-1.json && \
     perl -i -pe 's/\r//g' /usr/share/perl5/Lemonldap/NG/Common/Conf/DefaultValues.pm && \
     echo rm -f *.patch && \

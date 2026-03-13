@@ -14,9 +14,9 @@
 --- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Tree.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Tree.pm
 @@ -1224,6 +1224,7 @@ sub tree {
-                                                 'crowdsecPassword',
-                                                 'crowdsecMaxFailures',
-                                                 'crowdsecBlockDelay',
+                                                 'crowdsecFilters',
+                                                 'crowdSecAgentResponseCode',
+                                                 'crowdSecAgentResponseValue',
 +                                                'crowdsecFilters',
                                              ],
                                          },

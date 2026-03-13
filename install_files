@@ -1,0 +1,8 @@
+#!/bin/bash
+
+rm -rf {portal,uwsgi-portal}/install/var/lib/lemonldap-ng/crowdsec-filters/*
+mkdir -p {portal,uwsgi-portal}/install/var/lib/lemonldap-ng/crowdsec-filters
+
+for i in {portal,uwsgi-portal}/install/var/lib/lemonldap-ng/crowdsec-filters; do
+	cp -a crowdsec_filters/* $i
+done

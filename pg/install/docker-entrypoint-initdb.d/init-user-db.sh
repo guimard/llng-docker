@@ -70,7 +70,7 @@ psql -v ON_ERROR_STOP=1 $POSTGRES_HOST $POSTGRES_PORT --username "$POSTGRES_USER
 	CREATE INDEX i_a__saml_id      ON $SAMLTABLE ((a_session ->> '_saml_id'));
 	GRANT ALL PRIVILEGES ON TABLE $SAMLTABLE TO $USER;
 
-	CREATE UNLOGGED TABLE $OIDCTABLE (
+	CREATE TABLE $OIDCTABLE (
 	    id varchar(64) not null primary key,
 	    a_session jsonb
 	);

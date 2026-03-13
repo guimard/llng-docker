@@ -10,7 +10,9 @@ ENV SERVERNAME= \
 RUN echo "# Install nginx and portal libs" && \
     apt-get -y update && \
     apt-get -y upgrade && \
+    export DEBIAN_FRONTEND=noninteractive && \
     apt-get -y -o Dpkg::Options::="--force-confold" --no-install-recommends install nginx \
+	libnginx-mod-http-host-normalize \
         lemonldap-ng-uwsgi-app"${LLNGDIST}" \
         liblemonldap-ng-portal-perl"${LLNGDIST}" \
         gsfonts patch libconvert-pem-perl \
@@ -27,7 +29,9 @@ RUN echo "# Install nginx and portal libs" && \
         libcrypt-jwt-perl libdigest-hmac-perl libdata-password-zxcvbn-perl \
         libhttp-browserdetect-perl libnet-dns-perl \
         uwsgi uwsgi-plugin-psgi \
+	openssh-client \
         && \
+	rm -f /usr/bin/scp /usr/bin/sftp /usr/bin/ssh /usr/bin/ssh-add /usr/bin/ssh-agent /usr/bin/ssh-argv0 /usr/bin/ssh-copy-id /usr/bin/ssh-keyscan && \
     apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY *.patch /
@@ -38,12 +42,16 @@ RUN set -e && for p in appgrid.patch app-scope.patch ignorepollers.patch \
     getreftoken.patch 708-sid-in-userinfo.patch \
     717-introspection.patch 718-iat-and-nbf-in-at.patch \
     779-mail2f-api.patch \
-    722-adminlogout.patch 784-Crowdsec.patch 797-crowdsec-agent.patch 802-crowdsec-agent.patch \
+    722-adminlogout.patch \
     808-oidc-fix.patch \
     twake-wellknown.patch \
+    crowdsec.patch \
+    874-geoip.patch \
+    875-externalMenu.patch \
     ; do echo patch $p && patch -p1 < $p; done && \
     cp -f /usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.js /usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.min.js && \
     rm -f /*.patch && \
+    find /usr/share/perl5/Lemonldap -name '*.orig' -delete && \
     echo "# Install nginx configuration files" && \
     rm -f /etc/nginx/sites-enabled/* && \
     ln -s ../../lemonldap-ng/portal-nginx.conf /etc/nginx/sites-enabled/ && \

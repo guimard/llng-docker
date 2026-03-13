@@ -1,4 +1,19 @@
-# Changes
+# LTS 2.21.x Changes
+
+## v2.21.3-4 _(2026-03-13)_
+* Rebuild with recents Debian updates (imagemagick)
+* Update Nginx configuration
+
+## v2.21.3-3 _(2026-03-04)_
+* Fix updateConf script when value is multiline
+* Improve Patroni patch
+* Add device-pam
+* Add `STRICT_SERVER_NAME`
+* Add DBD::Patroni
+* Update Crowdsec plugins
+* Add patch for LocationDetect to use any compatible DB
+* Add externalMenu plugin
+* Fix adminLogout
 
 ## v2.21.3-2 _(2025-11-14)_
 * Add Twake app-accounts plugin

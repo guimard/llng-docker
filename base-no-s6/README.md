@@ -32,6 +32,7 @@ There are also date-based tags.
 
 ## Variables and default values
 
+* `STRICT_SERVER_NAME` = _(any value will set the Debian default website to catch requests without good `Host` header, this ensure respect of manager rules)_
 * `SSODOMAIN` = `example.com`
 * `CROWDSEC_SERVER` = _(full base url, example: http://myserver:8080)_
 * `CROWDSEC_POLICY` = `reject` _(possible values: warn, reject)_

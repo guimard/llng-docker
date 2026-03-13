@@ -2,6 +2,12 @@
 
 INI=/etc/lemonldap-ng/lemonldap-ng.ini
 
+if test -e /etc/nginx/sites-enabled; then
+	if test "$STRICT_SERVER_NAME"; then
+		(cd /etc/nginx/sites-enabled && ln -s ../sites-available/default 000-default.conf)
+	fi
+fi
+
 # Use overlay for config
 if grep -E '^type *= *Overlay$' $INI 2>&1; then
     echo "Overlay is already in use, skipping"

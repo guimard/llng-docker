@@ -1,0 +1,20 @@
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Conf/Parser.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Conf/Parser.pm
+@@ -146,10 +146,15 @@ sub scanTree {
+     # Set cfgNum to ref cfgNum (will be changed when saving), set other
+     # metadata and set a value to the key if empty
+     $self->newConf->{cfgNum} = $self->req->params('cfgNum');
++    my $envUser;
++    foreach (qw(REMOTE_USER SUDO_USER USER)) {
++        ( $envUser = $self->req->env->{$_} || $ENV{$_} ) and last;
++    }
+     $self->newConf->{cfgAuthor} =
+       $self->req->userData->{ Lemonldap::NG::Handler::Main->tsv->{whatToTrace}
+-          || '_whatToTrace' } // $self->req->env->{REMOTE_USER}
+-      // $ENV{REMOTE_USER} // "anonymous";
++          || '_whatToTrace' }
++      || $envUser
++      || "anonymous";
+     $self->newConf->{cfgAuthorIP} = $self->req->address;
+     $self->newConf->{cfgAuthorIP} .=
+       ' (maybe '

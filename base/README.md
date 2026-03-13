@@ -5,6 +5,7 @@ LemonLDAP::NG.
 
 ## Tags
 
+* `lts-2.21`: LTS version until 2030
 * `stable`: latest lemonldap-ng\* packages from Debian backports with stable patches
 * `stable-no-s6`: the same without [S6-overlay](https://github.com/just-containers/s6-overlay)
 * `2.x.x-y`: versioned lemonldap-ng\* packages from Debian backports with patches version "y"
@@ -32,6 +33,7 @@ There are also date-based tags.
 
 ## Variables and default values
 
+* `STRICT_SERVER_NAME` = _(any value will set the Debian default website to catch requests without good `Host` header, this ensure respect of manager rules)_
 * `SSODOMAIN` = `example.com`
 * `CROWDSEC_SERVER` = _(full base url, example: http://myserver:8080)_
 * `CROWDSEC_POLICY` = `reject` _(possible values: warn, reject)_

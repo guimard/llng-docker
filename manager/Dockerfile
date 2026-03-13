@@ -11,6 +11,7 @@ RUN echo "# Install nginx and manager libs" && \
     apt-get -y update && \
     apt-get -y upgrade && \
     apt-get -y --no-install-recommends install nginx \
+      libnginx-mod-http-host-normalize \
       lemonldap-ng-fastcgi-server${LLNGDIST} \
       liblemonldap-ng-manager-perl${LLNGDIST} \
       libglib-perl libgssapi-perl libsoap-lite-perl fonts-urw-base35 \
@@ -38,8 +39,11 @@ RUN \
 	787-CrowdsecAgent.patch \
 	797-crowdsec-agent.patch \
 	twake-plugins.patch \
-    ; do echo patch $p && patch -p1 < $p; done && \
+	875-externalMenu.patch \
+	better-cfgAuthor.patch \
+    ; do echo patch $p && patch -p1 < $p || exit 1; done && \
     rm -f *.patch && \
+    find /usr/share/perl5/Lemonldap -name '*.orig' -delete && \
     LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini \
     perl -MLemonldap::NG::Manager::Build -e 'Lemonldap::NG::Manager::Build->run( \
       structFile   => "/usr/share/lemonldap-ng/manager/htdocs/static/struct.json", \
