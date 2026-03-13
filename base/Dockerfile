@@ -1,17 +1,21 @@
 ARG DEBIANVERSION=trixie
 
-FROM debian:${DEBIANVERSION}-slim as debian-backports-updated
+FROM debian:${DEBIANVERSION}-slim AS debian-backports-updated
 
 ENV DEBIAN_VERSION=trixie
 
 RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
     apt-get -y update && \
-    apt-get -y install xz-utils && \
+    apt-get -y install xz-utils curl gpg && \
     apt-get -y upgrade && \
     echo "deb http://deb.debian.org/debian" ${DEBIAN_VERSION}"-backports main" > /etc/apt/sources.list.d/backports.list && \
+    curl -fsSL https://linagora.github.io/ngx-http-host-normalize/KEY.gpg | \
+    gpg --dearmor -o /etc/apt/keyrings/ngx-http-host-normalize.gpg && \
+    echo "deb [signed-by=/etc/apt/keyrings/ngx-http-host-normalize.gpg] https://linagora.github.io/ngx-http-host-normalize trixie main" \
+    > /etc/apt/sources.list.d/ngx-http-host-normalize.list && \
     apt-get -y update
 
-FROM debian-backports-updated as debian-backports-updated-with-s6
+FROM debian-backports-updated AS debian-backports-updated-with-s6
 
 ARG S6_OVERLAY_VERSION=3.1.3.0
 
@@ -23,7 +27,7 @@ RUN tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz && rm /tmp/s6-overlay-noarch.ta
     tar -C / -Jxpf /tmp/s6-overlay-x86_64.tar.xz && rm /tmp/s6-overlay-x86_64.tar.xz && \
     tar -C / -Jxpf /tmp/syslogd-overlay-noarch.tar.xz && rm /tmp/syslogd-overlay-noarch.tar.xz
 
-FROM debian-backports-updated as llng-client
+FROM debian-backports-updated AS llng-client
 ADD https://github.com/linagora/simple-oidc-client/archive/refs/heads/master.zip /tmp
 RUN apt-get install -y zip && cd /tmp && unzip master.zip
 

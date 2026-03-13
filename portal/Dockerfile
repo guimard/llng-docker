@@ -13,6 +13,7 @@ RUN echo "# Install nginx and portal libs" && \
     apt-get -y upgrade && \
     export DEBIAN_FRONTEND=noninteractive && \
     apt-get -y -o Dpkg::Options::="--force-confold" --no-install-recommends install nginx \
+        libnginx-mod-http-host-normalize \
         lemonldap-ng-fastcgi-server"${LLNGDIST}" \
         liblemonldap-ng-portal-perl"${LLNGDIST}" \
         gsfonts patch libconvert-pem-perl \

@@ -11,6 +11,7 @@ RUN echo "# Install nginx and manager libs" && \
     apt-get -y update && \
     apt-get -y upgrade && \
     apt-get -y --no-install-recommends install nginx \
+      libnginx-mod-http-host-normalize \
       lemonldap-ng-fastcgi-server${LLNGDIST} \
       liblemonldap-ng-manager-perl${LLNGDIST} \
       libglib-perl libgssapi-perl libsoap-lite-perl fonts-urw-base35 \
