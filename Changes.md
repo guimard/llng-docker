@@ -1,5 +1,9 @@
 # Changes
 
+## v2.21.3-4 _(2026-03-13)_
+* Rebuild with recents Debian updates (imagemagick)
+* Update Nginx configuration
+
 ## v2.21.3-3 _(2026-03-04)_
 * Fix updateConf script when value is multiline
 * Improve Patroni patch
