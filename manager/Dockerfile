@@ -45,37 +45,23 @@ RUN \
     ; do echo patch $p && patch -p1 < $p || exit 1; done && \
     rm -f *.patch && \
     find /usr/share/perl5/Lemonldap -name '*.orig' -delete && \
-    LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini \
-    perl -MLemonldap::NG::Manager::Build -e 'Lemonldap::NG::Manager::Build->run( \
-      structFile   => "/usr/share/lemonldap-ng/manager/htdocs/static/struct.json", \
-      confTreeFile => "/usr/share/lemonldap-ng/manager/htdocs/static/js/conftree.js", \
-      managerConstantsFile => "/usr/share/perl5/Lemonldap/NG/Common/Conf/ReConstants.pm", \
-      managerAttributesFile => "/usr/share/perl5/Lemonldap/NG/Manager/Attributes.pm", \
-      defaultValuesFile => "/usr/share/perl5/Lemonldap/NG/Common/Conf/DefaultValues.pm", \
-      confConstantsFile => "/usr/share/perl5/Lemonldap/NG/Common/Conf/Constants.pm", \
-      firstLmConfFile => "/var/lib/lemonldap-ng/conf/lmConf-1.json", \
-      reverseTreeFile => "/usr/share/lemonldap-ng/manager/htdocs/static/reverseTree.json", \
-      handlerStatusConstantsFile => "/usr/share/perl5/Lemonldap/NG/Handler/Lib/StatusConstants.pm", \
-      portalConstantsFile => "/dev/null", \
-      docConstantsFile => "/dev/null", \
-      )' && \
     perl -i -pe 's#^(use constant DEFAULTCONFFILE).*$#$1 => "/etc/lemonldap-ng/lemonldap-ng.ini";# && print STDERR "OK\n"' \
         /usr/share/perl5/Lemonldap/NG/Common/Conf/Constants.pm && \
     perl -i -pe 's/__DNSDOMAIN__/example.com/g; s#__CACHEDIR__#/var/cache/lemonldap-ng#g; s#__SESSIONDIR__#/var/lib/lemonldap-ng/sessions#g; s#__PSESSIONDIR__#/var/lib/lemonldap-ng/psessions#g; s#__NOTIFICATIONDIR__#/var/lib/lemonldap-ng/notifications#g;' /var/lib/lemonldap-ng/conf/lmConf-1.json && \
     rm -f /usr/share/lemonldap-ng/manager/htdocs/static/js/conftree.min.js && \
     ln -s conftree.js /usr/share/lemonldap-ng/manager/htdocs/static/js/conftree.min.js
 
-RUN if grep __ /var/lib/lemonldap-ng/conf/lmConf-1.json; then echo "Still __ in conf"; exit 1; fi
-
-RUN echo "# Install nginx configuration files" && \
-    rm -f /etc/nginx/sites-enabled/* && \
-    ln -s ../../lemonldap-ng/manager-nginx.conf /etc/nginx/sites-enabled/
-
-RUN (echo ""; echo "daemon off;") >> /etc/nginx/nginx.conf
-
-RUN perl -i -pe 's#access_log .*;#access_log /dev/stdout;#; s#error_log .*;#error_log /dev/stdout info;#' /etc/nginx/nginx.conf
-
 COPY install /
+
+RUN echo "Regenerating manager files" && \
+    mkdir -p /usr/share/perl5/Lemonldap/NG/Portal/Main/ && \
+    LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini \
+    /usr/share/lemonldap-ng/bin/llng-build-manager-files --plugins-dir /etc/lemonldap-ng/manager-plugins.d && \
+    echo "# Install nginx configuration files" && \
+    rm -f /etc/nginx/sites-enabled/* && \
+    ln -s ../../lemonldap-ng/manager-nginx.conf /etc/nginx/sites-enabled/ && \
+    (echo ""; echo "daemon off;") >> /etc/nginx/nginx.conf && \
+    perl -i -pe 's#access_log .*;#access_log /dev/stdout;#; s#error_log .*;#error_log /dev/stdout info;#' /etc/nginx/nginx.conf
 
 EXPOSE 80
 
