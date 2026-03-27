@@ -140,17 +140,3 @@ sub _findGpg {
 }
 
 1;
-
-__END__
-
-=head1 NAME
-
-Lemonldap::NG::Common::Store::Verify - Verification for LLNG plugin store
-
-=head1 DESCRIPTION
-
-Handles SHA256 checksum verification and GPG detached signature
-verification for plugin archives. Supports three GPG modes:
-C<required>, C<optional> (default), and C<disabled>.
-
-=cut

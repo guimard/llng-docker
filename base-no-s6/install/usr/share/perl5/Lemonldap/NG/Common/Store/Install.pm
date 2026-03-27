@@ -4,8 +4,8 @@ use strict;
 use warnings;
 use Archive::Tar;
 use File::Basename qw(dirname basename);
-use File::Copy qw(copy);
-use File::Path qw(make_path remove_tree);
+use File::Copy     qw(copy);
+use File::Path     qw(make_path remove_tree);
 use File::Find;
 use File::Temp qw(tempdir);
 use JSON;
@@ -20,13 +20,14 @@ my $DEFAULT_MANAGERSTATICDIR   = '__MANAGERSTATICDIR__';
 # Derive INSTALLSITELIB from where this module was loaded
 my $DEFAULT_INSTALLSITELIB;
 if ( my $path = $INC{'Lemonldap/NG/Common/Store/Install.pm'} ) {
-    ( $DEFAULT_INSTALLSITELIB = $path ) =~ s|/Lemonldap/NG/Common/Store/Install\.pm$||;
+    ( $DEFAULT_INSTALLSITELIB = $path ) =~
+      s|/Lemonldap/NG/Common/Store/Install\.pm$||;
 }
 
 # Mapping of archive directories to system destinations
 my %DIR_MAP = (
     'lib'               => \$DEFAULT_INSTALLSITELIB,
-    'manager-overrides' => undef,    # handled via managerPluginsDir config
+    'manager-overrides' => undef,    # handled via managerOverridesDir config
     'portal-templates'  => \$DEFAULT_PORTALTEMPLATESDIR,
     'portal-static'     => \$DEFAULT_PORTALSTATICDIR,
     'manager-static'    => \$DEFAULT_MANAGERSTATICDIR,
@@ -34,9 +35,8 @@ my %DIR_MAP = (
 
 sub new {
     my ( $class, %args ) = @_;
-    my $self = bless {
-        managerPluginsDir => $args{managerPluginsDir} || '/etc/lemonldap-ng/manager-plugins.d',
-    }, $class;
+    my $self = bless { managerOverridesDir => $args{managerOverridesDir}
+          || '/etc/lemonldap-ng/manager-overrides.d', }, $class;
     return $self;
 }
 
@@ -71,7 +71,8 @@ sub extractAndValidate {
     closedir $dh;
 
     unless ( @entries == 1 ) {
-        return ( 0, "Archive must contain exactly one top-level directory", undef );
+        return ( 0, "Archive must contain exactly one top-level directory",
+            undef );
     }
 
     my $plugin_dir = "$tmpdir/$entries[0]";
@@ -82,7 +83,8 @@ sub extractAndValidate {
         return ( 0, "Archive missing plugin.json", undef );
     }
 
-    open my $fh, '<', $meta_file or return ( 0, "Cannot read plugin.json: $!", undef );
+    open my $fh, '<', $meta_file
+      or return ( 0, "Cannot read plugin.json: $!", undef );
     local $/;
     my $content = <$fh>;
     close $fh;
@@ -103,8 +105,7 @@ sub extractAndValidate {
     # Validate Perl modules are in Lemonldap/NG/ namespace
     if ( -d "$plugin_dir/lib" ) {
         my @bad_files;
-        File::Find::find(
-            {
+        File::Find::find( {
                 wanted => sub {
                     return unless /\.pm$/;
                     my $rel = $File::Find::name;
@@ -118,11 +119,13 @@ sub extractAndValidate {
             "$plugin_dir/lib"
         );
         if (@bad_files) {
-            return ( 0,
-                    "Perl modules must be in Lemonldap::NG:: namespace. "
+            return (
+                0,
+                "Perl modules must be in Lemonldap::NG:: namespace. "
                   . "Invalid: "
                   . join( ', ', @bad_files ),
-                undef );
+                undef
+            );
         }
     }
 
@@ -144,7 +147,7 @@ sub installFiles {
         # Determine destination
         my $dest;
         if ( $src_dir eq 'manager-overrides' ) {
-            $dest = $self->{managerPluginsDir};
+            $dest = $self->{managerOverridesDir};
         }
         else {
             my $ref = $DIR_MAP{$src_dir};
@@ -153,7 +156,8 @@ sub installFiles {
 
         # Skip if placeholder not replaced (component not installed)
         if ( $dest =~ /^__.*__$/ ) {
-            push @warnings, "Skipping $src_dir: destination not configured ($dest)";
+            push @warnings,
+              "Skipping $src_dir: destination not configured ($dest)";
             next;
         }
 
@@ -168,13 +172,15 @@ sub installFiles {
 
         # Skip if destination doesn't exist
         unless ( -d $dest ) {
-            push @warnings, "Skipping $src_dir: destination directory does not exist ($dest)";
+            push @warnings,
+              "Skipping $src_dir: destination directory does not exist ($dest)";
             next;
         }
 
         # Copy files
         my ( $ok, $files, $err ) = $self->_copyTree( $src_path, $dest );
         unless ($ok) {
+
             # Rollback already installed files
             $self->removeFiles( \@installed_files );
             return ( 0, "Failed to install $src_dir: $err" );
@@ -197,8 +203,7 @@ sub _copyTree {
 
     my @files;
 
-    File::Find::find(
-        {
+    File::Find::find( {
             wanted => sub {
                 my $rel = $File::Find::name;
                 $rel =~ s|^\Q$src\E/?||;
@@ -208,6 +213,7 @@ sub _copyTree {
                 my $dest_full = "$dest/$rel";
 
                 if ( -d $src_full ) {
+
                     # Create directory
                     unless ( -d $dest_full ) {
                         make_path( $dest_full, { mode => 0755 } )
@@ -267,6 +273,7 @@ sub removeFiles {
             unlink $file or warn "Cannot remove $file: $!\n";
         }
         elsif ( -d $file ) {
+
             # Only remove if empty
             rmdir $file;    # silently fails if not empty, which is fine
         }
@@ -276,17 +283,19 @@ sub removeFiles {
 # Run llng-build-manager-files if available
 # Returns (success, message)
 sub rebuildManager {
-    my ( $self ) = @_;
-    my $plugins_dir = $self->{managerPluginsDir};
+    my ($self) = @_;
+    my $plugins_dir = $self->{managerOverridesDir};
 
     # Find llng-build-manager-files
     my $cmd = _findBuildScript();
     unless ($cmd) {
-        return ( 1, 'llng-build-manager-files not found, skipping manager rebuild' );
+        return ( 1,
+            'llng-build-manager-files not found, skipping manager rebuild' );
     }
 
     unless ( -d $plugins_dir ) {
-        return ( 1, "Manager plugins dir not found ($plugins_dir), skipping rebuild" );
+        return ( 1,
+            "Manager plugins dir not found ($plugins_dir), skipping rebuild" );
     }
 
     my $output = `$cmd --plugins-dir='$plugins_dir' 2>&1`;
@@ -310,18 +319,3 @@ sub _findBuildScript {
 }
 
 1;
-
-__END__
-
-=head1 NAME
-
-Lemonldap::NG::Common::Store::Install - Plugin installation for LLNG store
-
-=head1 DESCRIPTION
-
-Handles extraction of plugin archives, validation (anti-traversal,
-namespace checks, anti-overwrite), and file installation into existing
-LLNG system paths. Also manages file removal for uninstall/rollback
-and triggering manager rebuild via C<llng-build-manager-files>.
-
-=cut

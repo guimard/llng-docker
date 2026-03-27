@@ -8,12 +8,14 @@ use Lemonldap::NG::Common::Conf::Constants qw(DEFAULTCONFFILE DEFAULTSECTION);
 our $VERSION = '2.23.0';
 
 # Default values for [store] section
+# Placeholders __CONFDIR__, __DATADIR__, __CACHEDIR__ are replaced at install
+# time by the Makefile with actual installation paths.
 my %DEFAULTS = (
-    managerPluginsDir => '/etc/lemonldap-ng/manager-plugins.d',
-    stateFile         => '/var/lib/lemonldap-ng/plugins-state.json',
-    gpgVerify         => 'optional',
-    httpTimeout       => 30,
-    cacheDir          => '/var/cache/lemonldap-ng/store',
+    managerOverridesDir => '__CONFDIR__/manager-overrides.d',
+    stateFile           => '__DATADIR__/plugins-state.json',
+    gpgVerify           => 'optional',
+    httpTimeout         => 30,
+    cacheDir            => '__CACHEDIR__/store',
 );
 
 sub new {
@@ -59,12 +61,14 @@ sub _load {
     }
 
     # Environment variables override (highest priority)
-    $conf{storeUrls}         = $ENV{LLNG_STORE_URLS}       if $ENV{LLNG_STORE_URLS};
-    $conf{managerPluginsDir} = $ENV{LLNG_STORE_PLUGINSDIR} if $ENV{LLNG_STORE_PLUGINSDIR};
-    $conf{stateFile}         = $ENV{LLNG_STORE_STATEFILE}  if $ENV{LLNG_STORE_STATEFILE};
-    $conf{cacheDir}          = $ENV{LLNG_STORE_CACHEDIR}   if $ENV{LLNG_STORE_CACHEDIR};
-    $conf{gpgVerify}         = $ENV{LLNG_STORE_GPGVERIFY}  if $ENV{LLNG_STORE_GPGVERIFY};
-    $conf{gpgKeyring}        = $ENV{LLNG_STORE_GPGKEYRING} if $ENV{LLNG_STORE_GPGKEYRING};
+    $conf{storeUrls}           = $ENV{LLNG_STORE_URLS} if $ENV{LLNG_STORE_URLS};
+    $conf{managerOverridesDir} = $ENV{LLNG_STORE_OVERRIDESDIR}
+      if $ENV{LLNG_STORE_OVERRIDESDIR};
+    $conf{stateFile} = $ENV{LLNG_STORE_STATEFILE} if $ENV{LLNG_STORE_STATEFILE};
+    $conf{cacheDir}  = $ENV{LLNG_STORE_CACHEDIR}  if $ENV{LLNG_STORE_CACHEDIR};
+    $conf{gpgVerify} = $ENV{LLNG_STORE_GPGVERIFY} if $ENV{LLNG_STORE_GPGVERIFY};
+    $conf{gpgKeyring} = $ENV{LLNG_STORE_GPGKEYRING}
+      if $ENV{LLNG_STORE_GPGKEYRING};
 
     # Parse storeUrls into array
     if ( $conf{storeUrls} ) {
@@ -79,14 +83,14 @@ sub _load {
 }
 
 # Accessors
-sub storeUrls         { return @{ $_[0]->{conf}{_storeUrls} } }
-sub managerPluginsDir { return $_[0]->{conf}{managerPluginsDir} }
-sub stateFile         { return $_[0]->{conf}{stateFile} }
-sub gpgVerify         { return $_[0]->{conf}{gpgVerify} }
-sub gpgKeyring        { return $_[0]->{conf}{gpgKeyring} }
-sub httpTimeout       { return $_[0]->{conf}{httpTimeout} }
-sub cacheDir          { return $_[0]->{conf}{cacheDir} }
-sub confFile          { return $_[0]->{confFile} }
+sub storeUrls           { return @{ $_[0]->{conf}{_storeUrls} } }
+sub managerOverridesDir { return $_[0]->{conf}{managerOverridesDir} }
+sub stateFile           { return $_[0]->{conf}{stateFile} }
+sub gpgVerify           { return $_[0]->{conf}{gpgVerify} }
+sub gpgKeyring          { return $_[0]->{conf}{gpgKeyring} }
+sub httpTimeout         { return $_[0]->{conf}{httpTimeout} }
+sub cacheDir            { return $_[0]->{conf}{cacheDir} }
+sub confFile            { return $_[0]->{confFile} }
 
 # Override a config value (used by CLI options)
 sub override {
@@ -176,23 +180,3 @@ sub removeStore {
 }
 
 1;
-
-__END__
-
-=head1 NAME
-
-Lemonldap::NG::Common::Store::Config - Configuration reader for LLNG plugin store
-
-=head1 SYNOPSIS
-
-  use Lemonldap::NG::Common::Store::Config;
-  my $config = Lemonldap::NG::Common::Store::Config->new();
-  my @urls = $config->storeUrls;
-
-=head1 DESCRIPTION
-
-Reads the C<[store]> section from C<lemonldap-ng.ini> and provides
-accessors for store configuration. Also handles writing store URLs
-back to the INI file for C<add-store>/C<remove-store> commands.
-
-=cut

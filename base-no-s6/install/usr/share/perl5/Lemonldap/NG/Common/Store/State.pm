@@ -154,16 +154,3 @@ sub _now {
 }
 
 1;
-
-__END__
-
-=head1 NAME
-
-Lemonldap::NG::Common::Store::State - Plugin state tracking for LLNG store
-
-=head1 DESCRIPTION
-
-Manages the C<plugins-state.json> file that records which plugins are
-installed, their versions, and the list of files installed (for clean removal).
-
-=cut

@@ -7,7 +7,7 @@
 # Perl (.pm) or JSON (.json) format.
 #
 # Usage:
-#   llng-build-manager-files --plugins-dir=/etc/lemonldap-ng/manager-plugins.d
+#   llng-build-manager-files --plugins-dir=/etc/lemonldap-ng/manager-overrides.d --plugins-dir=/other/dir
 #
 # Paths are configured via placeholders replaced during installation.
 # All paths can be overridden via command line options.
@@ -16,7 +16,7 @@ use strict;
 use warnings;
 use Getopt::Long;
 use File::Basename qw(dirname basename);
-use Cwd qw(getcwd);
+use Cwd            qw(getcwd);
 use JSON;
 use Storable qw(dclone);
 
@@ -30,7 +30,7 @@ sub show_help {
     }
     else {
         print
-          "Usage: llng-build-manager-files [--plugins-dir=<path>] [options]\n";
+"Usage: llng-build-manager-files [--plugins-dir=<path> ...] [options]\n";
         print "Use 'perldoc $0' for full documentation.\n";
         exit $exitcode;
     }
@@ -54,19 +54,19 @@ my $DEFAULT_DOCDIR           = '/usr/share/doc/lemonldap-ng';
 my $DEFAULT_LANGDIR          = '/usr/share/lemonldap-ng/manager/htdocs/static/languages';
 
 # Command line options
+my @plugins_dirs;
 my (
-    $plugins_dir,                   $struct_file,
-    $conftree_file,                 $manager_constants_file,
-    $manager_attributes_file,       $default_values_file,
-    $conf_constants_file,           $first_lmconf_file,
-    $reverse_tree_file,             $portal_constants_file,
-    $handler_status_constants_file, $doc_constants_file,
-    $lang_dir,                      $help,
-    $verbose,
+    $struct_file,            $conftree_file,
+    $manager_constants_file, $manager_attributes_file,
+    $default_values_file,    $conf_constants_file,
+    $first_lmconf_file,      $reverse_tree_file,
+    $portal_constants_file,  $handler_status_constants_file,
+    $doc_constants_file,     $lang_dir,
+    $help,                   $verbose,
 );
 
 GetOptions(
-    'plugins-dir=s'                   => \$plugins_dir,
+    'plugins-dir=s'                   => \@plugins_dirs,
     'struct-file=s'                   => \$struct_file,
     'conftree-file=s'                 => \$conftree_file,
     'manager-constants-file=s'        => \$manager_constants_file,
@@ -90,11 +90,14 @@ sub verbose {
 }
 
 # plugins-dir is optional - if not specified or doesn't exist, run without extensions
-if ( $plugins_dir && !-d $plugins_dir ) {
-    print STDERR
-"Note: Plugins directory not found: $plugins_dir (continuing without extensions)\n";
-    $plugins_dir = undef;
-}
+@plugins_dirs = grep {
+    if ( !-d $_ ) {
+        print STDERR
+"Note: Plugins directory not found: $_ (continuing without extensions)\n";
+        0;
+    }
+    else { 1 }
+} @plugins_dirs;
 
 # Set default paths from placeholders (can be overridden via options)
 $struct_file       //= "$DEFAULT_MANAGERSTATICDIR/struct.json";
@@ -122,20 +125,19 @@ if ( $struct_file =~ /__(?:MANAGERSTATICDIR|INSTALLSITELIB)__/ ) {
       . "Please specify paths via command line options.\n";
 }
 
-    verbose "Configuration:\n"
-      . "  plugins-dir:                   "
-      . ( $plugins_dir // '(none)' ) . "\n"
-      . "  struct-file:                   $struct_file\n"
-      . "  conftree-file:                 $conftree_file\n"
-      . "  manager-constants-file:        $manager_constants_file\n"
-      . "  manager-attributes-file:       $manager_attributes_file\n"
-      . "  default-values-file:           $default_values_file\n"
-      . "  conf-constants-file:           $conf_constants_file\n"
-      . "  reverse-tree-file:             $reverse_tree_file\n"
-      . "  portal-constants-file:         $portal_constants_file\n"
-      . "  handler-status-constants-file: $handler_status_constants_file\n"
-      . "  lang-dir:                      $lang_dir\n"
-      . "\n";
+verbose "Configuration:\n"
+  . "  plugins-dir:                   "
+  . ( @plugins_dirs ? join( ', ', @plugins_dirs ) : '(none)' ) . "\n"
+  . "  struct-file:                   $struct_file\n"
+  . "  conftree-file:                 $conftree_file\n"
+  . "  manager-constants-file:        $manager_constants_file\n"
+  . "  manager-attributes-file:       $manager_attributes_file\n"
+  . "  default-values-file:           $default_values_file\n"
+  . "  conf-constants-file:           $conf_constants_file\n"
+  . "  reverse-tree-file:             $reverse_tree_file\n"
+  . "  portal-constants-file:         $portal_constants_file\n"
+  . "  handler-status-constants-file: $handler_status_constants_file\n"
+  . "  lang-dir:                      $lang_dir\n" . "\n";
 
 # 1. Load core data from Build modules
 verbose "Loading core configuration data...\n";
@@ -147,12 +149,14 @@ my $constants =
 
 # 2. Load and merge extensions from plugins directory
 my @ext_files;
-if ($plugins_dir) {
-    @ext_files = sort( glob("$plugins_dir/*.pm"), glob("$plugins_dir/*.json") );
-
-    verbose @ext_files
-      ? "No extension files found in $plugins_dir\n"
-      : "Found " . scalar(@ext_files) . " extension file(s)\n";
+if (@plugins_dirs) {
+    for my $dir (@plugins_dirs) {
+        my @files = sort( glob("$dir/*.pm"), glob("$dir/*.json") );
+        verbose @files
+          ? "Found " . scalar(@files) . " extension file(s) in $dir\n"
+          : "No extension files found in $dir\n";
+        push @ext_files, @files;
+    }
 }
 else {
     verbose "No plugins directory specified, running without extensions\n";
@@ -176,13 +180,35 @@ my $ext_constants  = {};
 my $ext_lang       = {};
 
 # Extract extensions by comparing with original
-my $orig_attr_keys = {
-    map { $_ => 1 }
-      keys %{ Lemonldap::NG::Manager::Build::Attributes::attributes() }
-};
+my $orig_attrs = Lemonldap::NG::Manager::Build::Attributes::attributes();
+my $orig_attr_keys = { map { $_ => 1 } keys %$orig_attrs };
+
+# Store select append operations separately (for existing attributes with
+# new select options added by extensions)
+my $ext_select_appends = {};
+
 for my $key ( keys %$attributes ) {
-    $ext_attributes->{$key} = $attributes->{$key}
-      unless $orig_attr_keys->{$key};
+    if ( $orig_attr_keys->{$key} ) {
+
+        # Check if select options were appended to an existing attribute
+        if (   ref $orig_attrs->{$key} eq 'HASH'
+            && ref $attributes->{$key} eq 'HASH'
+            && ref $orig_attrs->{$key}{select} eq 'ARRAY'
+            && ref $attributes->{$key}{select} eq 'ARRAY' )
+        {
+            my %orig_keys =
+              map  { $_->{k} => 1 }
+              grep { ref $_ eq 'HASH' && exists $_->{k} }
+              @{ $orig_attrs->{$key}{select} };
+            my @new_opts =
+              grep { ref $_ eq 'HASH' && $_->{k} && !$orig_keys{ $_->{k} } }
+              @{ $attributes->{$key}{select} };
+            $ext_select_appends->{$key} = \@new_opts if @new_opts;
+        }
+    }
+    else {
+        $ext_attributes->{$key} = $attributes->{$key};
+    }
 }
 
 # For tree: store extension modifications to replay on each fresh copy
@@ -222,10 +248,27 @@ my $orig_constants =
     *Lemonldap::NG::Manager::Build::Attributes::attributes = sub {
         my $fresh = $orig_attributes->();
 
-        # Merge extension attributes
+        # Merge extension attributes (new attributes)
         for my $key ( keys %$ext_attributes ) {
             $fresh->{$key} = $ext_attributes->{$key};
         }
+
+        # Apply select appends (new options added to existing select attributes)
+        for my $key ( keys %$ext_select_appends ) {
+            if (   ref $fresh->{$key} eq 'HASH'
+                && ref $fresh->{$key}{select} eq 'ARRAY' )
+            {
+                my %existing =
+                  map  { $_->{k} => 1 }
+                  grep { ref $_ eq 'HASH' && exists $_->{k} }
+                  @{ $fresh->{$key}{select} };
+                for my $opt ( @{ $ext_select_appends->{$key} } ) {
+                    push @{ $fresh->{$key}{select} }, $opt
+                      unless $existing{ $opt->{k} };
+                }
+            }
+        }
+
         return $fresh;
     };
 
@@ -282,7 +325,7 @@ if ( $conf_constants_file ne '/dev/null' && -r $conf_constants_file ) {
 # 5b. Redirect output files to /dev/null when their parent directory does not
 #     exist (component not installed locally, e.g. portal or handler absent)
 for my $ref (
-    \$struct_file,       \$conftree_file,
+    \$struct_file,            \$conftree_file,
     \$manager_constants_file, \$manager_attributes_file,
     \$default_values_file,    \$conf_constants_file,
     \$reverse_tree_file,      \$portal_constants_file,
@@ -312,19 +355,24 @@ Lemonldap::NG::Manager::Build->run(
 );
 
 # 6a. Restore preserved DEFAULTCONFFILE and dirName in Constants.pm
-if ( $conf_constants_file ne '/dev/null' && ( $saved_conffile || $saved_dirname ) ) {
-    open my $fh, '<', $conf_constants_file or die "Cannot read $conf_constants_file: $!";
+if ( $conf_constants_file ne '/dev/null'
+    && ( $saved_conffile || $saved_dirname ) )
+{
+    open my $fh, '<', $conf_constants_file
+      or die "Cannot read $conf_constants_file: $!";
     my $content = do { local $/; <$fh> };
     close $fh;
 
     my $modified = 0;
-    if ( $saved_conffile
-        && $content =~ s{^(use constant DEFAULTCONFFILE\s*=>\s*").*("\s*;)}{$1$saved_conffile$2}m )
+    if (   $saved_conffile
+        && $content =~
+s{^(use constant DEFAULTCONFFILE\s*=>\s*").*("\s*;)}{$1$saved_conffile$2}m
+      )
     {
         $modified = 1;
         verbose "  Restored DEFAULTCONFFILE=$saved_conffile\n";
     }
-    if ( $saved_dirname
+    if (   $saved_dirname
         && $content =~ s{^(\s*dirName\s*=>\s*').*('\s*,)}{$1$saved_dirname$2}m )
     {
         $modified = 1;
@@ -332,7 +380,8 @@ if ( $conf_constants_file ne '/dev/null' && ( $saved_conffile || $saved_dirname 
     }
 
     if ($modified) {
-        open my $out, '>', $conf_constants_file or die "Cannot write $conf_constants_file: $!";
+        open my $out, '>', $conf_constants_file
+          or die "Cannot write $conf_constants_file: $!";
         print $out $content;
         close $out;
     }
@@ -465,6 +514,29 @@ sub merge_attributes {
 
     for my $key ( keys %$ext ) {
         if ( exists $core->{$key} ) {
+
+            # If both core and extension have a 'select' array, append new
+            # options instead of replacing the entire attribute
+            if (   ref $core->{$key} eq 'HASH'
+                && ref $ext->{$key} eq 'HASH'
+                && ref $core->{$key}{select} eq 'ARRAY'
+                && ref $ext->{$key}{select} eq 'ARRAY' )
+            {
+                my %existing =
+                  map  { $_->{k} => 1 }
+                  grep { ref $_ eq 'HASH' && exists $_->{k} }
+                  @{ $core->{$key}{select} };
+                for my $opt ( @{ $ext->{$key}{select} } ) {
+                    next unless ref $opt eq 'HASH' && $opt->{k};
+                    unless ( $existing{ $opt->{k} } ) {
+                        push @{ $core->{$key}{select} }, $opt;
+                        verbose
+"  Appended select option '$opt->{k}' to attribute '$key'\n";
+                    }
+                }
+                next;
+            }
+
             warn "Warning [$ext_file]: Overriding existing attribute '$key'\n";
         }
         $core->{$key} = $ext->{$key};
@@ -692,8 +764,7 @@ sub update_language_files {
             # 3. Fall back to the first available language
             my $text;
             if ( ref($trans) eq 'HASH' ) {
-                $text = $trans->{$lang_code}
-                  // $trans->{en}
+                $text = $trans->{$lang_code} // $trans->{en}
                   // ( values %$trans )[0];
             }
             else {
@@ -703,8 +774,7 @@ sub update_language_files {
 
             if ( defined $text ) {
                 if ( exists $lang_data->{$key} ) {
-                    verbose
-"    [$lang_code] Overriding existing key '$key'\n";
+                    verbose "    [$lang_code] Overriding existing key '$key'\n";
                 }
                 $lang_data->{$key} = $text;
                 $modified = 1;
@@ -732,8 +802,8 @@ sub minify_conftree {
     my ($conftree_file) = @_;
 
     # Get directory and basename for proper source map paths
-    my $dir      = dirname($conftree_file);
-    my $basename = basename($conftree_file);
+    my $dir          = dirname($conftree_file);
+    my $basename     = basename($conftree_file);
     my $min_basename = $basename;
     $min_basename =~ s/\.js$/.min.js/;
 
@@ -814,7 +884,7 @@ llng-build-manager-files - Regenerate LemonLDAP::NG Manager with plugin extensio
 
 =head1 SYNOPSIS
 
-  llng-build-manager-files [--plugins-dir=/etc/lemonldap-ng/manager-plugins.d] [options]
+  llng-build-manager-files [--plugins-dir=<path> ...] [options]
 
 =head1 DESCRIPTION
 
@@ -832,7 +902,8 @@ loaded from the specified plugins directory.
 =item B<--plugins-dir>=I<path>
 
 Directory containing plugin extension files (.pm or .json).
-If not specified or the directory doesn't exist, the script runs without extensions.
+Can be specified multiple times to scan several directories.
+If not specified or a directory doesn't exist, it is skipped with a warning.
 
 =item B<--struct-file>=I<path>
 
@@ -1040,14 +1111,19 @@ A warning is issued if a value below 200 is used.
 =head1 EXAMPLES
 
   # Regenerate with plugins (uses default paths from installation)
-  llng-build-manager-files --plugins-dir=/etc/lemonldap-ng/manager-plugins.d
+  llng-build-manager-files --plugins-dir=/etc/lemonldap-ng/manager-overrides.d
+
+  # Multiple plugin directories
+  llng-build-manager-files \
+    --plugins-dir=/etc/lemonldap-ng/manager-overrides.d \
+    --plugins-dir=/usr/share/lemonldap-ng/plugins.d
 
   # Verbose mode
-  llng-build-manager-files --plugins-dir=/etc/lemonldap-ng/manager-plugins.d -v
+  llng-build-manager-files --plugins-dir=/etc/lemonldap-ng/manager-overrides.d -v
 
   # Override specific output paths (useful for testing)
   llng-build-manager-files \
-    --plugins-dir=/etc/lemonldap-ng/manager-plugins.d \
+    --plugins-dir=/etc/lemonldap-ng/manager-overrides.d \
     --struct-file=/custom/path/struct.json
 
 =head1 SEE ALSO

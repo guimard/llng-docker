@@ -30,8 +30,10 @@ my %COMMANDS = (
 sub run {
     my ( $class, @args ) = @_;
 
-    my ( $store_url, $search, $tag, $version, $force, $activate, $help,
-        $state_file, $cache_dir, $plugins_dir );
+    my (
+        $store_url, $search, $tag,        $version,   $force,
+        $activate,  $help,   $state_file, $cache_dir, $plugins_dir
+    );
     local @ARGV = @args;
 
     GetOptions(
@@ -61,10 +63,10 @@ sub run {
     my $config = Lemonldap::NG::Common::Store::Config->new();
 
     # CLI overrides (highest priority)
-    $config->override( 'stateFile',         $state_file )  if $state_file;
-    $config->override( 'cacheDir',          $cache_dir )   if $cache_dir;
-    $config->override( 'managerPluginsDir', $plugins_dir ) if $plugins_dir;
-    my $opts   = {
+    $config->override( 'stateFile',           $state_file )  if $state_file;
+    $config->override( 'cacheDir',            $cache_dir )   if $cache_dir;
+    $config->override( 'managerOverridesDir', $plugins_dir ) if $plugins_dir;
+    my $opts = {
         config    => $config,
         store_url => $store_url,
         search    => $search,
@@ -402,7 +404,7 @@ sub cmd_install {
 
     # 7. Extract and validate
     my $installer = Lemonldap::NG::Common::Store::Install->new(
-        managerPluginsDir => $config->managerPluginsDir, );
+        managerOverridesDir => $config->managerOverridesDir, );
 
     print "  Extracting and validating...\n";
     my ( $ext_ok, $meta, $plugin_dir ) =
@@ -487,7 +489,7 @@ sub cmd_remove {
 
     # Remove files
     my $installer = Lemonldap::NG::Common::Store::Install->new(
-        managerPluginsDir => $config->managerPluginsDir, );
+        managerOverridesDir => $config->managerOverridesDir, );
     $installer->removeFiles( $installed->{files} );
 
     # Update state
@@ -641,7 +643,7 @@ sub cmd_verify {
 
     # Extract and validate structure
     my $installer = Lemonldap::NG::Common::Store::Install->new(
-        managerPluginsDir => $config->managerPluginsDir, );
+        managerOverridesDir => $config->managerOverridesDir, );
 
     print "Validating archive structure...\n";
     my ( $ok, $meta, $plugin_dir ) = $installer->extractAndValidate($file);
@@ -848,7 +850,7 @@ Environment variables (override lemonldap-ng.ini):
   LLNG_STORE_URLS          Store URLs (comma-separated)
   LLNG_STORE_STATEFILE     State file path
   LLNG_STORE_CACHEDIR      Cache directory
-  LLNG_STORE_PLUGINSDIR    Manager plugins directory
+  LLNG_STORE_OVERRIDESDIR  Manager overrides directory
   LLNG_STORE_GPGVERIFY     GPG verification mode (required/optional/disabled)
   LLNG_STORE_GPGKEYRING    GPG keyring path
 USAGE
@@ -856,26 +858,3 @@ USAGE
 }
 
 1;
-
-__END__
-
-=head1 NAME
-
-Lemonldap::NG::Common::Store - Plugin store manager for LemonLDAP::NG
-
-=head1 SYNOPSIS
-
-  use Lemonldap::NG::Common::Store;
-  Lemonldap::NG::Common::Store->run(@ARGV);
-
-=head1 DESCRIPTION
-
-Main orchestrator for the LemonLDAP::NG plugin store system.
-Coordinates sub-modules to provide plugin discovery, download,
-verification, installation, and removal.
-
-=head1 SEE ALSO
-
-L<lemonldap-ng-store>, L<Lemonldap::NG::Common::Store::Config>
-
-=cut

@@ -156,16 +156,3 @@ sub _writeCache {
 }
 
 1;
-
-__END__
-
-=head1 NAME
-
-Lemonldap::NG::Common::Store::Remote - HTTP fetching for LLNG plugin store
-
-=head1 DESCRIPTION
-
-Handles downloading store indexes and plugin archives over HTTP/HTTPS.
-Supports caching of index files and SHA256 verification of downloads.
-
-=cut
