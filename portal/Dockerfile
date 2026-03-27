@@ -39,7 +39,7 @@ COPY *.patch /
 
 RUN set -e && for p in appgrid.patch app-scope.patch ignorepollers.patch \
     fixedLogout.patch more-logs.patch \
-    matrix-token.patch redirect-ajax.patch \
+    redirect-ajax.patch \
     getreftoken.patch 708-sid-in-userinfo.patch \
     717-introspection.patch 718-iat-and-nbf-in-at.patch \
     779-mail2f-api.patch \
@@ -54,6 +54,9 @@ RUN set -e && for p in appgrid.patch app-scope.patch ignorepollers.patch \
     cp -f /usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.js /usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.min.js && \
     rm -f /*.patch && \
     find /usr/share/perl5/Lemonldap -name '*.orig' -delete && \
+    LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini \
+    /usr/share/lemonldap-ng/bin/lemonldap-ng-store add-store https://linagora.github.io/lemonldap-ng-plugins && \
+    /usr/share/lemonldap-ng/bin/lemonldap-ng-store --force --plugins-dir=/etc/lemonldap-ng/manager-overrides.d install matrix-token-exchange && \
     echo "# Install nginx configuration files" && \
     rm -f /etc/nginx/sites-enabled/* && \
     ln -s ../../lemonldap-ng/portal-nginx.conf /etc/nginx/sites-enabled/ && \

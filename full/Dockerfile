@@ -25,7 +25,6 @@ RUN \
     set -e && for p in \
         ignorepollers.patch \
         fixedLogout.patch \
-        matrix-token-exchange.patch \
         722-adminlogout.patch \
 	3452-sessionexplorer.patch \
 	784-Crowdsec.patch \
@@ -46,9 +45,10 @@ RUN \
 
 COPY install /
 
-RUN echo "Regenerating manager files" && \
+RUN echo "Regenerating manager files (plugins installed in portal image)" && \
     LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini \
-    /usr/share/lemonldap-ng/bin/llng-build-manager-files --plugins-dir /etc/lemonldap-ng/manager-plugins.d && \
+    /usr/share/lemonldap-ng/bin/llng-build-manager-files --plugins-dir /etc/lemonldap-ng/manager-overrides.d && \
+    grep oidcRPMetaDataOptionsTokenXAuthorizedMatrix /usr/share/perl5/Lemonldap/NG/Manager/Attributes.pm && \
     echo "# Install nginx configuration files" && \
     ln -s ../../lemonldap-ng/manager-nginx.conf /etc/nginx/sites-enabled/z_manager-nginx.conf
 

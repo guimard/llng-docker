@@ -11,11 +11,11 @@ our $VERSION = '2.23.0';
 # Placeholders __CONFDIR__, __DATADIR__, __CACHEDIR__ are replaced at install
 # time by the Makefile with actual installation paths.
 my %DEFAULTS = (
-    managerOverridesDir => '__CONFDIR__/manager-overrides.d',
-    stateFile           => '__DATADIR__/plugins-state.json',
+    managerOverridesDir => '/etc/lemonldap-ng/manager-overrides.d',
+    stateFile           => '/var/lib/lemonldap-ng/plugins-state.json',
     gpgVerify           => 'optional',
     httpTimeout         => 30,
-    cacheDir            => '__CACHEDIR__/store',
+    cacheDir            => '/var/lib/lemonldap-ng/store',
 );
 
 sub new {

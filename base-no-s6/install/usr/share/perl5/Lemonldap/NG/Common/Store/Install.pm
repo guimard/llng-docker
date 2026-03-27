@@ -13,9 +13,9 @@ use JSON;
 our $VERSION = '2.23.0';
 
 # Default paths - placeholders replaced during installation
-my $DEFAULT_PORTALTEMPLATESDIR = '__PORTALTEMPLATESDIR__';
-my $DEFAULT_PORTALSTATICDIR    = '__PORTALSTATICDIR__';
-my $DEFAULT_MANAGERSTATICDIR   = '__MANAGERSTATICDIR__';
+my $DEFAULT_PORTALTEMPLATESDIR = '/usr/share/lemonldap-ng/portal/templates';
+my $DEFAULT_PORTALSTATICDIR    = '/usr/share/lemonldap-ng/portal/htdocs/static';
+my $DEFAULT_MANAGERSTATICDIR   = '/usr/share/lemonldap-ng/manager/htdocs/static';
 
 # Derive INSTALLSITELIB from where this module was loaded
 my $DEFAULT_INSTALLSITELIB;
@@ -308,12 +308,22 @@ sub rebuildManager {
     return ( 1, 'Manager files rebuilt successfully' );
 }
 
+# Placeholder __BINDIR__ is replaced at install time by the Makefile
+my $DEFAULT_BINDIR = '/usr/share/lemonldap-ng/bin';
+
 sub _findBuildScript {
-    for my $name ('llng-build-manager-files') {
-        for my $dir ( split /:/, $ENV{PATH} || '' ) {
-            my $path = "$dir/$name";
-            return $path if -x $path;
-        }
+    my $name = 'llng-build-manager-files';
+
+    # First, look in the install BINDIR
+    if ( $DEFAULT_BINDIR !~ /^__/ ) {
+        my $path = "$DEFAULT_BINDIR/$name";
+        return $path if -x $path;
+    }
+
+    # Fallback to PATH
+    for my $dir ( split /:/, $ENV{PATH} || '' ) {
+        my $path = "$dir/$name";
+        return $path if -x $path;
     }
     return undef;
 }

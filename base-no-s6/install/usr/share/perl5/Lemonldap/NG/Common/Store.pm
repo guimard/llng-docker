@@ -294,10 +294,41 @@ sub cmd_info {
 
 sub cmd_install {
     my ($opts) = @_;
-    my $name = $opts->{args}[0]
-      or die "Usage: lemonldap-ng-store install PLUGIN_NAME\n";
+    my @names = @{ $opts->{args} };
+    die "Usage: lemonldap-ng-store install PLUGIN_NAME [PLUGIN_NAME...]\n"
+      unless @names;
 
-    my $config = $opts->{config};
+    my $config    = $opts->{config};
+    my $installer = Lemonldap::NG::Common::Store::Install->new(
+        managerOverridesDir => $config->managerOverridesDir, );
+    my $state =
+      Lemonldap::NG::Common::Store::State->new( stateFile => $config->stateFile,
+      );
+
+    my $errors = 0;
+    for my $name (@names) {
+        print "\n" if $errors || $name ne $names[0];
+        eval { _installOne( $opts, $name, $config, $installer, $state ); };
+        if ($@) {
+            print STDERR $@;
+            $errors++;
+            next;
+        }
+    }
+
+    # Rebuild manager once after all installs
+    if ( @names > $errors ) {
+        print "\nRebuilding manager files...\n";
+        my ( $ok, $rebuild_msg ) = $installer->rebuildManager();
+        print "  $rebuild_msg\n";
+        print "\nDon't forget to restart the portal service.\n";
+    }
+
+    exit(1) if $errors;
+}
+
+sub _installOne {
+    my ( $opts, $name, $config, $installer, $state ) = @_;
 
     # 1. Find plugin in stores
     my $plugin = _findPlugin( $opts, $name, $opts->{version} );
@@ -362,9 +393,6 @@ sub cmd_install {
 
     # 5. Verify SHA256
     # Get trusted fingerprint for this store (TOFU from add-store)
-    my $state =
-      Lemonldap::NG::Common::Store::State->new( stateFile => $config->stateFile,
-      );
     my $store_info = $state->getStore($store_url);
     my @fingerprints =
       $store_info && $store_info->{gpgFingerprint}
@@ -403,9 +431,6 @@ sub cmd_install {
     }
 
     # 7. Extract and validate
-    my $installer = Lemonldap::NG::Common::Store::Install->new(
-        managerOverridesDir => $config->managerOverridesDir, );
-
     print "  Extracting and validating...\n";
     my ( $ext_ok, $meta, $plugin_dir ) =
       $installer->extractAndValidate($archive_file);
@@ -437,12 +462,7 @@ sub cmd_install {
 
     print "  Installed " . scalar(@$files_or_err) . " file(s)\n";
 
-    # 11. Rebuild manager
-    print "  Rebuilding manager files...\n";
-    ( $ok, my $rebuild_msg ) = $installer->rebuildManager();
-    print "  $rebuild_msg\n";
-
-    # 12. Activate plugin if --activate and customPlugins declared
+    # 11. Activate plugin if --activate and customPlugins declared
     if ( $opts->{activate} && $meta->{customPlugins} ) {
         print "  Activating plugin...\n";
         my ( $act_ok, $act_msg ) =
@@ -450,61 +470,59 @@ sub cmd_install {
         print "  $act_msg\n";
     }
 
-    # 13. Post-install instructions
-    print "\nInstallation complete!\n";
-    my $step = 1;
+    # 12. Post-install instructions
     if ( $meta->{customPlugins} && !$opts->{activate} ) {
-        print "Next steps:\n";
         print
-"  $step. Add to customPlugins in LLNG configuration: $meta->{customPlugins}\n";
-        $step++;
-        print "  $step. Restart the portal service\n";
-    }
-    else {
-        print "Don't forget to restart the portal service.\n";
+"  Note: add to customPlugins in LLNG configuration: $meta->{customPlugins}\n";
     }
     if ( $meta->{post_install} ) {
-        print "\nNote from plugin author:\n";
-        print "  $meta->{post_install}\n";
+        print "  Note from plugin author: $meta->{post_install}\n";
     }
 }
 
 sub cmd_remove {
     my ($opts) = @_;
-    my $name = $opts->{args}[0]
-      or die "Usage: lemonldap-ng-store remove PLUGIN_NAME\n";
+    my @names = @{ $opts->{args} };
+    die "Usage: lemonldap-ng-store remove PLUGIN_NAME [PLUGIN_NAME...]\n"
+      unless @names;
 
     my $config = $opts->{config};
 
     my $state =
       Lemonldap::NG::Common::Store::State->new( stateFile => $config->stateFile,
       );
-
-    my $installed = $state->get($name);
-    unless ($installed) {
-        die "Plugin not installed: $name\n";
-    }
-
-    print "Removing $name (version $installed->{version})...\n";
-
-    # Remove files
     my $installer = Lemonldap::NG::Common::Store::Install->new(
         managerOverridesDir => $config->managerOverridesDir, );
-    $installer->removeFiles( $installed->{files} );
 
-    # Update state
-    $state->remove($name);
+    my $errors  = 0;
+    my $removed = 0;
+    for my $name (@names) {
+        my $installed = $state->get($name);
+        unless ($installed) {
+            print STDERR "Plugin not installed: $name\n";
+            $errors++;
+            next;
+        }
 
-    # Rebuild manager
-    print "  Rebuilding manager files...\n";
-    my ( $ok, $msg ) = $installer->rebuildManager();
-    print "  $msg\n";
+        print "Removing $name (version $installed->{version})...\n";
+        $installer->removeFiles( $installed->{files} );
+        $state->remove($name);
+        $removed++;
+    }
 
-    print "\nPlugin removed: $name\n";
-    print "Don't forget to:\n";
-    print
-"  1. Remove the plugin module from customPlugins in LLNG configuration\n";
-    print "  2. Restart the portal service\n";
+    # Rebuild manager once after all removals
+    if ($removed) {
+        print "\nRebuilding manager files...\n";
+        my ( $ok, $msg ) = $installer->rebuildManager();
+        print "  $msg\n";
+
+        print "\nDon't forget to:\n";
+        print
+"  1. Remove the plugin module(s) from customPlugins in LLNG configuration\n";
+        print "  2. Restart the portal service\n";
+    }
+
+    exit(1) if $errors;
 }
 
 sub cmd_installed {

@@ -32,7 +32,6 @@ RUN \
     set -e && for p in \
         ignorepollers.patch \
         fixedLogout.patch \
-        matrix-token-exchange.patch \
         722-adminlogout.patch \
 	3452-sessionexplorer.patch \
 	784-Crowdsec.patch \
@@ -56,7 +55,9 @@ COPY install /
 RUN echo "Regenerating manager files" && \
     mkdir -p /usr/share/perl5/Lemonldap/NG/Portal/Main/ && \
     LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini \
-    /usr/share/lemonldap-ng/bin/llng-build-manager-files --plugins-dir /etc/lemonldap-ng/manager-plugins.d && \
+    /usr/share/lemonldap-ng/bin/lemonldap-ng-store add-store https://linagora.github.io/lemonldap-ng-plugins && \
+    /usr/share/lemonldap-ng/bin/lemonldap-ng-store --force --plugins-dir=/etc/lemonldap-ng/manager-overrides.d install matrix-token-exchange && \
+    grep oidcRPMetaDataOptionsTokenXAuthorizedMatrix /usr/share/perl5/Lemonldap/NG/Manager/Attributes.pm && \
     echo "# Install nginx configuration files" && \
     rm -f /etc/nginx/sites-enabled/* && \
     ln -s ../../lemonldap-ng/manager-nginx.conf /etc/nginx/sites-enabled/ && \
