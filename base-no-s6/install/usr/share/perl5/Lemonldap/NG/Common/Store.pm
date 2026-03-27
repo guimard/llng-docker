@@ -31,22 +31,24 @@ sub run {
     my ( $class, @args ) = @_;
 
     my (
-        $store_url, $search, $tag,        $version,   $force,
-        $activate,  $help,   $state_file, $cache_dir, $plugins_dir
+        $store_url,  $search,          $tag,      $version,
+        $force,      $allow_overwrite, $activate, $help,
+        $state_file, $cache_dir,       $plugins_dir
     );
     local @ARGV = @args;
 
     GetOptions(
-        'store=s'       => \$store_url,
-        'search=s'      => \$search,
-        'tag=s'         => \$tag,
-        'version=s'     => \$version,
-        'force'         => \$force,
-        'activate'      => \$activate,
-        'state-file=s'  => \$state_file,
-        'cache-dir=s'   => \$cache_dir,
-        'plugins-dir=s' => \$plugins_dir,
-        'help|h'        => \$help,
+        'store=s'         => \$store_url,
+        'search=s'        => \$search,
+        'tag=s'           => \$tag,
+        'version=s'       => \$version,
+        'force'           => \$force,
+        'allow-overwrite' => \$allow_overwrite,
+        'activate'        => \$activate,
+        'state-file=s'    => \$state_file,
+        'cache-dir=s'     => \$cache_dir,
+        'plugins-dir=s'   => \$plugins_dir,
+        'help|h'          => \$help,
     ) or _usage(1);
 
     my $command = shift @ARGV;
@@ -67,14 +69,15 @@ sub run {
     $config->override( 'cacheDir',            $cache_dir )   if $cache_dir;
     $config->override( 'managerOverridesDir', $plugins_dir ) if $plugins_dir;
     my $opts = {
-        config    => $config,
-        store_url => $store_url,
-        search    => $search,
-        tag       => $tag,
-        version   => $version,
-        force     => $force,
-        activate  => $activate,
-        args      => \@ARGV,
+        config          => $config,
+        store_url       => $store_url,
+        search          => $search,
+        tag             => $tag,
+        version         => $version,
+        force           => $force,
+        allow_overwrite => $allow_overwrite,
+        activate        => $activate,
+        args            => \@ARGV,
     };
 
     $cmd_info->($opts);
@@ -300,7 +303,9 @@ sub cmd_install {
 
     my $config    = $opts->{config};
     my $installer = Lemonldap::NG::Common::Store::Install->new(
-        managerOverridesDir => $config->managerOverridesDir, );
+        managerOverridesDir => $config->managerOverridesDir,
+        allowOverwrite      => $opts->{allow_overwrite},
+    );
     my $state =
       Lemonldap::NG::Common::Store::State->new( stateFile => $config->stateFile,
       );
@@ -857,6 +862,7 @@ Options:
   --tag=TAG                Filter plugins by tag
   --version=X.Y.Z          Install a specific version
   --force                  Skip compatibility checks
+  --allow-overwrite        Allow overwriting existing files (e.g. core plugins)
   --activate               Add plugin to customPlugins (requires lemonldap-ng-cli)
   --state-file=PATH        Override state file path
   --cache-dir=PATH         Override cache directory

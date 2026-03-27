@@ -35,8 +35,11 @@ my %DIR_MAP = (
 
 sub new {
     my ( $class, %args ) = @_;
-    my $self = bless { managerOverridesDir => $args{managerOverridesDir}
-          || '/etc/lemonldap-ng/manager-overrides.d', }, $class;
+    my $self = bless {
+        managerOverridesDir => $args{managerOverridesDir}
+          || '/etc/lemonldap-ng/manager-overrides.d',
+        allowOverwrite => $args{allowOverwrite} || 0,
+    }, $class;
     return $self;
 }
 
@@ -227,9 +230,14 @@ sub _copyTree {
                 else {
                     # Check for core file overwrite
                     if ( -e $dest_full ) {
-                        $self->{_error} =
-                          "Refusing to overwrite existing file: $dest_full";
-                        return;
+                        if ( $self->{allowOverwrite} ) {
+                            print "  Overwriting existing file: $dest_full\n";
+                        }
+                        else {
+                            $self->{_error} =
+"Refusing to overwrite existing file: $dest_full (use --allow-overwrite)";
+                            return;
+                        }
                     }
 
                     # Ensure parent directory exists
