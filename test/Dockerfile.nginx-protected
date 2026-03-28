@@ -1,0 +1,21 @@
+FROM nginx:alpine
+LABEL maintainer="test"
+LABEL description="Application web protegee par LemonLDAP::NG"
+
+ENV AUTHSERVER=llngauth:9001 \
+    PROTECTEDHOST=myapp.example.com
+
+# Configuration Nginx avec le handler LLNG
+COPY nginx/handler-nginx.conf /etc/nginx/conf.d/handler-nginx.conf
+
+# Fichiers de l'application de demo
+COPY sample-app/ /usr/share/nginx/html/
+
+# Script de demarrage qui remplace les variables
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
+
+# Supprimer la config par defaut de Nginx
+RUN rm -f /etc/nginx/conf.d/default.conf
+
+CMD ["/start.sh"]

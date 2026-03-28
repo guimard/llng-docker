@@ -1,0 +1,75 @@
+version: "3.4"
+
+services:
+  # --- Backend: PostgreSQL pour la configuration LLNG ---
+  db:
+    image: yadd/lemonldap-ng-pg-database
+    environment:
+      - POSTGRES_PASSWORD=zz
+    healthcheck:
+      test: "exit 0"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+
+  # --- Backend: Redis pour les sessions ---
+  redis:
+    image: redis:7-alpine
+
+  # --- LemonLDAP::NG Portal + Manager (image "full") ---
+  portal:
+    image: yadd/lemonldap-ng-full
+    environment:
+      - PG_SERVER=db
+      - REDIS_SERVER=redis:6379
+      - LOGGER=stderr
+      - USERLOGGER=stderr
+      - FORCE_KEY_REGENERATION=yes
+      - PORTAL=http://auth.example.com/
+      - SSODOMAIN=example.com
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  # --- Serveur FastCGI d'authentification (SSOaaS) ---
+  authserver:
+    image: yadd/lemonldap-ng-ssoaas-fastcgi-server
+    environment:
+      - PG_SERVER=db
+      - REDIS_SERVER=redis:6379
+      - LOGGER=stderr
+      - USERLOGGER=stderr
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  # --- Votre application web protegee par LLNG ---
+  myapp:
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx-protected
+    environment:
+      - AUTHSERVER=authserver:9001
+      - PROTECTEDHOST=myapp.example.com
+    depends_on:
+      authserver:
+        condition: service_started
+
+  # --- HAProxy: point d'entree unique (port 80) ---
+  haproxy:
+    image: haproxy:2.6-bullseye
+    ports:
+      - "80:80"
+    volumes:
+      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    sysctls:
+      - net.ipv4.ip_unprivileged_port_start=0
+    depends_on:
+      - portal
+      - myapp
+
+volumes:
+  pg-data:
