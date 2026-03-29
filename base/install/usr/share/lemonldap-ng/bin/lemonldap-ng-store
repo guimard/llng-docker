@@ -49,7 +49,7 @@ Plugins are installed into existing LemonLDAP::NG directories:
 
 =item * Perl modules go into C<@INC>
 
-=item * Manager extensions go into the manager-plugins.d directory
+=item * Manager extensions go into the manager-overrides.d directory
 
 =item * Portal templates and static files go into their respective directories
 
@@ -113,6 +113,12 @@ Check if updates are available for installed plugins.
 =item B<verify> ARCHIVE_FILE
 
 Verify a local plugin archive (structure + GPG if .asc available).
+
+=item B<rebuild>
+
+Rebuild manager files. Useful after upgrading LemonLDAP::NG to
+regenerate manager configuration with installed plugin extensions.
+Requires root.
 
 =back
 

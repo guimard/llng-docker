@@ -46,8 +46,8 @@ RUN \
 COPY install /
 
 RUN echo "Regenerating manager files (plugins installed in portal image)" && \
-    LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini \
-    /usr/share/lemonldap-ng/bin/llng-build-manager-files --plugins-dir /etc/lemonldap-ng/manager-overrides.d && \
+    export LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini && \
+    /usr/share/lemonldap-ng/bin/lemonldap-ng-store --force --plugins-dir=/etc/lemonldap-ng/manager-overrides.d rebuild && \
     grep oidcRPMetaDataOptionsTokenXAuthorizedMatrix /usr/share/perl5/Lemonldap/NG/Manager/Attributes.pm && \
     echo "# Install nginx configuration files" && \
     ln -s ../../lemonldap-ng/manager-nginx.conf /etc/nginx/sites-enabled/z_manager-nginx.conf

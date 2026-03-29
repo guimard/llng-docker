@@ -54,7 +54,7 @@ RUN set -e && for p in appgrid.patch app-scope.patch ignorepollers.patch \
     cp -f /usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.js /usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.min.js && \
     rm -f /*.patch && \
     find /usr/share/perl5/Lemonldap -name '*.orig' -delete && \
-    LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini \
+    export LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini && \
     /usr/share/lemonldap-ng/bin/lemonldap-ng-store add-store https://linagora.github.io/lemonldap-ng-plugins && \
     /usr/share/lemonldap-ng/bin/lemonldap-ng-store --force --plugins-dir=/etc/lemonldap-ng/manager-overrides.d install matrix-token-exchange && \
     echo "# Install nginx configuration files" && \

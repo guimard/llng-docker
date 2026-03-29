@@ -25,6 +25,7 @@ my %COMMANDS = (
     'update'       => \&cmd_update,
     'check'        => \&cmd_check,
     'verify'       => \&cmd_verify,
+    'rebuild'      => \&cmd_rebuild,
 );
 
 sub run {
@@ -220,9 +221,9 @@ sub cmd_list {
         if ( $opts->{search} ) {
             my $term = lc( $opts->{search} );
             @plugins = grep {
-                     lc( $_->{name} )              =~ /\Q$term\E/
-                  || lc( $_->{summary} )           =~ /\Q$term\E/
-                  || lc( $_->{description} || '' ) =~ /\Q$term\E/
+                     $_->{name}                  =~ /\Q$term\E/i
+                  || $_->{summary}               =~ /\Q$term\E/i
+                  || ( $_->{description} || '' ) =~ /\Q$term\E/i
             } @plugins;
         }
 
@@ -237,6 +238,7 @@ sub cmd_list {
 
         for my $plugin (@plugins) {
             my $compat = _checkCompat( $plugin->{llng_compat}, $llng_version );
+            next if !$compat && !$opts->{force};
             my $compat_str = $compat ? 'OK' : 'INCOMPAT';
             printf "%-25s %-10s %-8s %s\n",
               $plugin->{name},
@@ -258,22 +260,21 @@ sub cmd_info {
     my $llng_version = _getLlngVersion();
     my $compat       = _checkCompat( $plugin->{llng_compat}, $llng_version );
 
-    print "Name:           $plugin->{name}\n";
-    print "Version:        $plugin->{version}\n";
-    print "Summary:        " . ( $plugin->{summary}     || '' ) . "\n";
-    print "Description:    " . ( $plugin->{description} || '' ) . "\n";
-    print "Author:         " . ( $plugin->{author}      || '' ) . "\n";
-    print "License:        " . ( $plugin->{license}     || '' ) . "\n";
-    print "LLNG compat:    " . ( $plugin->{llng_compat} || 'any' ) . "\n";
-    print "Compatible:     "
-      . ( $compat ? 'Yes' : "No (current: $llng_version)" ) . "\n";
-    print "Tags:           " . join( ', ', @{ $plugin->{tags} || [] } ) . "\n";
-    print "Homepage:       " . ( $plugin->{homepage}  || '' ) . "\n";
-    print "Published:      " . ( $plugin->{published} || '' ) . "\n";
-    print "SHA256:         " . ( $plugin->{sha256}    || '' ) . "\n";
+    print join(
+        "\n",
+        map {
+            my $k = lc($_);
+            my $n = $_;
+            $n =~ s/_/ /g;
+            my $v = $plugin->{$k} // '';
+            $v = ref($v) ? join( ', ', @$v ) : $v;
+            sprintf "%-14s: %s", $n, $v // ''
+          } qw(Name Version Summary Description Author License LLNG_compat
+          Compatible Tags Homepage Published SHA256)
+    ) . "\n";
 
     if ( $plugin->{perl_requires} && %{ $plugin->{perl_requires} } ) {
-        print "Perl requires:\n";
+        print "Perl requires :\n";
         for my $mod ( sort keys %{ $plugin->{perl_requires} } ) {
             my $ver     = $plugin->{perl_requires}{$mod};
             my $present = _checkPerlModule( $mod, $ver );
@@ -287,12 +288,8 @@ sub cmd_info {
     my $state = Lemonldap::NG::Common::Store::State->new(
         stateFile => $opts->{config}->stateFile, );
     my $installed = $state->get($name);
-    if ($installed) {
-        print "Installed:      Yes (version $installed->{version})\n";
-    }
-    else {
-        print "Installed:      No\n";
-    }
+    printf "%-14s: %s\n", 'Installed',
+      ( $installed ? "Yes (version $installed->{version})" : 'No' );
 }
 
 sub cmd_install {
@@ -519,12 +516,9 @@ sub cmd_remove {
     if ($removed) {
         print "\nRebuilding manager files...\n";
         my ( $ok, $msg ) = $installer->rebuildManager();
-        print "  $msg\n";
-
-        print "\nDon't forget to:\n";
-        print
-"  1. Remove the plugin module(s) from customPlugins in LLNG configuration\n";
-        print "  2. Restart the portal service\n";
+        print "  $msg\n\nDon't forget to:
+  1. Remove the plugin module(s) from customPlugins in LLNG configuration
+  2. Restart the portal service\n";
     }
 
     exit(1) if $errors;
@@ -671,9 +665,9 @@ sub cmd_verify {
     print "Validating archive structure...\n";
     my ( $ok, $meta, $plugin_dir ) = $installer->extractAndValidate($file);
     if ($ok) {
-        print "  Structure: OK\n";
-        print "  Name:      $meta->{name}\n";
-        print "  Version:   $meta->{version}\n";
+        print "  Structure: OK
+  Name:      $meta->{name}
+  Version:   $meta->{version}\n";
     }
     else {
         print "  Structure: FAILED - $meta\n";
@@ -695,6 +689,21 @@ sub cmd_verify {
     }
 
     print "Archive valid.\n";
+}
+
+sub cmd_rebuild {
+    my ($opts) = @_;
+    my $config = $opts->{config};
+
+    my $installer = Lemonldap::NG::Common::Store::Install->new(
+        managerOverridesDir => $config->managerOverridesDir, );
+
+    print "Rebuilding manager files...\n";
+    my ( $ok, $msg ) = $installer->rebuildManager();
+    print "  $msg\n";
+    unless ($ok) {
+        die "Error: rebuild failed\n";
+    }
 }
 
 #
@@ -855,6 +864,7 @@ Commands:
   update                   Refresh store indexes
   check [PLUGIN]           Check for updates
   verify ARCHIVE           Verify a local archive
+  rebuild                  Rebuild manager files (after LLNG upgrade)
 
 Options:
   --store=URL              Use a specific store URL
