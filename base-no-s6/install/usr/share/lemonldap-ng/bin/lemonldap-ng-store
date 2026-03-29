@@ -1,0 +1,162 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+require Lemonldap::NG::Common::Store;
+
+Lemonldap::NG::Common::Store->run(@ARGV);
+
+__END__
+
+=head1 NAME
+
+lemonldap-ng-store - Plugin store manager for LemonLDAP::NG
+
+=head1 SYNOPSIS
+
+  # Manage stores
+  lemonldap-ng-store add-store https://plugins.example.com/
+  lemonldap-ng-store remove-store https://plugins.example.com/
+
+  # Browse plugins
+  lemonldap-ng-store list
+  lemonldap-ng-store list --search=totp --tag=2fa
+  lemonldap-ng-store info myplugin
+
+  # Install / remove
+  sudo lemonldap-ng-store install myplugin
+  sudo lemonldap-ng-store install myplugin --version=1.0.0
+  sudo lemonldap-ng-store remove myplugin
+
+  # Maintenance
+  lemonldap-ng-store installed
+  lemonldap-ng-store update
+  lemonldap-ng-store check
+
+  # Verify a local archive
+  lemonldap-ng-store verify llng-plugin-myplugin-1.0.0.tar.gz
+
+=head1 DESCRIPTION
+
+C<lemonldap-ng-store> manages third-party plugins for LemonLDAP::NG.
+It can discover plugins from configured store URLs, download and verify
+them (SHA256 + optional GPG), and install them into the system paths.
+
+Plugins are installed into existing LemonLDAP::NG directories:
+
+=over 4
+
+=item * Perl modules go into C<@INC>
+
+=item * Manager extensions go into the manager-overrides.d directory
+
+=item * Portal templates and static files go into their respective directories
+
+=back
+
+After installation, C<llng-build-manager-files> is called automatically
+(if available) to regenerate the manager configuration.
+
+=head1 CONFIGURATION
+
+Stores are configured in the C<[store]> section of C<lemonldap-ng.ini>:
+
+  [store]
+  storeUrls = https://plugins.lemonldap-ng.org/v2/
+  gpgVerify = optional
+
+See L<Lemonldap::NG::Common::Store::Config> for all options.
+
+=head1 COMMANDS
+
+=over 4
+
+=item B<add-store> URL
+
+Add an approved store URL. Creates the C<[store]> section in
+C<lemonldap-ng.ini> if it does not exist. Requires root.
+
+=item B<remove-store> URL
+
+Remove a store URL. Requires root.
+
+=item B<list> [--store=URL] [--search=TERM] [--tag=TAG]
+
+List available plugins from configured stores.
+
+=item B<info> PLUGIN_NAME [--store=URL]
+
+Show detailed information about a plugin.
+
+=item B<install> PLUGIN_NAME [--store=URL] [--version=X.Y.Z] [--force]
+
+Download, verify (SHA256 + GPG), and install a plugin.
+Requires root.
+
+=item B<remove> PLUGIN_NAME
+
+Remove an installed plugin. Requires root.
+
+=item B<installed>
+
+List locally installed plugins.
+
+=item B<update> [--store=URL]
+
+Force refresh of cached store index files.
+
+=item B<check> [PLUGIN_NAME]
+
+Check if updates are available for installed plugins.
+
+=item B<verify> ARCHIVE_FILE
+
+Verify a local plugin archive (structure + GPG if .asc available).
+
+=item B<rebuild>
+
+Rebuild manager files. Useful after upgrading LemonLDAP::NG to
+regenerate manager configuration with installed plugin extensions.
+Requires root.
+
+=back
+
+=head1 SECURITY
+
+=over 4
+
+=item * Store URLs should use HTTPS (HTTP triggers a warning)
+
+=item * SHA256 checksums are always verified
+
+=item * GPG signature verification is configurable (required/optional/disabled)
+
+=item * Archives are validated for path traversal attacks
+
+=item * Perl modules must be in the C<Lemonldap::NG::> namespace
+
+=item * Existing core files are never overwritten
+
+=item * No code is executed during installation (pure file copy)
+
+=back
+
+=head1 SEE ALSO
+
+L<Lemonldap::NG::Common::Store>,
+L<llng-build-manager-files>,
+L<https://lemonldap-ng.org/>
+
+=head1 AUTHORS
+
+LemonLDAP::NG team L<http://lemonldap-ng.org/team>
+
+=head1 LICENSE
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2, or (at your option)
+any later version.
+
+=cut
