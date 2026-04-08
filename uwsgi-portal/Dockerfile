@@ -53,6 +53,7 @@ RUN set -e && for p in \
     getreftoken.patch \
     779-mail2f-api.patch \
     874-geoip.patch \
+    2.23-oidc-hooks.patch \
     ; do echo patch $p && patch -p1 < $p || exit 1 ; done && \
     cp -f /usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.js /usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.min.js && \
     rm -f /*.patch && \
