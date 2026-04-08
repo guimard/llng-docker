@@ -4,15 +4,18 @@ FROM debian:${DEBIANVERSION}-slim AS debian-backports-updated
 
 ENV DEBIAN_VERSION=trixie
 
+COPY install/etc/apt/keyrings/ngx-http-host-normalize.gpg /etc/apt/keyrings/
+
 RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
     apt-get -y update && \
     apt-get -y install xz-utils curl gpg && \
     apt-get -y upgrade && \
     echo "deb http://deb.debian.org/debian" ${DEBIAN_VERSION}"-backports main" > /etc/apt/sources.list.d/backports.list && \
-    curl -fsSL https://linagora.github.io/ngx-http-host-normalize/KEY.gpg | \
-    gpg --dearmor -o /etc/apt/keyrings/ngx-http-host-normalize.gpg && \
     echo "deb [signed-by=/etc/apt/keyrings/ngx-http-host-normalize.gpg] https://linagora.github.io/ngx-http-host-normalize trixie main" \
     > /etc/apt/sources.list.d/ngx-http-host-normalize.list && \
+    echo "deb [signed-by=/etc/apt/keyrings/ngx-http-host-normalize.gpg] \
+    https://linagora.github.io/lemonldap-ng-plugins/debian stable main" \
+    | tee /etc/apt/sources.list.d/linagora-llng-plugins.list && \
     apt-get -y update
 
 FROM debian-backports-updated AS debian-backports-updated-with-s6
@@ -34,8 +37,7 @@ RUN apt-get install -y zip && cd /tmp && unzip master.zip
 FROM debian-backports-updated-with-s6
 
 ENV DEBIAN_VERSION="trixie"
-#ENV LLNGDIST="/trixie-backports"
-ENV LLNGDIST=
+ENV LLNGDIST="/trixie-backports"
 
 LABEL maintainer="Yadd yadd@debian.org>" \
       name="yadd/lemonldap-ng-base" \
@@ -87,7 +89,7 @@ ENV SSODOMAIN=example.com \
     DEFAULT_WEBSITE=no \
     PGSSLCERT=/tmp/postgres.crt
 
-COPY *.patch /
+#COPY *.patch /
 
 COPY --from=llng-client /tmp/simple-oidc-client-master/sh/llng /usr/local/lib
 COPY --from=llng-client /tmp/simple-oidc-client-master/sh/llng-lib.sh /usr/local/lib
@@ -109,12 +111,6 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     mkdir -p /var/lib/lemonldap-ng/cache && \
     chown www-data:www-data /var/lib/lemonldap-ng/cache && \
     chmod 750 /var/lib/lemonldap-ng/cache && \
-    echo "# patch 724-webpubsub.patch" && patch -p1 < 724-webpubsub.patch && \
-    echo "# 769-loki.patch" && patch -p1 <769-loki.patch && \
-    echo "# 784-Crowdsec.patch" && patch -p1 < 784-Crowdsec.patch && \
-    echo "# 2.22.0-patroni.patch" && patch -p1 < 2.22.0-patroni.patch && \
-    echo "# 2.22.2-patroni.patch" && patch -p1 < 2.22.2-patroni.patch && \
-    echo "# 827-patroni.patch" && patch -p1 < 827-patroni.patch && \
     perl -000 -MJSON -i -ne '$_=JSON::from_json($_);$_->{reloadUrls}={};print JSON->new->pretty->canonical->encode($_)' /var/lib/lemonldap-ng/conf/lmConf-1.json && \
     perl -i -pe 's/\r//g' /usr/share/perl5/Lemonldap/NG/Common/Conf/DefaultValues.pm && \
     echo rm -f *.patch && \

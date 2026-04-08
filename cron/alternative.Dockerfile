@@ -13,8 +13,7 @@ RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
 FROM debian-backports-updated
 
 ENV DEBIAN_VERSION=trixie
-#ENV LLNGDIST="/trixie-backports"
-ENV LLNGDIST=
+ENV LLNGDIST="/trixie-backports"
 
 LABEL maintainer="Yadd yadd@debian.org>" \
       name="yadd/lemonldap-ng-cron" \
