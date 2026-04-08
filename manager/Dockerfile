@@ -7,6 +7,8 @@ LABEL maintainer="Yadd yadd@debian.org>" \
 ENV PROTECTION=manager \
     AUTHBASIC=
 
+COPY install/usr/share/lemonldap-ng/bin/llng-build-manager-files /usr/share/lemonldap-ng/bin/
+
 RUN echo "# Install nginx and manager libs" && \
     apt-get -y update && \
     apt-get -y upgrade && \
@@ -19,7 +21,17 @@ RUN echo "# Install nginx and manager libs" && \
       libconvert-base32-perl libio-string-perl libipc-run-perl \
       libgd-securityimage-perl libmime-tools-perl libnet-ldap-perl \
       libio-socket-timeout-perl libunicode-string-perl \
-      libio-string-perl libregexp-assemble-perl apache2-utils && \
+      libio-string-perl libregexp-assemble-perl apache2-utils \
+      linagora-lemonldap-ng-plugin-matrix-token-exchange \
+      linagora-lemonldap-ng-plugin-json-file \
+      linagora-lemonldap-ng-plugin-ssh-ca \
+      linagora-lemonldap-ng-plugin-pam-access \
+      linagora-lemonldap-ng-plugin-mail-autodiscover \
+      linagora-lemonldap-ng-plugin-reports \
+      linagora-lemonldap-ng-plugin-oidc-scope-applications \
+      linagora-lemonldap-ng-plugin-fixed-logout-redirection \
+      linagora-lemonldap-ng-plugin-external-menu && \
+    grep oidcRPMetaDataOptionsTokenXAuthorizedMatrix /usr/share/perl5/Lemonldap/NG/Manager/Attributes.pm && \
     mv /etc/dpkg/dpkg.cfg.d /tmp/ && \
     apt-get -y --no-install-recommends install \
       lemonldap-ng-doc${LLNGDIST} && \
@@ -30,16 +42,6 @@ COPY *.patch /
 
 RUN \
     set -e && for p in \
-        ignorepollers.patch \
-        fixedLogout.patch \
-        722-adminlogout.patch \
-	3452-sessionexplorer.patch \
-	784-Crowdsec.patch \
-	787-CrowdsecAgent.patch \
-	797-crowdsec-agent.patch \
-	twake-plugins.patch \
-	dp.patch \
-	875-externalMenu.patch \
 	better-cfgAuthor.patch \
     ; do echo patch $p && patch -p1 < $p || exit 1; done && \
     rm -f *.patch && \
@@ -52,12 +54,11 @@ RUN \
 
 COPY install /
 
-RUN echo "Regenerating manager files" && \
+RUN echo "Regenerating manager files (in case of patches)" && \
+    echo -n "##################### " && grep VERSION /usr/share/perl5/Lemonldap/NG/Manager.pm && \
     mkdir -p /usr/share/perl5/Lemonldap/NG/Portal/Main/ && \
-    export LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini && \
-    /usr/share/lemonldap-ng/bin/lemonldap-ng-store add-store https://linagora.github.io/lemonldap-ng-plugins && \
-    /usr/share/lemonldap-ng/bin/lemonldap-ng-store --force --plugins-dir=/etc/lemonldap-ng/manager-overrides.d install matrix-token-exchange && \
-    grep oidcRPMetaDataOptionsTokenXAuthorizedMatrix /usr/share/perl5/Lemonldap/NG/Manager/Attributes.pm && \
+    dpkg -l | grep linagora && \
+    /usr/share/lemonldap-ng/bin/lemonldap-ng-store rebuild && \
     echo "# Install nginx configuration files" && \
     rm -f /etc/nginx/sites-enabled/* && \
     ln -s ../../lemonldap-ng/manager-nginx.conf /etc/nginx/sites-enabled/ && \

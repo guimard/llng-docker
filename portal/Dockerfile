@@ -13,50 +13,49 @@ RUN echo "# Install nginx and portal libs" && \
     apt-get -y upgrade && \
     export DEBIAN_FRONTEND=noninteractive && \
     apt-get -y -o Dpkg::Options::="--force-confold" --no-install-recommends install nginx \
-        libnginx-mod-http-host-normalize \
-        lemonldap-ng-fastcgi-server"${LLNGDIST}" \
-        liblemonldap-ng-portal-perl"${LLNGDIST}" \
-        gsfonts patch libconvert-pem-perl \
-        libcrypt-u2f-server-perl libgeoip2-perl \
-        libglib-perl libgssapi-perl libhttp-browserdetect-perl \
-        libimage-magick-perl liblasso-perl libnet-facebook-oauth2-perl \
-        libnet-openid-consumer-perl libnet-openid-server-perl \
-        libnet-oauth-perl libsoap-lite-perl fonts-urw-base35 \
-        libauthen-webauthn-perl libcrypt-openssl-bignum-perl \
-        libconvert-base32-perl libio-string-perl libipc-run-perl \
-        libgd-securityimage-perl libmime-tools-perl libnet-ldap-perl \
-        libio-socket-timeout-perl libunicode-string-perl liblasso-perl \
-        libio-string-perl libemail-sender-perl libregexp-common-perl \
-        libcrypt-jwt-perl libdigest-hmac-perl libdata-password-zxcvbn-perl \
-        libhttp-browserdetect-perl libnet-dns-perl \
-	libfcgi-engine-perl libfcgi-procmanager-maxrequests-perl \
-	openssh-client \
-        && \
-	rm -f /usr/bin/scp /usr/bin/sftp /usr/bin/ssh /usr/bin/ssh-add /usr/bin/ssh-agent /usr/bin/ssh-argv0 /usr/bin/ssh-copy-id /usr/bin/ssh-keyscan && \
+      libnginx-mod-http-host-normalize \
+      lemonldap-ng-fastcgi-server"${LLNGDIST}" \
+      liblemonldap-ng-portal-perl"${LLNGDIST}" \
+      gsfonts patch libconvert-pem-perl \
+      libcrypt-u2f-server-perl libgeoip2-perl \
+      libglib-perl libgssapi-perl libhttp-browserdetect-perl \
+      libimage-magick-perl liblasso-perl libnet-facebook-oauth2-perl \
+      libnet-openid-consumer-perl libnet-openid-server-perl \
+      libnet-oauth-perl libsoap-lite-perl fonts-urw-base35 \
+      libauthen-webauthn-perl libcrypt-openssl-bignum-perl \
+      libconvert-base32-perl libio-string-perl libipc-run-perl \
+      libgd-securityimage-perl libmime-tools-perl libnet-ldap-perl \
+      libio-socket-timeout-perl libunicode-string-perl liblasso-perl \
+      libio-string-perl libemail-sender-perl libregexp-common-perl \
+      libcrypt-jwt-perl libdigest-hmac-perl libdata-password-zxcvbn-perl \
+      libhttp-browserdetect-perl libnet-dns-perl \
+      libfcgi-engine-perl libfcgi-procmanager-maxrequests-perl \
+      openssh-client \
+      linagora-lemonldap-ng-plugin-matrix-token-exchange \
+      linagora-lemonldap-ng-plugin-json-file \
+      linagora-lemonldap-ng-plugin-ssh-ca \
+      linagora-lemonldap-ng-plugin-pam-access \
+      linagora-lemonldap-ng-plugin-mail-autodiscover \
+      linagora-lemonldap-ng-plugin-reports \
+      linagora-lemonldap-ng-plugin-oidc-scope-applications \
+      linagora-lemonldap-ng-plugin-fixed-logout-redirection \
+      linagora-lemonldap-ng-plugin-external-menu \
+      && \
+      rm -f /usr/bin/scp /usr/bin/sftp /usr/bin/ssh /usr/bin/ssh-add /usr/bin/ssh-agent /usr/bin/ssh-argv0 /usr/bin/ssh-copy-id /usr/bin/ssh-keyscan && \
     apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY *.patch /
 
-RUN set -e && for p in appgrid.patch app-scope.patch ignorepollers.patch \
-    fixedLogout.patch more-logs.patch \
+RUN set -e && for p in \
+    more-logs.patch \
     redirect-ajax.patch \
-    getreftoken.patch 708-sid-in-userinfo.patch \
-    717-introspection.patch 718-iat-and-nbf-in-at.patch \
+    getreftoken.patch \
     779-mail2f-api.patch \
-    722-adminlogout.patch \
-    808-oidc-fix.patch \
-    twake-wellknown.patch \
-    dp.patch \
-    crowdsec.patch \
     874-geoip.patch \
-    875-externalMenu.patch \
-    ; do echo patch $p && patch -p1 < $p; done && \
+    ; do echo patch $p && patch -p1 < $p || exit 1 ; done && \
     cp -f /usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.js /usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.min.js && \
     rm -f /*.patch && \
     find /usr/share/perl5/Lemonldap -name '*.orig' -delete && \
-    export LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini && \
-    /usr/share/lemonldap-ng/bin/lemonldap-ng-store add-store https://linagora.github.io/lemonldap-ng-plugins && \
-    /usr/share/lemonldap-ng/bin/lemonldap-ng-store --force --plugins-dir=/etc/lemonldap-ng/manager-overrides.d install matrix-token-exchange && \
     echo "# Install nginx configuration files" && \
     rm -f /etc/nginx/sites-enabled/* && \
     ln -s ../../lemonldap-ng/portal-nginx.conf /etc/nginx/sites-enabled/ && \

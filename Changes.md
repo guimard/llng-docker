@@ -1,6 +1,8 @@
 # Changes
 
-## v2.21.3-5 _(dev)_
+## v2.22.0-1 _(dev)_
+* Use LLNG 2.22.0
+* Replace patches by Linagora store entries when exist
 
 ## v2.21.3-4 _(2026-03-13)_
 * Rebuild with recents Debian updates (imagemagick)

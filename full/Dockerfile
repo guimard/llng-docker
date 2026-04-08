@@ -23,16 +23,6 @@ COPY *.patch /
 
 RUN \
     set -e && for p in \
-        ignorepollers.patch \
-        fixedLogout.patch \
-        722-adminlogout.patch \
-	3452-sessionexplorer.patch \
-	784-Crowdsec.patch \
-	787-CrowdsecAgent.patch \
-	797-crowdsec-agent.patch \
-	twake-plugins.patch \
-	dp.patch \
-	875-externalMenu.patch \
 	better-cfgAuthor.patch \
     ; do echo patch $p && patch -p1 < $p || exit 1; done && \
     rm -f *.patch && \
@@ -47,7 +37,7 @@ COPY install /
 
 RUN echo "Regenerating manager files (plugins installed in portal image)" && \
     export LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini && \
-    /usr/share/lemonldap-ng/bin/lemonldap-ng-store --force --plugins-dir=/etc/lemonldap-ng/manager-overrides.d rebuild && \
+    /usr/share/lemonldap-ng/bin/lemonldap-ng-store rebuild && \
     grep oidcRPMetaDataOptionsTokenXAuthorizedMatrix /usr/share/perl5/Lemonldap/NG/Manager/Attributes.pm && \
     echo "# Install nginx configuration files" && \
     ln -s ../../lemonldap-ng/manager-nginx.conf /etc/nginx/sites-enabled/z_manager-nginx.conf
