@@ -7,8 +7,6 @@ LABEL maintainer="Yadd yadd@debian.org>" \
 ENV PROTECTION=manager \
     AUTHBASIC=
 
-COPY install/usr/share/lemonldap-ng/bin/llng-build-manager-files /usr/share/lemonldap-ng/bin/
-
 RUN echo "# Install nginx and manager libs" && \
     apt-get -y update && \
     apt-get -y upgrade && \
@@ -22,6 +20,7 @@ RUN echo "# Install nginx and manager libs" && \
       libgd-securityimage-perl libmime-tools-perl libnet-ldap-perl \
       libio-socket-timeout-perl libunicode-string-perl \
       libio-string-perl libregexp-assemble-perl apache2-utils \
+      linagora-llng-build-manager-files \
       linagora-lemonldap-ng-plugin-matrix-token-exchange \
       linagora-lemonldap-ng-plugin-json-file \
       linagora-lemonldap-ng-plugin-ssh-ca \

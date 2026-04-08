@@ -12,7 +12,9 @@ RUN echo "# Install nginx and portal and manager libs" && \
     apt-get -y upgrade && \
     apt-get -y --no-install-recommends install nginx \
       libnginx-mod-http-host-normalize \
-      liblemonldap-ng-manager-perl${LLNGDIST} apache2-utils && \
+      liblemonldap-ng-manager-perl${LLNGDIST} apache2-utils \
+      linagora-llng-build-manager-files \
+    && \
     mv /etc/dpkg/dpkg.cfg.d /tmp/ && \
     apt-get -y --no-install-recommends install \
       lemonldap-ng-doc${LLNGDIST} && \
