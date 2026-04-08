@@ -217,8 +217,14 @@ for my $key ( keys %$attributes ) {
 my @tree_extensions;
 for my $ext_file (@ext_files) {
     my $ext = load_extension($ext_file);
-    push @tree_extensions, { ext => $ext->{tree}, file => $ext_file }
-      if $ext->{tree} && %{ $ext->{tree} };
+    if ( $ext->{tree} ) {
+        my @trees =
+          ref $ext->{tree} eq 'ARRAY' ? @{ $ext->{tree} } : ( $ext->{tree} );
+        for my $t (@trees) {
+            push @tree_extensions, { ext => $t, file => $ext_file }
+              if $t && %$t;
+        }
+    }
     push @{ $ext_ctrees->{$_} },
       { ext => $ext->{ctrees}{$_}, file => $ext_file }
       for keys %{ $ext->{ctrees} || {} };
@@ -497,8 +503,14 @@ sub merge_extension {
     merge_attributes( $core_attrs, $ext->{attributes}, $ext_file );
 
     # Merge tree (insert nodes at specified path)
-    merge_tree( $core_tree, $ext->{tree}, $ext_file )
-      if $ext->{tree} && %{ $ext->{tree} };
+    # Support both single hash and array of hashes
+    if ( $ext->{tree} ) {
+        my @trees =
+          ref $ext->{tree} eq 'ARRAY' ? @{ $ext->{tree} } : ( $ext->{tree} );
+        for my $t (@trees) {
+            merge_tree( $core_tree, $t, $ext_file ) if $t && %$t;
+        }
+    }
 
     # Merge ctrees (insert into specific node templates)
     merge_ctrees( $core_ctrees, $ext->{ctrees}, $ext_file )
