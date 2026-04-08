@@ -33,6 +33,8 @@ RUN echo "# Install nginx and portal libs" && \
       openssh-client \
       linagora-lemonldap-ng-plugin-matrix-token-exchange \
       linagora-lemonldap-ng-plugin-json-file \
+      linagora-lemonldap-ng-plugin-oidc-device-authorization \
+      linagora-lemonldap-ng-plugin-oidc-device-organization \
       linagora-lemonldap-ng-plugin-ssh-ca \
       linagora-lemonldap-ng-plugin-pam-access \
       linagora-lemonldap-ng-plugin-mail-autodiscover \
