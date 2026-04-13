@@ -11,8 +11,6 @@ RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
     apt-get -y install xz-utils curl gpg && \
     apt-get -y upgrade && \
     echo "deb http://deb.debian.org/debian" ${DEBIAN_VERSION}"-backports main" > /etc/apt/sources.list.d/backports.list && \
-    echo "deb [signed-by=/etc/apt/keyrings/ngx-http-host-normalize.gpg] https://linagora.github.io/ngx-http-host-normalize trixie main" \
-    > /etc/apt/sources.list.d/ngx-http-host-normalize.list && \
     echo "deb [signed-by=/etc/apt/keyrings/ngx-http-host-normalize.gpg] \
     https://linagora.github.io/lemonldap-ng-plugins/debian stable main" \
     | tee /etc/apt/sources.list.d/linagora-llng-plugins.list && \
