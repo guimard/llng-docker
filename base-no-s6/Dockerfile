@@ -75,7 +75,7 @@ ENV SSODOMAIN=example.com \
     DEFAULT_WEBSITE=no \
     PGSSLCERT=/tmp/postgres.crt
 
-#COPY *.patch /
+COPY *.patch /
 
 COPY --from=llng-client /tmp/simple-oidc-client-master/sh/llng /usr/local/lib
 COPY --from=llng-client /tmp/simple-oidc-client-master/sh/llng-lib.sh /usr/local/lib
@@ -102,6 +102,7 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     chmod 750 /var/lib/lemonldap-ng/cache && \
     perl -000 -MJSON -i -ne '$_=JSON::from_json($_);$_->{reloadUrls}={};print JSON->new->pretty->canonical->encode($_)' /var/lib/lemonldap-ng/conf/lmConf-1.json && \
     perl -i -pe 's/\r//g' /usr/share/perl5/Lemonldap/NG/Common/Conf/DefaultValues.pm && \
+    echo "## oidc-hooks.patch" && patch -p1 <oidc-hooks.patch && \
     echo rm -f *.patch && \
     cd /usr/bin && \
     ln -s /usr/local/lib/llng

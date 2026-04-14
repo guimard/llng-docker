@@ -1,0 +1,69 @@
+commit 809e3e060a42ab0a593b3251cca21f9518e8a0e6
+Author: Maxime Besson <maxime.besson@worteks.com>
+Date:   Fri Oct 3 16:21:19 2025 +0200
+
+    Add PSGI helpers to build responses (#2748)
+    
+    No other part of the code should be assembling PSGI responses
+
+--- a/usr/share/perl5/Lemonldap/NG/Common/PSGI.pm
++++ b/usr/share/perl5/Lemonldap/NG/Common/PSGI.pm
+@@ -359,6 +359,35 @@ sub sendJs {
+     ];
+ }
+ 
++sub sendTextResponse {
++    my ( $self, $req, $text, %args ) = @_;
++
++    my $data = $text;
++
++    #my $data = Encode::encode( "UTF-8", $text );
++
++    $args{type} ||= "text/plain; charset=utf-8";
++
++    return $self->sendBinaryResponse( $req, $data, %args );
++}
++
++sub sendBinaryResponse {
++    my ( $self, $req, $data, %args ) = @_;
++    $args{code} ||= 200;
++    $args{type} ||= "application/octet-stream";
++    my $headers = $args{headers} || [ $req->spliceHdrs ];
++
++    return [
++        $args{code},
++        [
++            'Content-Type'   => $args{type},
++            'Content-Length' => length($data),
++            @$headers,
++        ],
++        [$data]
++    ];
++}
++
+ sub sendHtml {
+     my ( $self, $req, $template, %args ) = @_;
+     my $sp = $self->staticPrefix;
+@@ -479,6 +508,22 @@ sub logAndRun {
+     return $res;
+ }
+ 
++sub sendRedirection {
++    my ( $self, $req, $destination, %args ) = @_;
++
++    $args{code}    ||= 302;
++    $args{headers} ||= [ $req->spliceHdrs ];
++
++    return [
++        $args{code},
++        [
++            ( $destination ? ( Location => $destination ) : () ),
++            @{ $args{headers} }
++        ],
++        []
++    ];
++}
++
+ 1;
+ __END__
+ 
