@@ -458,7 +458,13 @@
              next unless /\w/;
              s/[\r\n]//g;
 +            s/^\s+//;
-+            s/\s+$//;
++            # For regex files, preserve trailing escaped spaces (e.g. '\ ')
++            if ( $type eq 're' ) {
++                s/(?<!\\)\s+$//;
++            }
++            else {
++                s/\s+$//;
++            }
              push @{ $res->{$lcat}->{$type} }, $_;
              $c++;
          }
@@ -482,13 +488,7 @@
 +        chomp;
 +        s/[^\x21-\x7E]//g;    # Remove non-printable characters and spaces
 +        s/^\s+//;
-+        # For regex files, preserve trailing escaped spaces (e.g. '\ ')
-+        if ( $type eq 're' ) {
-+            s/(?<!\\)\s+$//;
-+        }
-+        else {
 +            s/\s+$//;
-+        }
 +        next if /^#/;
 +        next unless /\S/;
 +
