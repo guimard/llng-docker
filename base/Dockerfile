@@ -112,6 +112,8 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     mkdir -p /var/lib/lemonldap-ng/cache && \
     chown www-data:www-data /var/lib/lemonldap-ng/cache && \
     chmod 750 /var/lib/lemonldap-ng/cache && \
+    chown root:www-data /etc/lemonldap-ng/lemonldap-ng.ini && \
+    chmod 640 /etc/lemonldap-ng/lemonldap-ng.ini && \
     perl -000 -MJSON -i -ne '$_=JSON::from_json($_);$_->{reloadUrls}={};print JSON->new->pretty->canonical->encode($_)' /var/lib/lemonldap-ng/conf/lmConf-1.json && \
     perl -i -pe 's/\r//g' /usr/share/perl5/Lemonldap/NG/Common/Conf/DefaultValues.pm && \
     echo "## oidc-hooks.patch" && patch -p1 <oidc-hooks.patch && \
