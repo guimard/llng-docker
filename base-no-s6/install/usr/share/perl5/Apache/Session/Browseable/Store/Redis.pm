@@ -33,8 +33,14 @@ sub insert {
       ? $session->{args}->{Index}
       : [ split /\s+/, $session->{args}->{Index} ];
 
-    my $id = $session->{data}->{_session_id};
-    $self->{cache}->set( $id, $session->{serialized} );
+    my $id  = $session->{data}->{_session_id};
+    my $ttl = $session->{args}->{TTL};
+    if ($ttl) {
+        $self->{cache}->set( $id, $session->{serialized}, 'EX', $ttl );
+    }
+    else {
+        $self->{cache}->set( $id, $session->{serialized} );
+    }
     foreach my $i (@$index) {
         my $t = $session->{data}->{$i};
         next unless ( defined($t) and ( length($t) > 0 ) );
@@ -65,7 +71,13 @@ sub update {
     }
 
     # Store new data
-    $self->{cache}->set( $id, $session->{serialized} );
+    my $ttl = $session->{args}->{TTL};
+    if ($ttl) {
+        $self->{cache}->set( $id, $session->{serialized}, 'EX', $ttl );
+    }
+    else {
+        $self->{cache}->set( $id, $session->{serialized} );
+    }
 
     foreach my $i (@$index) {
         my $old_val = defined($old_data) ? $old_data->{$i} : undef;
@@ -165,12 +177,32 @@ Apache::Session::Store
  tie %hash, 'Apache::Session::Browseable::Redis', $id, {
     # optional: default to localhost
     server => '127.0.0.1:6379',
+
+    # optional: set a Redis TTL (in seconds) on session keys
+    TTL => 86400,
  };
 
 =head1 DESCRIPTION
 
 This module is an implementation of Apache::Session::Browseable. It uses the
-Redis storage system
+Redis storage system.
+
+=head1 OPTIONS
+
+=over
+
+=item B<TTL>
+
+Optional. If set, session keys will be stored with a Redis TTL (in seconds)
+using C<SET key value EX ttl>. The TTL is refreshed on every update. This
+acts as a safety net: sessions are automatically removed by Redis if the
+application fails to delete them. Index sets are not expired by Redis, but
+orphan index entries will be cleaned up by C<searchOn> or manual maintenance.
+
+Without this option, session keys have no expiration and must be explicitly
+deleted or purged.
+
+=back
 
 =head1 SEE ALSO
 

@@ -142,11 +142,19 @@ sub deleteIfLowerThan {
                     }
                 }
             }
+            # Empty or data-less sessions should be purged
             my $dominated = 0;
-            if ( $rule->{or} ) {
+            if ( !$v || !%$v || !exists $v->{_session_id} ) {
+                $dominated = 1;
+            }
+            elsif ( $rule->{or} ) {
                 foreach ( keys %{ $rule->{or} } ) {
-                    if ( defined( $v->{$_} ) and $v->{$_} < $rule->{or}->{$_} )
-                    {
+                    if ( !defined( $v->{$_} ) ) {
+                        # Session missing a required field: treat as expired
+                        $dominated = 1;
+                        last;
+                    }
+                    if ( $v->{$_} < $rule->{or}->{$_} ) {
                         $dominated = 1;
                         last;
                     }
@@ -156,8 +164,8 @@ sub deleteIfLowerThan {
                 my $res = 1;
                 foreach ( keys %{ $rule->{and} } ) {
                     $res = 0
-                      unless defined( $v->{$_} )
-                      and $v->{$_} < $rule->{and}->{$_};
+                      unless !defined( $v->{$_} )
+                      or $v->{$_} < $rule->{and}->{$_};
                 }
                 $dominated = $res;
             }
@@ -286,6 +294,9 @@ Apache::Session::Redis
 
        # Choose your browseable fields
        Index          => 'uid mail',
+
+       # Optional: set a Redis TTL on session keys (in seconds)
+       # TTL => 86400,
   };
   
   # Use it like Apache::Session
