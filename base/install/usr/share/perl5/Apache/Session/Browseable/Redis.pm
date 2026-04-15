@@ -126,6 +126,11 @@ sub deleteIfLowerThan {
     my ( $class, $args, $rule ) = @_;
     my $deleted  = 0;
     my $redisObj = $class->_getRedis($args);
+    my $index =
+      ref( $args->{Index} )
+      ? $args->{Index}
+      : [ split /\s+/, $args->{Index} ];
+
     $class->get_key_from_all_sessions(
         $args,
         sub {
@@ -137,13 +142,13 @@ sub deleteIfLowerThan {
                     }
                 }
             }
+            my $dominated = 0;
             if ( $rule->{or} ) {
                 foreach ( keys %{ $rule->{or} } ) {
                     if ( defined( $v->{$_} ) and $v->{$_} < $rule->{or}->{$_} )
                     {
-                        $redisObj->del($k);
-                        $deleted++;
-                        return ();
+                        $dominated = 1;
+                        last;
                     }
                 }
             }
@@ -152,12 +157,19 @@ sub deleteIfLowerThan {
                 foreach ( keys %{ $rule->{and} } ) {
                     $res = 0
                       unless defined( $v->{$_} )
-                      and $v->{$_} < $rule->{not}->{$_};
+                      and $v->{$_} < $rule->{and}->{$_};
                 }
-                if ($res) {
-                    $redisObj->del($k);
-                    $deleted++;
+                $dominated = $res;
+            }
+            if ($dominated) {
+                # Clean up index entries before deleting the session
+                foreach my $i (@$index) {
+                    my $t = $v->{$i};
+                    next unless ( defined($t) and length($t) > 0 );
+                    eval { $redisObj->srem( "${i}_$t", $k ) };
                 }
+                $redisObj->del($k);
+                $deleted++;
             }
             return ();
         },

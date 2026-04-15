@@ -1,6 +1,7 @@
 package Apache::Session::Browseable::Store::Redis;
 
 use strict;
+use JSON qw(decode_json);
 
 our $VERSION = '1.3.18';
 
@@ -41,7 +42,47 @@ sub insert {
     }
 }
 
-*update = *insert;
+sub update {
+    my ( $self, $session ) = @_;
+    my $index =
+      ref( $session->{args}->{Index} )
+      ? $session->{args}->{Index}
+      : [ split /\s+/, $session->{args}->{Index} ];
+
+    my $id = $session->{data}->{_session_id};
+
+    # Read old data to clean up stale index entries
+    my $old_raw = eval { $self->{cache}->get($id) };
+    my $old_data;
+    if ($old_raw) {
+        $old_data = eval {
+            decode_json($old_raw);
+        };
+    }
+
+    # Store new data
+    $self->{cache}->set( $id, $session->{serialized} );
+
+    foreach my $i (@$index) {
+        my $old_val = defined($old_data) ? $old_data->{$i} : undef;
+        my $new_val = $session->{data}->{$i};
+
+        # Remove old index entry if value changed
+        if ( defined($old_val) && length($old_val) > 0 ) {
+            if ( !defined($new_val)
+                || length($new_val) == 0
+                || $old_val ne $new_val )
+            {
+                eval { $self->{cache}->srem( "${i}_$old_val", $id ) };
+            }
+        }
+
+        # Add new index entry
+        if ( defined($new_val) && length($new_val) > 0 ) {
+            $self->{cache}->sadd( "${i}_$new_val", $id );
+        }
+    }
+}
 
 sub materialize {
     my ( $self, $session ) = @_;
