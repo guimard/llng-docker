@@ -1,0 +1,3 @@
+# CrowdSec equivalent: capacity=4, leakspeed=5s
+# Time window = capacity * leakspeed ≈ 20s, rounded to 30s
+30

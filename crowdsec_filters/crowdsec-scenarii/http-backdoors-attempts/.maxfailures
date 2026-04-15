@@ -1,0 +1,3 @@
+# CrowdSec equivalent: capacity=1 (overflow at 2)
+# Very aggressive - ban quickly on backdoor access attempts
+2

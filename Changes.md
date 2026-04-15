@@ -4,6 +4,7 @@
 * Use LLNG 2.22.0
 * Replace patches by Linagora store entries when exist
 * Import Crowdsec filter from 2.23.0
+* Install named Crowdsec scenarii
 
 ## v2.21.3-4 _(2026-03-13)_
 * Rebuild with recents Debian updates (imagemagick)

@@ -1,0 +1,28 @@
+# Path traversal patterns
+# Source: https://hub-data.crowdsec.net/web/path_traversal.txt
+
+# Directory traversal sequences
+../
+..\
+%2e%2e%2f
+%2e%2e%5c
+%252e%252e%252f
+
+# Unix system files
+/etc/passwd
+/etc/shadow
+/etc/hosts
+/etc/group
+/proc/self/
+
+# PHP/file wrappers
+=file://
+=zip://
+=php://
+=expect://
+=data://
+
+# Windows system files
+windows/win.ini
+boot.ini
+%25SYSTEMROOT%25
