@@ -53,11 +53,15 @@ sub update {
 
     # Read old data to clean up stale index entries
     my $old_raw = eval { $self->{cache}->get($id) };
+    if ($@) {
+        warn "Failed to read previous session '$id' from Redis: $@";
+    }
     my $old_data;
-    if ($old_raw) {
-        $old_data = eval {
-            decode_json($old_raw);
-        };
+    if ( defined $old_raw && length $old_raw ) {
+        $old_data = eval { decode_json($old_raw) };
+        if ($@) {
+            warn "Failed to decode previous session '$id': $@";
+        }
     }
 
     # Store new data

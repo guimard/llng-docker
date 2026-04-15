@@ -163,13 +163,23 @@ sub deleteIfLowerThan {
             }
             if ($dominated) {
                 # Clean up index entries before deleting the session
+                my $index_ok = 1;
                 foreach my $i (@$index) {
                     my $t = $v->{$i};
                     next unless ( defined($t) and length($t) > 0 );
                     eval { $redisObj->srem( "${i}_$t", $k ) };
+                    if ($@) {
+                        warn "Failed to remove '$k' from index '${i}_$t': $@";
+                        $index_ok = 0;
+                    }
                 }
-                $redisObj->del($k);
-                $deleted++;
+                if ($index_ok) {
+                    $redisObj->del($k);
+                    $deleted++;
+                }
+                else {
+                    warn "Skipping deletion of session '$k' due to index cleanup failure";
+                }
             }
             return ();
         },
