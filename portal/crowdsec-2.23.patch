@@ -453,7 +453,7 @@
              unless ( grep { $_ eq $lcat } knownCat ) {
                  $self->logger->error("Unknown category $lcat for $path");
                  next LOOP;
-@@ -90,12 +175,102 @@ sub parseFilters {
+@@ -90,12 +175,108 @@ sub parseFilters {
              next if /^\s*#/;
              next unless /\w/;
              s/[\r\n]//g;
@@ -482,7 +482,13 @@
 +        chomp;
 +        s/[^\x21-\x7E]//g;    # Remove non-printable characters and spaces
 +        s/^\s+//;
-+        s/\s+$//;
++        # For regex files, preserve trailing escaped spaces (e.g. '\ ')
++        if ( $type eq 're' ) {
++            s/(?<!\\)\s+$//;
++        }
++        else {
++            s/\s+$//;
++        }
 +        next if /^#/;
 +        next unless /\S/;
 +
