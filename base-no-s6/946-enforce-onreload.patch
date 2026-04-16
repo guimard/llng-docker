@@ -1,0 +1,32 @@
+--- a/usr/share/perl5/Lemonldap/NG/Handler/Main/Reload.pm
++++ b/usr/share/perl5/Lemonldap/NG/Handler/Main/Reload.pm
+@@ -20,8 +20,14 @@ our @_onReload;
+ 
+ sub onReload {
+     my ( $class, $obj, $sub ) = @_;
+-    weaken($obj);
+-    push @_onReload, [ $obj, $sub ];
++    unless ( ref($obj) and $sub ) {
++        $class->logger->error(
++            'onReload called with invalid arguments, skipping');
++        return;
++    }
++    my $entry = [ $obj, $sub ];
++    weaken( $entry->[0] );
++    push @_onReload, $entry;
+ }
+ 
+ # CONFIGURATION UPDATE
+@@ -78,6 +84,12 @@ sub checkConf {
+         }
+         $class->configReload($conf);
+         foreach (@_onReload) {
++            unless ( ref($_) eq 'ARRAY' ) {
++                $class->logger->error(
++                    "Corrupted entry in _onReload: expected ARRAY ref, got "
++                      . ( defined $_ ? "'$_'" : 'undef' ) );
++                next;
++            }
+             my ( $obj, $sub ) = @$_;
+             if ($obj) {
+                 $class->logger->debug(

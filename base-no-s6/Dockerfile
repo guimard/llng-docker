@@ -105,6 +105,7 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     perl -000 -MJSON -i -ne '$_=JSON::from_json($_);$_->{reloadUrls}={};print JSON->new->pretty->canonical->encode($_)' /var/lib/lemonldap-ng/conf/lmConf-1.json && \
     perl -i -pe 's/\r//g' /usr/share/perl5/Lemonldap/NG/Common/Conf/DefaultValues.pm && \
     echo "## oidc-hooks.patch" && patch -p1 <oidc-hooks.patch && \
+    echo "## 946-enforce-onreload.patch" && patch -p1 <946-enforce-onreload.patch && \
     echo rm -f *.patch && \
     cd /usr/bin && \
     ln -s /usr/local/lib/llng
