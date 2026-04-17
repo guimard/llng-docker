@@ -30,6 +30,7 @@ RUN echo "# Install nginx and portal libs" && \
       libhttp-browserdetect-perl libnet-dns-perl \
       libfcgi-engine-perl libfcgi-procmanager-maxrequests-perl \
       openssh-client \
+      linagora-llng-crowdsec-filters \
       linagora-lemonldap-ng-plugin-matrix-token-exchange \
       linagora-lemonldap-ng-plugin-json-file \
       linagora-lemonldap-ng-plugin-oidc-device-authorization \
