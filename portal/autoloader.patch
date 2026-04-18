@@ -1,0 +1,14 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm
+@@ -159,6 +159,11 @@ sub enabledPlugins {
+         push @res, grep ( /\w+/, split( /[,\s]+/, $conf->{customPlugins} ) );
+     }
+ 
++    # Autoloader: always loaded; its init() scans $conf->{autoloadDir}
++    # (default /etc/lemonldap-ng/autoload.d, typically populated by the
++    # plugin store) and loads the declared plugins through loadPlugin()
++    push @res, '::Plugins::Autoloader';
++
+     # Impersonation overwrites req->step and pops 'afterData' EP.
+     # Static and custom 'afterData' plugins will be never launched
+     # if they are loaded after Impersonation.

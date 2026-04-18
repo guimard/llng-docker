@@ -28,7 +28,8 @@ RUN echo "# Install nginx and portal libs" && \
       libcrypt-jwt-perl libdigest-hmac-perl libdata-password-zxcvbn-perl \
       libhttp-browserdetect-perl libnet-dns-perl \
       uwsgi uwsgi-plugin-psgi \
-      openssh-client \
+      openssh-client
+RUN apt-get -y -o Dpkg::Options::="--force-confold" install \
       linagora-llng-crowdsec-filters \
       linagora-lemonldap-ng-plugin-matrix-token-exchange \
       linagora-lemonldap-ng-plugin-json-file \
@@ -55,6 +56,7 @@ RUN set -e && for p in \
     874-geoip.patch \
     2.23-oidc-hooks.patch \
     crowdsec-2.23.patch \
+    autoloader.patch \
     ; do echo patch $p && patch -p1 < $p || exit 1 ; done && \
     cp -f /usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.js /usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.min.js && \
     rm -f /*.patch && \
