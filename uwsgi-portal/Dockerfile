@@ -30,18 +30,30 @@ RUN echo "# Install nginx and portal libs" && \
       uwsgi uwsgi-plugin-psgi \
       openssh-client
 RUN apt-get -y -o Dpkg::Options::="--force-confold" install \
-      linagora-llng-crowdsec-filters \
-      linagora-lemonldap-ng-plugin-matrix-token-exchange \
+      linagora-lemonldap-ng-plugin-captchetat \
+      linagora-lemonldap-ng-plugin-external-menu \
+      linagora-lemonldap-ng-plugin-fixed-logout-redirection \
       linagora-lemonldap-ng-plugin-json-file \
+      linagora-lemonldap-ng-plugin-mail-autodiscover \
+      linagora-lemonldap-ng-plugin-matrix-token-exchange \
+      linagora-lemonldap-ng-plugin-oidc-ciba \
       linagora-lemonldap-ng-plugin-oidc-device-authorization \
       linagora-lemonldap-ng-plugin-oidc-device-organization \
-      linagora-lemonldap-ng-plugin-ssh-ca \
-      linagora-lemonldap-ng-plugin-pam-access \
-      linagora-lemonldap-ng-plugin-mail-autodiscover \
-      linagora-lemonldap-ng-plugin-reports \
+      linagora-lemonldap-ng-plugin-oidc-federation \
+      linagora-lemonldap-ng-plugin-oidc-global-scopes \
+      linagora-lemonldap-ng-plugin-oidc-jar \
+      linagora-lemonldap-ng-plugin-oidc-jarm \
+      linagora-lemonldap-ng-plugin-oidc-par \
       linagora-lemonldap-ng-plugin-oidc-scope-applications \
-      linagora-lemonldap-ng-plugin-fixed-logout-redirection \
-      linagora-lemonldap-ng-plugin-external-menu \
+      linagora-lemonldap-ng-plugin-pacc \
+      linagora-lemonldap-ng-plugin-pam-access \
+      linagora-lemonldap-ng-plugin-reports \
+      linagora-lemonldap-ng-plugin-ssh-ca \
+      linagora-lemonldap-ng-plugin-twake \
+      linagora-lemonldap-ng-plugin-vault-conf-backend \
+      linagora-lemonldap-ng-store \
+      linagora-llng-build-manager-files \
+      linagora-llng-crowdsec-filters \
       && \
       rm -f /usr/bin/scp /usr/bin/sftp /usr/bin/ssh /usr/bin/ssh-add /usr/bin/ssh-agent /usr/bin/ssh-argv0 /usr/bin/ssh-copy-id /usr/bin/ssh-keyscan && \
     apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -57,9 +69,9 @@ RUN set -e && for p in \
     2.23-oidc-hooks.patch \
     crowdsec-2.23.patch \
     autoloader.patch \
-    ; do echo patch $p && patch -p1 < $p || exit 1 ; done && \
+    ; do echo patch $p && patch -p1 < $p || exit 1; done && \
     cp -f /usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.js /usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.min.js && \
-    rm -f /*.patch && \
+    rm -f *.patch && \
     find /usr/share/perl5/Lemonldap -name '*.orig' -delete && \
     echo "# Install nginx configuration files" && \
     rm -f /etc/nginx/sites-enabled/* && \

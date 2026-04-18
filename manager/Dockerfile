@@ -19,19 +19,33 @@ RUN echo "# Install nginx and manager libs" && \
       libconvert-base32-perl libio-string-perl libipc-run-perl \
       libgd-securityimage-perl libmime-tools-perl libnet-ldap-perl \
       libio-socket-timeout-perl libunicode-string-perl \
-      libio-string-perl libregexp-assemble-perl apache2-utils \
-      linagora-llng-build-manager-files \
-      linagora-lemonldap-ng-plugin-matrix-token-exchange \
+      libio-string-perl libregexp-assemble-perl apache2-utils
+RUN apt-get -y -o Dpkg::Options::="--force-confold" install \
+      linagora-lemonldap-ng-plugin-captchetat \
+      linagora-lemonldap-ng-plugin-external-menu \
+      linagora-lemonldap-ng-plugin-fixed-logout-redirection \
       linagora-lemonldap-ng-plugin-json-file \
+      linagora-lemonldap-ng-plugin-mail-autodiscover \
+      linagora-lemonldap-ng-plugin-matrix-token-exchange \
+      linagora-lemonldap-ng-plugin-oidc-ciba \
       linagora-lemonldap-ng-plugin-oidc-device-authorization \
       linagora-lemonldap-ng-plugin-oidc-device-organization \
-      linagora-lemonldap-ng-plugin-ssh-ca \
-      linagora-lemonldap-ng-plugin-pam-access \
-      linagora-lemonldap-ng-plugin-mail-autodiscover \
-      linagora-lemonldap-ng-plugin-reports \
+      linagora-lemonldap-ng-plugin-oidc-federation \
+      linagora-lemonldap-ng-plugin-oidc-global-scopes \
+      linagora-lemonldap-ng-plugin-oidc-jar \
+      linagora-lemonldap-ng-plugin-oidc-jarm \
+      linagora-lemonldap-ng-plugin-oidc-par \
       linagora-lemonldap-ng-plugin-oidc-scope-applications \
-      linagora-lemonldap-ng-plugin-fixed-logout-redirection \
-      linagora-lemonldap-ng-plugin-external-menu && \
+      linagora-lemonldap-ng-plugin-pacc \
+      linagora-lemonldap-ng-plugin-pam-access \
+      linagora-lemonldap-ng-plugin-reports \
+      linagora-lemonldap-ng-plugin-ssh-ca \
+      linagora-lemonldap-ng-plugin-twake \
+      linagora-lemonldap-ng-plugin-vault-conf-backend \
+      linagora-lemonldap-ng-store \
+      linagora-llng-build-manager-files \
+      linagora-llng-crowdsec-filters \
+      && \
     grep oidcRPMetaDataOptionsTokenXAuthorizedMatrix /usr/share/perl5/Lemonldap/NG/Manager/Attributes.pm && \
     mv /etc/dpkg/dpkg.cfg.d /tmp/ && \
     apt-get -y --no-install-recommends install \
@@ -41,8 +55,7 @@ RUN echo "# Install nginx and manager libs" && \
 
 COPY *.patch /
 
-RUN \
-    set -e && for p in \
+RUN set -e && for p in \
 	better-cfgAuthor.patch \
     ; do echo patch $p && patch -p1 < $p || exit 1; done && \
     rm -f *.patch && \
