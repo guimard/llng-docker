@@ -52,7 +52,6 @@ RUN apt-get -y -o Dpkg::Options::="--force-confold" install \
       linagora-lemonldap-ng-plugin-twake \
       linagora-lemonldap-ng-plugin-vault-conf-backend \
       linagora-lemonldap-ng-store \
-      linagora-llng-build-manager-files \
       linagora-llng-crowdsec-filters \
       && \
       rm -f /usr/bin/scp /usr/bin/sftp /usr/bin/ssh /usr/bin/ssh-add /usr/bin/ssh-agent /usr/bin/ssh-argv0 /usr/bin/ssh-copy-id /usr/bin/ssh-keyscan && \
