@@ -1,0 +1,376 @@
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Api/Common.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Api/Common.pm
+@@ -172,8 +172,12 @@ sub _getSSOMod {
+ 
+ sub _saveApplyConf {
+     my ( $self, $conf ) = @_;
+-    $self->_confAcc->saveConf($conf);
++    my $res = $self->_confAcc->saveConf($conf);
++    if ( $res <= 0 ) {
++        return 0;
++    }
+     $self->applyConf($conf);
++    return 1;
+ }
+ 
+ 1;
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Api/Menu/App.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Api/Menu/App.pm
+@@ -166,7 +166,7 @@ sub addMenuApp {
+     my $res =
+       $self->_pushMenuApp( $conf, $catConfKey, $add->{confKey}, $add, 1 );
+ 
+-    return $self->sendError( $req, $res->{msg}, 400 )
++    return $self->sendError( $req, $res->{msg}, $res->{code} || 400 )
+       unless ( $res->{res} eq 'ok' );
+ 
+     return $self->sendJSONresponse(
+@@ -215,7 +215,7 @@ sub updateMenuApp {
+     my $res =
+       $self->_pushMenuApp( $conf, $catConfKey, $appConfKey, $update, 0 );
+ 
+-    return $self->sendError( $req, $res->{msg}, 400 )
++    return $self->sendError( $req, $res->{msg}, $res->{code} || 400 )
+       unless ( $res->{res} eq 'ok' );
+ 
+     return $self->sendJSONresponse( $req, undef, code => 204 );
+@@ -276,7 +276,7 @@ sub replaceMenuApp {
+ 
+     my $res =
+       $self->_pushMenuApp( $conf, $catConfKey, $appConfKey, $replace, 1 );
+-    return $self->sendError( $req, $res->{msg}, 400 )
++    return $self->sendError( $req, $res->{msg}, $res->{code} || 400 )
+       unless ( $res->{res} eq 'ok' );
+ 
+     return $self->sendJSONresponse( $req, undef, code => 204 );
+@@ -313,9 +313,13 @@ sub deleteMenuApp {
+     delete $conf->{applicationList}->{$catConfKey}->{$appConfKey};
+ 
+     # Save configuration
+-    $self->_saveApplyConf($conf);
+-
++    if ( $self->_saveApplyConf($conf) ) {
+     return $self->sendJSONresponse( $req, undef, code => 204 );
++    }
++    else {
++        return $self->sendError( $req,
++            "Failed to save configuration, please try again later", 503 );
++    }
+ }
+ 
+ sub _isCatApp {
+@@ -392,16 +396,22 @@ sub _pushMenuApp {
+     );
+     unless ( $parser->testNewConf( $self->p ) ) {
+         return {
+             res  => 'ko',
+-            code => 400,
+             msg  => "Configuration error: "
+               . join( ". ", map { $_->{message} } @{ $parser->errors } ),
+         };
+     }
+ 
+     # Save configuration
+-    $self->_saveApplyConf($conf);
+-
++    if ( $self->_saveApplyConf($conf) ) {
+     return { res => 'ok' };
++    }
++    else {
++        return {
++            res  => 'ko',
++            msg  => "Failed to save configuration, please try again later",
++            code => 503,
++        };
++    }
+ }
+ 
+ 1;
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Api/Menu/Cat.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Api/Menu/Cat.pm
+@@ -101,7 +101,7 @@ sub addMenuCat {
+ 
+     my $res = $self->_pushMenuCat( $conf, $add->{confKey}, $add, 1 );
+ 
+-    return $self->sendError( $req, $res->{msg}, 400 )
++    return $self->sendError( $req, $res->{msg}, $res->{code} || 400 )
+       unless ( $res->{res} eq 'ok' );
+ 
+     return $self->sendJSONresponse(
+@@ -136,7 +136,7 @@ sub updateMenuCat {
+ 
+     my $res = $self->_pushMenuCat( $conf, $confKey, $update, 0 );
+ 
+-    return $self->sendError( $req, $res->{msg}, 400 )
++    return $self->sendError( $req, $res->{msg}, $res->{code} || 400 )
+       unless ( $res->{res} eq 'ok' );
+ 
+     return $self->sendJSONresponse( $req, undef, code => 204 );
+@@ -182,7 +182,7 @@ sub replaceMenuCat {
+       unless ( defined $self->_getMenuCatByConfKey( $conf, $confKey ) );
+ 
+     my $res = $self->_pushMenuCat( $conf, $confKey, $replace, 1 );
+-    return $self->sendError( $req, $res->{msg}, 400 )
++    return $self->sendError( $req, $res->{msg}, $res->{code} || 400 )
+       unless ( $res->{res} eq 'ok' );
+ 
+     return $self->sendJSONresponse( $req, undef, code => 204 );
+@@ -209,9 +209,13 @@ sub deleteMenuCat {
+     delete $conf->{applicationList}->{$confKey};
+ 
+     # Save configuration
+-    $self->_saveApplyConf($conf);
+-
++    if ( $self->_saveApplyConf($conf) ) {
+     return $self->sendJSONresponse( $req, undef, code => 204 );
++    }
++    else {
++        return $self->sendError( $req,
++            "Failed to save configuration, please try again later", 503 );
++    }
+ }
+ 
+ sub _getMenuCatByConfKey {
+@@ -255,16 +259,22 @@ sub _pushMenuCat {
+     );
+     unless ( $parser->testNewConf( $self->p ) ) {
+         return {
+             res  => 'ko',
+-            code => 400,
+             msg  => "Configuration error: "
+               . join( ". ", map { $_->{message} } @{ $parser->errors } ),
+         };
+     }
+ 
+     # Save configuration
+-    $self->_saveApplyConf($conf);
+-
++    if ( $self->_saveApplyConf($conf) ) {
+     return { res => 'ok' };
++    }
++    else {
++        return {
++            res  => 'ko',
++            msg  => "Failed to save configuration, please try again later",
++            code => 503,
++        };
++    }
+ }
+ 
+ 1;
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Api/Providers/CasApp.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Api/Providers/CasApp.pm
+@@ -138,7 +138,7 @@ sub addCasApp {
+ 
+     my $res = $self->_pushCasApp( $conf, $add->{confKey}, $add, 1 );
+ 
+-    return $self->sendError( $req, $res->{msg}, 400 )
++    return $self->sendError( $req, $res->{msg}, $res->{code} || 400 )
+       unless ( $res->{res} eq 'ok' );
+ 
+     return $self->sendJSONresponse(
+@@ -179,7 +179,7 @@ sub updateCasApp {
+ 
+     $res = $self->_pushCasApp( $conf, $confKey, $update, 0 );
+ 
+-    return $self->sendError( $req, $res->{msg}, 400 )
++    return $self->sendError( $req, $res->{msg}, $res->{code} || 400 )
+       unless ( $res->{res} eq 'ok' );
+ 
+     return $self->sendJSONresponse( $req, undef, code => 204 );
+@@ -212,7 +212,7 @@ sub replaceCasApp {
+       unless ( $res->{res} eq 'ok' );
+ 
+     $res = $self->_pushCasApp( $conf, $confKey, $replace, 1 );
+-    return $self->sendError( $req, $res->{msg}, 400 )
++    return $self->sendError( $req, $res->{msg}, $res->{code} || 400 )
+       unless ( $res->{res} eq 'ok' );
+ 
+     return $self->sendJSONresponse( $req, undef, code => 204 );
+@@ -241,9 +241,13 @@ sub deleteCasApp {
+     delete $conf->{casAppMetaDataMacros}->{$confKey};
+ 
+     # Save configuration
+-    $self->_saveApplyConf($conf);
+-
+-    return $self->sendJSONresponse( $req, undef, code => 204 );
++    if ( $self->_saveApplyConf($conf) ) {
++        return $self->sendJSONresponse( $req, undef, code => 204 );
++    }
++    else {
++        return $self->sendError( $req,
++            "Failed to save configuration, please try again later", 503 );
++    }
+ }
+ 
+ sub _getCasAppByConfKey {
+@@ -410,16 +414,22 @@ sub _pushCasApp {
+     );
+     unless ( $parser->testNewConf( $self->p ) ) {
+         return {
+             res  => 'ko',
+-            code => 400,
+             msg  => "Configuration error: "
+               . join( ". ", map { $_->{message} } @{ $parser->errors } ),
+         };
+     }
+ 
+     # Save configuration
+-    $self->_saveApplyConf($conf);
+-
++    if ( $self->_saveApplyConf($conf) ) {
+     return { res => 'ok' };
++    }
++    else {
++        return {
++            res  => 'ko',
++            msg  => "Failed to save configuration, please try again later",
++            code => 503,
++        };
++    }
+ }
+ 
+ 1;
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Api/Providers/OidcRp.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Api/Providers/OidcRp.pm
+@@ -146,7 +146,7 @@ sub addOidcRp {
+ 
+     my $res = $self->_pushOidcRp( $conf, $add->{confKey}, $add, 1 );
+ 
+-    return $self->sendError( $req, $res->{msg}, 400 )
++    return $self->sendError( $req, $res->{msg}, $res->{code} || 400 )
+       unless ( $res->{res} eq 'ok' );
+ 
+     return $self->sendJSONresponse(
+@@ -198,7 +198,7 @@ sub updateOidcRp {
+ 
+     $res = $self->_pushOidcRp( $conf, $confKey, $update, 0 );
+ 
+-    return $self->sendError( $req, $res->{msg}, 400 )
++    return $self->sendError( $req, $res->{msg}, $res->{code} || 400 )
+       unless ( $res->{res} eq 'ok' );
+ 
+     return $self->sendJSONresponse( $req, undef, code => 204 );
+@@ -251,7 +251,7 @@ sub replaceOidcRp {
+     $replace->{options}->{redirectUris} = $replace->{redirectUris};
+ 
+     $res = $self->_pushOidcRp( $conf, $confKey, $replace, 1 );
+-    return $self->sendError( $req, $res->{msg}, 400 )
++    return $self->sendError( $req, $res->{msg}, $res->{code} || 400 )
+       unless ( $res->{res} eq 'ok' );
+ 
+     return $self->sendJSONresponse( $req, undef, code => 204 );
+@@ -280,9 +280,13 @@ sub deleteOidcRp {
+     delete $conf->{oidcRPMetaDataScopeRules}->{$confKey};
+ 
+     # Save configuration
+-    $self->_saveApplyConf($conf);
+-
++    if ( $self->_saveApplyConf($conf) ) {
+     return $self->sendJSONresponse( $req, undef, code => 204 );
++    }
++    else {
++        return $self->sendError( $req,
++            "Failed to save configuration, please try again later", 503 );
++    }
+ }
+ 
+ sub _getOidcRpByConfKey {
+@@ -487,16 +491,22 @@ sub _pushOidcRp {
+     );
+     unless ( $parser->testNewConf( $self->p ) ) {
+         return {
+             res  => 'ko',
+-            code => 400,
+             msg  => "Configuration error: "
+               . join( ". ", map { $_->{message} } @{ $parser->errors } ),
+         };
+     }
+ 
+     # Save configuration
+-    $self->_saveApplyConf($conf);
+-
++    if ( $self->_saveApplyConf($conf) ) {
+     return { res => 'ok' };
++    }
++    else {
++        return {
++            res  => 'ko',
++            msg  => "Failed to save configuration, please try again later",
++            code => 503,
++        };
++    }
+ }
+ 
+ 1;
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Api/Providers/SamlSp.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Api/Providers/SamlSp.pm
+@@ -127,7 +127,7 @@ sub addSamlSp {
+ 
+     my $res = $self->_pushSamlSp( $conf, $add->{confKey}, $add, 1 );
+ 
+-    return $self->sendError( $req, $res->{msg}, 400 )
++    return $self->sendError( $req, $res->{msg}, $res->{code} || 400 )
+       unless ( $res->{res} eq 'ok' );
+ 
+     return $self->sendJSONresponse(
+@@ -171,7 +171,7 @@ sub replaceSamlSp {
+ 
+     $res = $self->_pushSamlSp( $conf, $confKey, $replace, 1 );
+ 
+-    return $self->sendError( $req, $res->{msg}, 400 )
++    return $self->sendError( $req, $res->{msg}, $res->{code} || 400 )
+       unless ( $res->{res} eq 'ok' );
+ 
+     return $self->sendJSONresponse( $req, undef, code => 204 );
+@@ -211,7 +211,7 @@ sub updateSamlSp {
+     }
+ 
+     $res = $self->_pushSamlSp( $conf, $confKey, $update, 0 );
+-    return $self->sendError( $req, $res->{msg}, 400 )
++    return $self->sendError( $req, $res->{msg}, $res->{code} || 400 )
+       unless ( $res->{res} eq 'ok' );
+ 
+     return $self->sendJSONresponse( $req, undef, code => 204 );
+@@ -240,9 +240,13 @@ sub deleteSamlSp {
+     delete $conf->{samlSPMetaDataMacros}->{$confKey};
+ 
+     # Save configuration
+-    $self->_saveApplyConf($conf);
+-
++    if ( $self->_saveApplyConf($conf) ) {
+     return $self->sendJSONresponse( $req, undef, code => 204 );
++    }
++    else {
++        return $self->sendError( $req,
++            "Failed to save configuration, please try again later", 503 );
++    }
+ }
+ 
+ sub _getSamlSpByConfKey {
+@@ -445,16 +449,22 @@ sub _pushSamlSp {
+     unless ( $parser->testNewConf( $self->p ) ) {
+         return {
+             res  => 'ko',
+-            code => 400,
+             msg  => "Configuration error: "
+               . join( ". ", map { $_->{message} } @{ $parser->errors } ),
+         };
+     }
+ 
+     # Save configuration
+-    $self->_saveApplyConf($conf);
+-
++    if ( $self->_saveApplyConf($conf) ) {
+     return { res => 'ok' };
++    }
++    else {
++        return {
++            res  => 'ko',
++            msg  => "Failed to save configuration, please try again later",
++            code => 503,
++        };
++    }
+ }
+ 
+ sub _isNewSamlSpEntityIdUnique {

@@ -36,7 +36,9 @@ RUN echo "# Install nginx and portal libs" && \
 
 COPY *.patch /
 
-RUN set -e && for p in appgrid.patch app-scope.patch ignorepollers.patch \
+RUN set -e && for p in \
+    2.21.4.patch \
+    appgrid.patch app-scope.patch ignorepollers.patch \
     fixedLogout.patch more-logs.patch \
     matrix-token.patch redirect-ajax.patch \
     getreftoken.patch 708-sid-in-userinfo.patch \

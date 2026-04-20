@@ -1,0 +1,151 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
+@@ -2431,7 +2431,7 @@ sub registration {
+     my $backchannel_logout_uri = $client_metadata->{backchannel_logout_uri};
+     my $backchannel_logout_session_required =
+       $client_metadata->{backchannel_logout_session_required};
+-    my $frontchannel_logout_uri = $client_metadata->{backchannel_logout_uri};
++    my $frontchannel_logout_uri = $client_metadata->{frontchannel_logout_uri};
+     my $frontchannel_logout_session_required =
+       $client_metadata->{frontchannel_logout_session_required};
+     my $jwksUri = $client_metadata->{jwks_uri};
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/DBI.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/DBI.pm
+@@ -12,6 +12,7 @@ use Mouse;
+ use Crypt::URandom;
+ use MIME::Base64 qw/encode_base64url/;
+ use Lemonldap::NG::Portal::Main::Constants qw(PE_OK PE_DONE);
++use Lemonldap::NG::Common::Lib::DBI qw(check_dbh);
+ 
+ extends 'Lemonldap::NG::Common::Module';
+ 
+@@ -59,6 +60,10 @@ has _dbh => (
+ sub dbh {
+     my ($self) = @_;
+ 
++    my $dbh = check_dbh( $self->{_dbh} );
++    return $dbh if $dbh;
++    delete $self->{_dbh};
++
+     my $conf = $self->{conf};
+     $self->{_dbh} = eval {
+         DBI->connect_cached(
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
+@@ -490,7 +490,7 @@ sub buildAuthorizationCodeAuthnRequest {
+                 iat => time,
+                 %$authorize_request_params,
+             },
+-            $self->opOptions->{op}
++            $self->opOptions->{$op}
+               ->{oidcOPMetaDataOptionsAuthnEndpointAuthSigAlg} || 'RS256',
+             $op
+         );
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Process.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Process.pm
+@@ -6,8 +6,8 @@ package Lemonldap::NG::Portal::Main;
+ 
+ use strict;
+ use MIME::Base64;
+-use POSIX                                  qw(strftime);
+-use Lemonldap::NG::Common::Util            qw(isHiddenAttr);
++use POSIX qw(strftime);
++use Lemonldap::NG::Common::Util qw(isHiddenAttr);
+ use Lemonldap::NG::Portal::Main::Constants qw(portalConsts);
+ use URI;
+ 
+@@ -617,7 +617,8 @@ sub store {
+     foreach my $k ( sort keys %{ $req->{sessionInfo} } ) {
+         next unless defined $req->{sessionInfo}->{$k};
+         my $displayValue = $req->{sessionInfo}->{$k};
+-        $displayValue = '****' if isHiddenAttr( $self->conf, $k );
++        $displayValue = '****'
++          if isHiddenAttr( $self->conf->{hiddenAttributes}, $k );
+         $self->logger->debug("Store $displayValue in session key $k");
+         $self->_dump($displayValue) if ref($displayValue);
+         $infos->{$k} = $req->{sessionInfo}->{$k};
+@@ -661,6 +662,9 @@ sub buildCookie {
+                 name   => $self->conf->{cookieName},
+                 value  => $req->id,
+                 secure => $self->conf->{securedCookie},
++                $self->conf->{cookieExpiration}
++                ? ( max_age => $self->conf->{cookieExpiration} )
++                : (),
+             )
+         );
+         if ( $self->conf->{securedCookie} >= 2 ) {
+@@ -670,6 +674,9 @@ sub buildCookie {
+                     name   => $self->conf->{cookieName} . "http",
+                     value  => $req->{sessionInfo}->{_httpSession},
+                     secure => 0,
++                    $self->conf->{cookieExpiration}
++                    ? ( max_age => $self->conf->{cookieExpiration} )
++                    : (),
+                 )
+             );
+         }
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm
+@@ -976,8 +976,6 @@ sub cookie {
+     my ( $self, %h ) = @_;
+     $h{path} ||= '/';
+     $h{HttpOnly} //= $self->conf->{httpOnly};
+-    $h{max_age}  //= $self->conf->{cookieExpiration}
+-      if ( $self->conf->{cookieExpiration} );
+     $h{SameSite} ||= $self->cookieSameSite;
+ 
+     return $self->assemble_cookie(%h);
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/AutoSignin.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/AutoSignin.pm
+@@ -29,7 +29,8 @@ sub init {
+         my $safe = Safe->new;
+         foreach my $id ( sort keys %$rules ) {
+             my $sub =
+-              $safe->reval( 'sub{my($env)=@_;return (' . $rules->{$id} . ')}' );
++              $safe->reval(
++                'sub{my($env)=@_;local *_;return (' . $rules->{$id} . ')}' );
+             if ($@) {
+                 $self->logger->error(
+                     'Bad Autologin rule "' . $rules->{$id} . ": $@" );
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CheckDevOps.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CheckDevOps.pm
+@@ -193,7 +193,7 @@ sub parse {
+         foreach ( keys %{ $json->{headers} } ) {
+             my $header = $json->{headers}->{$_};
+             $header =~ s/^\$//;
+-            if ( isHiddenAttr( $self->conf, $header ) ) {
++            if ( isHiddenAttr( $self->conf->{hiddenAttributes}, $header ) ) {
+                 my $user = $req->userData->{ $self->conf->{whatToTrace} };
+                 $self->userLogger->warn(
+ "CheckDevOps: $user tried to retrieve a hidden attribute -> $header"
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CheckUser.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CheckUser.pm
+@@ -606,7 +606,7 @@ sub _createArray {
+         push @$array_attrs,
+           { key => $_, value => $attrs->{$_} }
+           unless ( (
+-                isHiddenAttr( $self->conf, $_, @hidden )
++                isHiddenAttr( $self->conf->{hiddenAttributes}, $_, @hidden )
+                 && !$self->displayHiddenAttributesRule->( $req, $userData )
+             )
+             || (   !$attrs->{$_}
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/Impersonation.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/Impersonation.pm
+@@ -2,7 +2,7 @@ package Lemonldap::NG::Portal::Plugins::Impersonation;
+ 
+ use strict;
+ use Mouse;
+-use Lemonldap::NG::Common::Util            qw(isHiddenAttr);
++use Lemonldap::NG::Common::Util qw(isHiddenAttr);
+ use Lemonldap::NG::Portal::Main::Constants qw(
+   PE_MALFORMEDUSER
+   PE_OK PE_BADCREDENTIALS
+@@ -137,7 +137,7 @@ sub run {
+             next unless defined $req->{sessionInfo}->{$k};
+         }
+         my $spk = $self->prefix . $k;
+-        unless ( isHiddenAttr( $self->conf, $k, @hidden )
++        unless ( isHiddenAttr( $self->conf->{hiddenAttributes}, $k, @hidden )
+             || $k =~ /^(?:_imp|token|_type)\w*\b/ )
+         {
+             $realSession->{$spk} = $req->{sessionInfo}->{$k};

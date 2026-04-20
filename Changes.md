@@ -1,5 +1,8 @@
 # LTS 2.21.x Changes
 
+## v2.21.4-1 _(2026-04-20)_
+* Update to 2.21.4
+
 ## v2.21.3-4 _(2026-03-13)_
 * Rebuild with recents Debian updates (imagemagick)
 * Update Nginx configuration

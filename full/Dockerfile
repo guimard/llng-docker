@@ -22,6 +22,7 @@ COPY *.patch /
 
 RUN \
     set -e && for p in \
+	2.21.4.patch \
         ignorepollers.patch \
         fixedLogout.patch \
         matrix-token-exchange.patch \
