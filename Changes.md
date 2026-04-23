@@ -1,6 +1,6 @@
 # Changes
 
-## v2.22.0-1 _(dev)_
+## v2.22.3-1 _(dev)_
 * Use LLNG 2.22.0
 * Replace patches by Linagora store entries when exist
 * Import Crowdsec filter from 2.23.0
