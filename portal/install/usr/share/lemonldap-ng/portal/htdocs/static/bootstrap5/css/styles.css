@@ -12454,6 +12454,8 @@ div.actions button {
 }
 
 .navbar {
+  position: relative;
+  z-index: 1030;
   border-radius: var(--bs-border-radius-lg) var(--bs-border-radius-lg) 0 0;
 }
 
