@@ -1,1 +1,0 @@
-../bootstrap/./okta2fchoice.tpl

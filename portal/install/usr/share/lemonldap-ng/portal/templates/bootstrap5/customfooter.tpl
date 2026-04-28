@@ -1,1 +1,0 @@
-../bootstrap/./customfooter.tpl

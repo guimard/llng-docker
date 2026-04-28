@@ -1,1 +1,0 @@
-../bootstrap/./confirm.tpl

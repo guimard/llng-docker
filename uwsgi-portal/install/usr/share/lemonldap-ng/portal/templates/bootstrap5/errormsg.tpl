@@ -1,1 +1,0 @@
-../bootstrap/./errormsg.tpl

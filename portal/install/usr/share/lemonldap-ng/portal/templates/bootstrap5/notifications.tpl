@@ -1,1 +1,0 @@
-../bootstrap/./notifications.tpl

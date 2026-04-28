@@ -1,1 +1,0 @@
-../bootstrap/./2fwait.tpl

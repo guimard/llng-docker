@@ -1,1 +1,0 @@
-../bootstrap/./samlSpLogout.tpl

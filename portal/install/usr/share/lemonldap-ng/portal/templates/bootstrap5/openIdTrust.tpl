@@ -1,1 +1,0 @@
-../bootstrap/./openIdTrust.tpl

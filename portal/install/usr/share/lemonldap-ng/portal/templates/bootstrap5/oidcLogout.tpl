@@ -1,1 +1,0 @@
-../bootstrap/./oidcLogout.tpl

@@ -1,0 +1,12 @@
+#!/bin/bash
+
+cd /usr/share/lemonldap-ng/portal/templates/
+
+SKINS=$(ls | perl -ne 'print unless /^(common|bootstrap)$/')
+LIST=$(cd bootstrap && ls *.tpl)
+
+for skin in $SKINS; do
+	for file in $LIST; do
+		test -e $skin/$file || ln -s ../bootstrap/$file $skin/$file
+	done
+done

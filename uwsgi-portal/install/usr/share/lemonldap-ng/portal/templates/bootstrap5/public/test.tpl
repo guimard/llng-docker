@@ -1,1 +1,0 @@
-../../bootstrap/public/test.tpl
