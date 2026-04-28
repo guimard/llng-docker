@@ -1,0 +1,1 @@
+../bootstrap/./simpleInfo.tpl

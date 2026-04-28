@@ -8,6 +8,7 @@
 * Import #3596 fix
 * Enable autoLoader plugin
 * Install all plugins from https://linagora.github.io/lemonldap-ng-plugins
+* Default to bootstrap5
 
 ## v2.21.3-4 _(2026-03-13)_
 * Rebuild with recents Debian updates (imagemagick)

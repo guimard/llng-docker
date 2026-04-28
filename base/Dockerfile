@@ -120,6 +120,7 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     echo "## 946-enforce-onreload.patch" && patch -p1 <946-enforce-onreload.patch && \
     echo rm -f *.patch && \
     cd /usr/bin && \
+    perl -i -pe 's/bootstrap/bootstrap5/;s/"portalSkinBackground"\s*:\s*"[^"]+"/"portalSkinBackground":""/' /var/lib/lemonldap-ng/conf/lmConf-1.json && \
     ln -s /usr/local/lib/llng
 
 #COPY syslogopt.patch .

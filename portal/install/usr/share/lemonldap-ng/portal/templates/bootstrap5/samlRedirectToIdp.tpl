@@ -1,0 +1,1 @@
+../bootstrap/./samlRedirectToIdp.tpl

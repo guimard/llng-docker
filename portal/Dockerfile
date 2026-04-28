@@ -70,7 +70,10 @@ RUN set -e && for p in \
     2.23-oidc-hooks.patch \
     crowdsec-2.23.patch \
     autoloader.patch \
+    bootstrap5.patch \
     ; do echo patch $p && patch -p1 < $p || exit 1; done && \
+    rm -f /usr/share/lemonldap-ng/portal/htdocs/static/common/js/carousel.min.js && \
+    ln -s carousel.js /usr/share/lemonldap-ng/portal/htdocs/static/common/js/carousel.min.js && \
     cp -f /usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.js /usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.min.js && \
     rm -f *.patch && \
     find /usr/share/perl5/Lemonldap -name '*.orig' -delete && \

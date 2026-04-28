@@ -1,0 +1,1 @@
+../bootstrap/./webauthn2fcheck.tpl

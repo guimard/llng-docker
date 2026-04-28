@@ -1,0 +1,13 @@
+--- a/usr/share/lemonldap-ng/portal/htdocs/static/common/js/carousel.js
++++ b/usr/share/lemonldap-ng/portal/htdocs/static/common/js/carousel.js
+@@ -85,8 +85,8 @@
+       carouselIndicators.append(notificationIndicator);
+     });
+     // Append the carousel inner to the carousel container
+-    var previousButton = $("<a class=\"carousel-control-prev\" href=\"#carousel\" role=\"button\" data-slide=\"prev\">\n        <span class=\"carousel-control-prev-icon\" aria-hidden=\"true\"></span>\n        <span class=\"sr-only\">Previous</span>\n      </a>");
+-    var nextButton = $("<a class=\"carousel-control-next\" href=\"#carousel\" role=\"button\" data-slide=\"next\">\n    <span class=\"carousel-control-next-icon\" aria-hidden=\"true\"></span>\n    <span class=\"sr-only\">Next</span>\n  </a>");
++    var previousButton = $("<a class=\"carousel-control-prev\" href=\"#carousel\" role=\"button\" data-slide=\"prev\" data-bs-slide=\"prev\">\n        <span class=\"carousel-control-prev-icon\" aria-hidden=\"true\"></span>\n        <span class=\"sr-only visually-hidden\">Previous</span>\n      </a>");
++    var nextButton = $("<a class=\"carousel-control-next\" href=\"#carousel\" role=\"button\" data-slide=\"next\" data-bs-slide=\"next\">\n    <span class=\"carousel-control-next-icon\" aria-hidden=\"true\"></span>\n    <span class=\"sr-only visually-hidden\">Next</span>\n  </a>");
+     $("div.carousel").append(carouselIndicators, carouselInner, previousButton, nextButton);
+   });
+ 

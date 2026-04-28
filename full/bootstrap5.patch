@@ -1,0 +1,14 @@
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
+@@ -1127,7 +1127,10 @@ sub attributes {
+             type          => 'portalskin',
+             default       => 'bootstrap',
+             documentation => 'Name of portal skin',
+-            select        => [ { k => 'bootstrap', v => 'Bootstrap' }, ],
++            select        => [
++                { k => 'bootstrap',  v => 'Bootstrap' },
++                { k => 'bootstrap5', v => 'Bootstrap 5' },
++            ],
+         },
+         portalSkinBackground => {
+             type          => 'portalskinbackground',
