@@ -1,0 +1,184 @@
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
+@@ -1551,6 +1551,16 @@ sub attributes {
+             type          => 'text',
+             documentation => 'Crowdsec filters directory',
+         },
++        crowdsecMetricsEnabled => {
++            default       => 0,
++            type          => 'bool',
++            documentation => 'Enable CrowdSec usage-metrics push',
++        },
++        crowdsecMetricsInterval => {
++            default       => 60,
++            type          => 'int',
++            documentation => 'CrowdSec usage-metrics flush interval (seconds)',
++        },
+         crowdSecAgentResponseCode => {
+             type          => 'int',
+             default       => 404,
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Tree.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Tree.pm
+@@ -1259,6 +1259,8 @@ sub tree {
+                                                 'crowdsecAction',
+                                                 'crowdsecUrl',
+                                                 'crowdsecKey',
++                                                'crowdsecMetricsEnabled',
++                                                'crowdsecMetricsInterval',
+                                             ],
+                                         },
+                                         {
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json
+@@ -294,6 +294,8 @@
+ "crowdsecKey":"مفتاح أل API",
+ "crowdsecMachineId":"Crowdsec agent ID",
+ "crowdsecMaxFailures":"Max failures allowed during delay",
++"crowdsecMetricsEnabled":"Enable CrowdSec usage-metrics",
++"crowdsecMetricsInterval":"Usage-metrics flush interval (s)",
+ "crowdsecPassword":"كلمة المرور",
+ "crowdsecUrl":"Base URL of local API",
+ "cspConnect":"وجهات أجاكس",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json
+@@ -294,6 +294,8 @@
+ "crowdsecKey":"API key",
+ "crowdsecMachineId":"Crowdsec agent ID",
+ "crowdsecMaxFailures":"Max failures allowed during delay",
++"crowdsecMetricsEnabled":"Enable CrowdSec usage-metrics",
++"crowdsecMetricsInterval":"Usage-metrics flush interval (s)",
+ "crowdsecPassword":"Password",
+ "crowdsecUrl":"Base URL of local API",
+ "cspConnect":"Ajax destinations",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json
+@@ -294,6 +294,8 @@
+ "crowdsecKey":"Clave API",
+ "crowdsecMachineId":"Crowdsec agent ID",
+ "crowdsecMaxFailures":"Max failures allowed during delay",
++"crowdsecMetricsEnabled":"Enable CrowdSec usage-metrics",
++"crowdsecMetricsInterval":"Usage-metrics flush interval (s)",
+ "crowdsecPassword":"Contraseña",
+ "crowdsecUrl":"Base URL of local API",
+ "cspConnect":"Destinos Ajax",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json
+@@ -294,6 +294,8 @@
+ "crowdsecKey":"Clef de l'API",
+ "crowdsecMachineId":"ID de l'agent Crowdsec",
+ "crowdsecMaxFailures":"Nombre maximal d'échecs autorisés dans le délai",
++"crowdsecMetricsEnabled":"Activer les métriques CrowdSec",
++"crowdsecMetricsInterval":"Intervalle d'envoi des métriques (s)",
+ "crowdsecPassword":"Mot de passe",
+ "crowdsecUrl":"URL de base de l'API locale",
+ "cspConnect":"Destinations des requêtes AJAX",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json
+@@ -294,6 +294,8 @@
+ "crowdsecKey":"מפתח API",
+ "crowdsecMachineId":"Crowdsec agent ID",
+ "crowdsecMaxFailures":"Max failures allowed during delay",
++"crowdsecMetricsEnabled":"Enable CrowdSec usage-metrics",
++"crowdsecMetricsInterval":"Usage-metrics flush interval (s)",
+ "crowdsecPassword":"סיסמה",
+ "crowdsecUrl":"כתובת בסיס ל־API המקומי",
+ "cspConnect":"יעדי Ajax",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json
+@@ -294,6 +294,8 @@
+ "crowdsecKey":"Chiave API",
+ "crowdsecMachineId":"Crowdsec agent ID",
+ "crowdsecMaxFailures":"Max failures allowed during delay",
++"crowdsecMetricsEnabled":"Enable CrowdSec usage-metrics",
++"crowdsecMetricsInterval":"Usage-metrics flush interval (s)",
+ "crowdsecPassword":"Password",
+ "crowdsecUrl":"Base URL of local API",
+ "cspConnect":"Destinazioni Ajax",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json
+@@ -294,6 +294,8 @@
+ "crowdsecKey":"Klucz API",
+ "crowdsecMachineId":"Crowdsec agent ID",
+ "crowdsecMaxFailures":"Max failures allowed during delay",
++"crowdsecMetricsEnabled":"Enable CrowdSec usage-metrics",
++"crowdsecMetricsInterval":"Usage-metrics flush interval (s)",
+ "crowdsecPassword":"Hasło",
+ "crowdsecUrl":"Podstawowy adres URL lokalnego API",
+ "cspConnect":"Miejsca docelowe Ajax",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json
+@@ -294,6 +294,8 @@
+ "crowdsecKey":"Chave de API",
+ "crowdsecMachineId":"Crowdsec agent ID",
+ "crowdsecMaxFailures":"Max failures allowed during delay",
++"crowdsecMetricsEnabled":"Enable CrowdSec usage-metrics",
++"crowdsecMetricsInterval":"Usage-metrics flush interval (s)",
+ "crowdsecPassword":"Senha",
+ "crowdsecUrl":"URL base da API local",
+ "cspConnect":"Destinos AJAX",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json
+@@ -294,6 +294,8 @@
+ "crowdsecKey":"Chave de API",
+ "crowdsecMachineId":"Crowdsec agent ID",
+ "crowdsecMaxFailures":"Max failures allowed during delay",
++"crowdsecMetricsEnabled":"Enable CrowdSec usage-metrics",
++"crowdsecMetricsInterval":"Usage-metrics flush interval (s)",
+ "crowdsecPassword":"Senha",
+ "crowdsecUrl":"URL base da API local",
+ "cspConnect":"Destinos AJAX",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json
+@@ -294,6 +294,8 @@
+ "crowdsecKey":"Ключ API",
+ "crowdsecMachineId":"Crowdsec agent ID",
+ "crowdsecMaxFailures":"Max failures allowed during delay",
++"crowdsecMetricsEnabled":"Enable CrowdSec usage-metrics",
++"crowdsecMetricsInterval":"Usage-metrics flush interval (s)",
+ "crowdsecPassword":"Пароль",
+ "crowdsecUrl":"Базовый URL локального API",
+ "cspConnect":"Ajax-адресаты",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json
+@@ -294,6 +294,8 @@
+ "crowdsecKey":"API anahtarı",
+ "crowdsecMachineId":"Crowdsec agent ID",
+ "crowdsecMaxFailures":"Max failures allowed during delay",
++"crowdsecMetricsEnabled":"Enable CrowdSec usage-metrics",
++"crowdsecMetricsInterval":"Usage-metrics flush interval (s)",
+ "crowdsecPassword":"Parola",
+ "crowdsecUrl":"Yerel API'nin temel URL'si",
+ "cspConnect":"Ajax hedefleri",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json
+@@ -294,6 +294,8 @@
+ "crowdsecKey":"khóa API",
+ "crowdsecMachineId":"Crowdsec agent ID",
+ "crowdsecMaxFailures":"Max failures allowed during delay",
++"crowdsecMetricsEnabled":"Enable CrowdSec usage-metrics",
++"crowdsecMetricsInterval":"Usage-metrics flush interval (s)",
+ "crowdsecPassword":"Mật khẩu",
+ "crowdsecUrl":"URL cơ sở của API cục bộ",
+ "cspConnect":"Đích cúa Ajax",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json
+@@ -294,6 +294,8 @@
+ "crowdsecKey":"API 金鑰",
+ "crowdsecMachineId":"Crowdsec agent ID",
+ "crowdsecMaxFailures":"Max failures allowed during delay",
++"crowdsecMetricsEnabled":"Enable CrowdSec usage-metrics",
++"crowdsecMetricsInterval":"Usage-metrics flush interval (s)",
+ "crowdsecPassword":"密码",
+ "crowdsecUrl":"Base URL of local API",
+ "cspConnect":"Ajax 目的地",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json
+@@ -294,6 +294,8 @@
+ "crowdsecKey":"API 金鑰",
+ "crowdsecMachineId":"Crowdsec agent ID",
+ "crowdsecMaxFailures":"Max failures allowed during delay",
++"crowdsecMetricsEnabled":"Enable CrowdSec usage-metrics",
++"crowdsecMetricsInterval":"Usage-metrics flush interval (s)",
+ "crowdsecPassword":"密碼",
+ "crowdsecUrl":"Base URL of local API",
+ "cspConnect":"Ajax 目的地",

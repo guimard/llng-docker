@@ -1,0 +1,127 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/CrowdSec.pm
+@@ -40,6 +40,13 @@ has ua => (
+ has token    => ( is => 'rw' );
+ has tokenExp => ( is => 'rw', default => 0 );
+ 
++has _metricsCounters => (
++    is      => 'rw',
++    default => sub { { processed => 0, last_flush => time } },
++);
++has _droppedByOrigin => ( is => 'rw', default => sub { {} } );
++has _startupTime     => ( is => 'rw' );
++
+ has crowdsecUrl => ( is => 'rw' );
+ 
+ sub _init {
+@@ -54,6 +61,7 @@ sub _init {
+             "crowdsecUrl isn't set, fallback to http://localhost:8080");
+         $self->crowdsecUrl('http://localhost:8080');
+     }
++    $self->_startupTime(time);
+     return 1;
+ }
+ 
+@@ -92,7 +100,8 @@ sub bouncer {
+                 return ( 0,
+                         "$ip banned by CrowdSec ('"
+                       . $decision->{scenario}
+-                      . "' for $decision->{duration})" );
++                      . "' for $decision->{duration})",
++                    $decision );
+             }
+         }
+         $self->userLogger->info("$ip not banned by CrowdSec");
+@@ -441,4 +450,78 @@ sub getToken {
+     return $self->token( $json->{token} );
+ }
+ 
++sub _recordRequest {
++    my ( $self, $ip, $banDecision ) = @_;
++    return if defined $self->conf->{crowdsecMetricsEnabled} and !$self->conf->{crowdsecMetricsEnabled};
++    $self->_metricsCounters->{processed}++;
++    if ($banDecision) {
++        my $origin  = $banDecision->{origin} || 'unknown';
++        my $ip_type =
++          ( $ip && index( $ip, ':' ) >= 0 ) ? 'ipv6' : 'ipv4';
++        $self->_droppedByOrigin->{"$origin|$ip_type"}++;
++    }
++    my $interval = $self->conf->{crowdsecMetricsInterval} || 60;
++    $self->_flushMetrics
++      if time - $self->_metricsCounters->{last_flush} >= $interval;
++    return 1;
++}
++
++# Push usage-metrics to CrowdSec LAPI
++sub _flushMetrics {
++    my ($self) = @_;
++    my $now    = time;
++    my $proc   = $self->_metricsCounters->{processed};
++    my %drops  = %{ $self->_droppedByOrigin };
++    return unless $proc or %drops;
++
++    my $window = ( $now - $self->_metricsCounters->{last_flush} ) || 1;
++    my @items  = ( {
++        name   => 'processed',
++        value  => $proc,
++        labels => {},
++        unit   => 'request',
++    } );
++    for my $key ( keys %drops ) {
++        my ( $origin, $ip_type ) = split /\|/, $key, 2;
++        push @items, {
++            name   => 'dropped',
++            value  => $drops{$key},
++            labels => { origin => $origin, ip_type => $ip_type },
++            unit   => 'request',
++        };
++    }
++
++    my $payload = {
++        remediation_components => [ {
++            name    => 'llng',
++            type    => 'LLNG-CrowdsecAgent',
++            version => $VERSION,
++            feature_flags         => [],
++            utc_startup_timestamp => $self->_startupTime,
++            os                    => { name => $^O, version => '' },
++            metrics => [ {
++                meta => {
++                    utc_now_timestamp   => $now,
++                    window_size_seconds => $window,
++                },
++                items => \@items,
++            } ],
++        } ],
++    };
++
++    my $resp = $self->ua->post(
++        $self->crowdsecUrl . '/v1/usage-metrics',
++        'X-Api-Key'    => $self->conf->{crowdsecKey},
++        'Content-Type' => 'application/json',
++        Content        => to_json($payload),
++    );
++    if ( !$resp->is_success ) {
++        $self->logger->warn(
++            'Failed to push usage-metrics: ' . $resp->status_line );
++    }
++    $self->_metricsCounters( { processed => 0, last_flush => $now } );
++    $self->_droppedByOrigin( {} );
++    return;
++}
++
+ 1;
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CrowdSec.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CrowdSec.pm
+@@ -39,7 +39,8 @@ sub checkCrowdsec {
+         return $sub->($req);
+     }
+     my $ip = $req->address;
+-    my ( $ok, $err ) = $self->bouncer($ip);
++    my ( $ok, $err, $decision ) = $self->bouncer($ip);
++    $self->_recordRequest( $ip, $ok ? undef : $decision );
+ 
+     # bouncer() answer $ok=0 only when Crowdsec response rejects the given IP
+     return $sub->($req)
+new file mode 100644
+--- /dev/null

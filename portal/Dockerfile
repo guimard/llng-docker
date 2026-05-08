@@ -72,6 +72,7 @@ RUN set -e && for p in \
     874-geoip.patch \
     2.23-oidc-hooks.patch \
     crowdsec-2.23.patch \
+    crowdsec-stats.patch \
     autoloader.patch \
     bootstrap5.patch \
     ; do echo patch $p && patch -p1 < $p || exit 1; done && \
