@@ -19,7 +19,9 @@ RUN echo "# Install nginx and manager libs" && \
       libconvert-base32-perl libio-string-perl libipc-run-perl \
       libgd-securityimage-perl libmime-tools-perl libnet-ldap-perl \
       libio-socket-timeout-perl libunicode-string-perl \
-      libio-string-perl libregexp-assemble-perl apache2-utils
+      libio-string-perl libregexp-assemble-perl apache2-utils \
+      linagora-llng-build-manager-files \
+      linagora-lemonldap-ng-store
 RUN apt-get -y -o Dpkg::Options::="--force-confold" install \
       linagora-lemonldap-ng-plugin-captchetat \
       linagora-lemonldap-ng-plugin-external-menu \
@@ -33,6 +35,7 @@ RUN apt-get -y -o Dpkg::Options::="--force-confold" install \
       linagora-lemonldap-ng-plugin-oidc-device-organization \
       linagora-lemonldap-ng-plugin-oidc-federation \
       linagora-lemonldap-ng-plugin-oidc-global-scopes \
+      linagora-lemonldap-ng-plugin-oidc-grant-management \
       linagora-lemonldap-ng-plugin-oidc-jar \
       linagora-lemonldap-ng-plugin-oidc-jarm \
       linagora-lemonldap-ng-plugin-oidc-par \
@@ -45,8 +48,6 @@ RUN apt-get -y -o Dpkg::Options::="--force-confold" install \
       linagora-lemonldap-ng-plugin-ssh-ca \
       linagora-lemonldap-ng-plugin-twake \
       linagora-lemonldap-ng-plugin-vault-conf-backend \
-      linagora-lemonldap-ng-store \
-      linagora-llng-build-manager-files \
       linagora-llng-crowdsec-filters \
       open-bastion-plugins \
       && \

@@ -28,7 +28,8 @@ RUN echo "# Install nginx and portal libs" && \
       libcrypt-jwt-perl libdigest-hmac-perl libdata-password-zxcvbn-perl \
       libhttp-browserdetect-perl libnet-dns-perl \
       uwsgi uwsgi-plugin-psgi \
-      openssh-client
+      openssh-client \
+      linagora-lemonldap-ng-store
 RUN apt-get -y -o Dpkg::Options::="--force-confold" install \
       linagora-lemonldap-ng-plugin-captchetat \
       linagora-lemonldap-ng-plugin-external-menu \
@@ -42,6 +43,7 @@ RUN apt-get -y -o Dpkg::Options::="--force-confold" install \
       linagora-lemonldap-ng-plugin-oidc-device-organization \
       linagora-lemonldap-ng-plugin-oidc-federation \
       linagora-lemonldap-ng-plugin-oidc-global-scopes \
+      linagora-lemonldap-ng-plugin-oidc-grant-management \
       linagora-lemonldap-ng-plugin-oidc-jar \
       linagora-lemonldap-ng-plugin-oidc-jarm \
       linagora-lemonldap-ng-plugin-oidc-par \
@@ -54,7 +56,6 @@ RUN apt-get -y -o Dpkg::Options::="--force-confold" install \
       linagora-lemonldap-ng-plugin-ssh-ca \
       linagora-lemonldap-ng-plugin-twake \
       linagora-lemonldap-ng-plugin-vault-conf-backend \
-      linagora-lemonldap-ng-store \
       linagora-llng-crowdsec-filters \
       open-bastion-plugins \
       && \
