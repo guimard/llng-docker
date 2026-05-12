@@ -47,7 +47,6 @@ RUN apt-get -y -o Dpkg::Options::="--force-confold" install \
       linagora-lemonldap-ng-plugin-oidc-jar \
       linagora-lemonldap-ng-plugin-oidc-jarm \
       linagora-lemonldap-ng-plugin-oidc-par \
-      linagora-lemonldap-ng-plugin-oidc-resource-indicators \
       linagora-lemonldap-ng-plugin-oidc-scope-applications \
       linagora-lemonldap-ng-plugin-pacc \
       linagora-lemonldap-ng-plugin-pam-access \
