@@ -30,7 +30,6 @@ RUN apt-get -y -o Dpkg::Options::="--force-confold" install \
       linagora-lemonldap-ng-plugin-mail-autodiscover \
       linagora-lemonldap-ng-plugin-matrix-token-exchange \
       linagora-lemonldap-ng-plugin-oidc-acr-claims \
-      linagora-lemonldap-ng-plugin-oidc-ciba \
       linagora-lemonldap-ng-plugin-oidc-device-authorization \
       linagora-lemonldap-ng-plugin-oidc-device-organization \
       linagora-lemonldap-ng-plugin-oidc-federation \
@@ -39,7 +38,6 @@ RUN apt-get -y -o Dpkg::Options::="--force-confold" install \
       linagora-lemonldap-ng-plugin-oidc-jar \
       linagora-lemonldap-ng-plugin-oidc-jarm \
       linagora-lemonldap-ng-plugin-oidc-par \
-      linagora-lemonldap-ng-plugin-oidc-rar \
       linagora-lemonldap-ng-plugin-oidc-resource-indicators \
       linagora-lemonldap-ng-plugin-oidc-scope-applications \
       linagora-lemonldap-ng-plugin-pacc \
