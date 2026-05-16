@@ -1,5 +1,8 @@
 # LTS 2.21.x Changes
 
+## v2.21.4-3 _(2026-05-16)_
+* Rebuild with Debian 13.4
+
 ## v2.21.4-2 _(2026-05-14)_
 * Import CVE-2026-8503 fix
 

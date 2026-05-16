@@ -95,7 +95,6 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     mkdir -p /var/lib/lemonldap-ng/cache && \
     chown www-data:www-data /var/lib/lemonldap-ng/cache && \
     chmod 750 /var/lib/lemonldap-ng/cache && \
-    echo "# 2.21.4.patch " && patch -p1 < 2.21.4.patch && \
     echo "# patch 724-webpubsub.patch" && patch -p1 < 724-webpubsub.patch && \
     echo "# 769-loki.patch" && patch -p1 <769-loki.patch && \
     echo "# 784-Crowdsec.patch" && patch -p1 < 784-Crowdsec.patch && \
