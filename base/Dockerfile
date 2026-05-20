@@ -118,6 +118,7 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     perl -i -pe 's/\r//g' /usr/share/perl5/Lemonldap/NG/Common/Conf/DefaultValues.pm && \
     echo "## oidc-hooks.patch" && patch -p1 <oidc-hooks.patch && \
     echo "## 946-enforce-onreload.patch" && patch -p1 <946-enforce-onreload.patch && \
+    echo "## conf-cache.patch" && patch -p1 <conf-cache.patch && \
     echo rm -f *.patch && \
     cd /usr/bin && \
     perl -i -pe 's/bootstrap/bootstrap5/;s/"portalSkinBackground"\s*:\s*"[^"]+"/"portalSkinBackground":""/' /var/lib/lemonldap-ng/conf/lmConf-1.json && \
