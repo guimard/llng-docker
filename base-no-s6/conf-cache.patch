@@ -1,0 +1,59 @@
+--- a/usr/share/perl5/Lemonldap/NG/Common/Conf.pm
++++ b/usr/share/perl5/Lemonldap/NG/Common/Conf.pm
+@@ -125,7 +125,9 @@ sub new {
+ sub saveConf {
+     my ( $self, $conf, %args ) = @_;
+ 
+-    my $last = $self->lastCfg;
++    # noCache => 1 disables the localStorage fallback in lastCfg, so a stale
++    # cached cfgNum cannot let us overwrite a newer central configuration.
++    my $last = $self->lastCfg( { noCache => 1 } );
+ 
+     # If configuration was modified, return an error
+     if ( not $args{force} ) {
+@@ -220,7 +222,7 @@ sub getConf {
+     # Check cfgNum in conf backend
+     # Get conf in backend only if a newer configuration is available
+     else {
+-        $cfgNum ||= $self->lastCfg;
++        $cfgNum ||= $self->lastCfg( { noCache => $noCache } );
+         unless ($cfgNum) {
+             $msg .= "Error: No configuration available in backend.\n";
+         }
+@@ -504,11 +506,33 @@ sub available {
+     return shift->_launch( 'available', @_ );
+ }
+ 
+-## @method int lastCfg()
++## @method int lastCfg(hashRef args)
+ # Call lastCfg() from the $self->{type} package.
+-# @return Number of the last configuration available
++#
++# When the backend call fails (returns undef/0) and a populated localStorage
++# is available, returns the cfgNum of the cached configuration except if
++# noCache is set.
++#
++# @param $args Optional hashRef, recognized keys: noCache
++# @return Number of the last configuration available, 0 on failure
+ sub lastCfg {
+-    return shift->_launch( 'lastCfg', @_ ) || 0;
++    my ( $self, $args ) = @_;
++    $args ||= {};
++    my $r = $self->_launch('lastCfg');
++    return $r if $r;
++
++    if ( !$args->{noCache} and ref( $self->{refLocalStorage} ) ) {
++        my $cached;
++        eval { $cached = $self->{refLocalStorage}->get('conf') };
++        $msg .= "Warn: $@\n" if $@;
++        if ( ref($cached) and $cached->{cfgNum} ) {
++            $msg .=
++                "lastCfg failed, falling back to cached configuration "
++              . "(cfgNum=$cached->{cfgNum}).\n";
++            return $cached->{cfgNum};
++        }
++    }
++    return 0;
+ }
+ 
+ ## @method boolean lock()
