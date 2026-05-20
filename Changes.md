@@ -2,6 +2,7 @@
 
 ## v2.21.4-4 _(2026-05-20)_
 * Use cached configuration when available if DB is down
+* Update Patroni driver
 
 ## v2.21.4-3 _(2026-05-16)_
 * Rebuild with Debian 13.4
