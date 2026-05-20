@@ -191,6 +191,16 @@ sub _invalidate_cluster_cache {
     return;
 }
 
+# Extract user-supplied host/port from a DSN, before _build_dsn rewrites it.
+# Returns ($host, $port) — either or both may be undef.
+sub _extract_host_port {
+    my ($dsn) = @_;
+    return ( undef, undef ) unless defined $dsn;
+    my ($host) = $dsn =~ /(?:^|;)\s*host=([^;]+)/i;
+    my ($port) = $dsn =~ /(?:^|;)\s*port=([^;]+)/i;
+    return ( $host, $port );
+}
+
 # Build DSN with host/port, cleaning up any existing host/port params
 sub _build_dsn {
     my ( $dsn, $host, $port ) = @_;
@@ -204,6 +214,35 @@ sub _build_dsn {
 
     # Append new host/port
     return "$dsn;host=$host;port=$port";
+}
+
+# Fallback connection used when Patroni cluster discovery fails.
+# Connects directly to the DSN-supplied host, detects its role via
+# pg_is_in_recovery(), and returns ($dbh, $role) — or () on failure.
+# Emits a warn() so the application notices the degraded state.
+sub _connect_fallback {
+    my ( $dsn, $host, $port, $user, $pass, $attr, $patroni_url ) = @_;
+    return unless $host;
+
+    my $fb_dsn = _build_dsn( $dsn, $host, $port // 5432 );
+    my $dbh    = DBI->connect( "dbi:Pg:$fb_dsn", $user, $pass,
+        { %{ $attr || {} }, RaiseError => 0, PrintError => 0 } );
+    return unless $dbh;
+
+    my $role = 'unknown';
+    eval {
+        my ($in_recovery) =
+          $dbh->selectrow_array('SELECT pg_is_in_recovery()');
+        $role =
+          defined($in_recovery) && $in_recovery ? 'replica' : 'leader';
+    };
+
+    warn sprintf(
+        "DBD::Patroni: cluster discovery failed for %s, falling back to DSN host %s as %s (degraded mode)\n",
+        $patroni_url // '?',
+        $host, $role
+    );
+    return ( $dbh, $role );
 }
 
 # Detect read-only queries
@@ -430,6 +469,31 @@ On connection failure, DBD::Patroni will:
 =item 3. Retry the failed operation
 
 =back
+
+=head1 FALLBACK HOST (DEGRADED MODE)
+
+If the DSN contains a C<host=> (and optionally C<port=>) parameter, it is
+used as an implicit fallback when the Patroni REST API cannot be reached
+(network partition, Patroni restart, etc.). In that case:
+
+=over 4
+
+=item * The driver connects directly to the DSN-supplied host.
+
+=item * C<SELECT pg_is_in_recovery()> is issued to detect whether that
+host is the leader or a replica; a C<warn()> is emitted.
+
+=item * That single connection is used for both reads and writes
+(degraded mode — no replica load balancing).
+
+=item * The next connection error triggers a rediscovery; if Patroni is
+reachable again, normal leader/replica routing is restored automatically.
+
+=back
+
+There is no opt-in flag: a C<host=> in the DSN previously had no effect
+(it was overwritten during cluster discovery), so this behavior is
+strictly additive.
 
 =head1 SEE ALSO
 
