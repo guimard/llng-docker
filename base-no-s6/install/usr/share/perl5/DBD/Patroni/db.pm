@@ -47,7 +47,28 @@ sub _rediscover_cluster {
         $config->{patroni_cache_ttl},
     );
 
+    # If Patroni is unreachable and the DSN had a host, fall back to it.
+    if ( !$leader && $config->{fallback_host} ) {
+        my ( $fb_dbh, $fb_role ) = DBD::Patroni::_connect_fallback(
+            $config->{dsn},     $config->{fallback_host},
+            $config->{fallback_port}, $config->{user},
+            $config->{pass},    $config->{attr},
+            $config->{patroni_url},
+        );
+        if ($fb_dbh) {
+            $dbh->{patroni_leader_dbh}  = $fb_dbh;
+            $dbh->{patroni_replica_dbh} = $fb_dbh;
+            $config->{degraded}      = 1;
+            $config->{degraded_role} = $fb_role;
+            return 1;
+        }
+    }
+
     return 0 unless $leader;
+
+    # Clear any previous degraded state — Patroni is back.
+    delete $config->{degraded};
+    delete $config->{degraded_role};
 
     # Rebuild leader DSN
     my $leader_dsn = DBD::Patroni::_build_dsn( $config->{dsn}, $leader->{host},

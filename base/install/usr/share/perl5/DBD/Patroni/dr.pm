@@ -70,10 +70,48 @@ sub connect {
         return;
     }
 
+    # Capture the user-supplied host/port (if any) before _build_dsn rewrites
+    # them — this is what we fall back to when cluster discovery fails.
+    my ( $fallback_host, $fallback_port ) =
+      DBD::Patroni::_extract_host_port($dsn);
+
     # Discover cluster (optionally via the driver-level shared cache)
     my ( $leader, @replicas ) =
       DBD::Patroni::_discover_cluster_cached( $patroni_url, $patroni_timeout,
         \%ssl_opts, $patroni_shared_cache, $patroni_cache_ttl );
+
+    # If discovery failed but the DSN provided a host, fall back to it.
+    if ( !$leader && $fallback_host ) {
+        my ( $fb_dbh, $fb_role ) =
+          DBD::Patroni::_connect_fallback( $dsn, $fallback_host,
+            $fallback_port, $user, $pass, $attr, $patroni_url );
+
+        if ($fb_dbh) {
+            my ( $outer, $dbh ) =
+              DBI::_new_dbh( $drh, { Name => $dsn } );
+            $dbh->{patroni_leader_dbh}  = $fb_dbh;
+            $dbh->{patroni_replica_dbh} = $fb_dbh;
+            $dbh->{patroni_config}      = {
+                dsn                  => $dsn,
+                user                 => $user,
+                pass                 => $pass,
+                attr                 => $attr,
+                patroni_url          => $patroni_url,
+                patroni_lb           => $patroni_lb,
+                patroni_timeout      => $patroni_timeout,
+                patroni_ssl_opts     => \%ssl_opts,
+                patroni_shared_cache => $patroni_shared_cache,
+                patroni_cache_ttl    => $patroni_cache_ttl,
+                fallback_host        => $fallback_host,
+                fallback_port        => $fallback_port,
+                degraded             => 1,
+                degraded_role        => $fb_role,
+            };
+            $dbh->STORE( Active     => 1 );
+            $dbh->STORE( AutoCommit => $fb_dbh->{AutoCommit} );
+            return $outer;
+        }
+    }
 
     unless ($leader) {
         $DBD::Patroni::errstr = "Cannot discover cluster from: $patroni_url";
@@ -131,6 +169,8 @@ sub connect {
         patroni_ssl_opts     => \%ssl_opts,
         patroni_shared_cache => $patroni_shared_cache,
         patroni_cache_ttl    => $patroni_cache_ttl,
+        fallback_host        => $fallback_host,
+        fallback_port        => $fallback_port,
     };
 
     # Copy attributes from leader handle
