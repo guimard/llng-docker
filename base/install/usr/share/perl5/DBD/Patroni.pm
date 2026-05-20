@@ -22,6 +22,11 @@ our $errstr  = '';       # DBI error string
 our $state   = '';       # DBI state
 our $rr_idx  = 0;        # Round-robin index for replica selection
 
+# Driver-level cluster discovery cache (opt-in via patroni_shared_cache).
+# Keyed by normalized patroni_url string. Each entry:
+#   { leader => \%member, replicas => \@members, expires_at => epoch }
+our %_cluster_cache;
+
 # Load submodules
 require DBD::Patroni::dr;
 require DBD::Patroni::db;
@@ -134,7 +139,7 @@ sub _parse_dsn {
     my @remaining;
 
     for my $part ( split /;/, $dsn ) {
-        if ( $part =~ /^(patroni_(?:url|lb|timeout|ssl_verify|ssl_ca_file|ssl_cert_file|ssl_key_file))=(.*)$/i ) {
+        if ( $part =~ /^(patroni_(?:url|lb|timeout|ssl_verify|ssl_ca_file|ssl_cert_file|ssl_key_file|shared_cache|cache_ttl))=(.*)$/i ) {
             $params{ lc($1) } = $2;
         }
         else {
@@ -143,6 +148,47 @@ sub _parse_dsn {
     }
 
     return ( join( ';', @remaining ), \%params );
+}
+
+# Build a normalized cache key from a patroni_url string (order-insensitive).
+sub _cache_key {
+    my ($urls) = @_;
+    return '' unless defined $urls;
+    return join( ',', sort grep { length } split /[,\s]+/, $urls );
+}
+
+# Discover cluster, optionally using the driver-level cache.
+# Returns (leader, @replicas) just like _discover_cluster.
+sub _discover_cluster_cached {
+    my ( $urls, $timeout, $ssl_opts, $use_cache, $ttl ) = @_;
+
+    if ($use_cache) {
+        my $key   = _cache_key($urls);
+        my $entry = $_cluster_cache{$key};
+        if ( $entry && $entry->{expires_at} > time ) {
+            return ( $entry->{leader}, @{ $entry->{replicas} } );
+        }
+
+        my ( $leader, @replicas ) =
+          _discover_cluster( $urls, $timeout, $ssl_opts );
+        if ($leader) {
+            $_cluster_cache{$key} = {
+                leader     => $leader,
+                replicas   => [@replicas],
+                expires_at => time + ( $ttl // 30 ),
+            };
+        }
+        return ( $leader, @replicas );
+    }
+
+    return _discover_cluster( $urls, $timeout, $ssl_opts );
+}
+
+# Drop a cached cluster entry (used after a connection failure).
+sub _invalidate_cluster_cache {
+    my ($urls) = @_;
+    delete $_cluster_cache{ _cache_key($urls) };
+    return;
 }
 
 # Build DSN with host/port, cleaning up any existing host/port params
@@ -336,6 +382,28 @@ Must be used together with C<patroni_ssl_key_file>.
 
 Path to a client private key file for Patroni API mutual TLS authentication.
 Must be used together with C<patroni_ssl_cert_file>.
+
+=item patroni_shared_cache
+
+Enable a process-wide cluster discovery cache shared by every DBD::Patroni
+handle that uses the same C<patroni_url>. Disabled by default (C<0>).
+Accepts: C<0>, C<1>, C<no>, C<yes>, C<off>, C<on>, C<false>, C<true>.
+
+When enabled, the first connection performs the HTTP discovery and stores
+the topology (leader + replicas) in C<%DBD::Patroni::_cluster_cache>.
+Subsequent connections to the same URL reuse the cached topology until
+C<patroni_cache_ttl> elapses, avoiding redundant calls to the Patroni REST
+API.
+
+The cache is also automatically invalidated whenever a connection error
+triggers a rediscovery — so a failover on one handle effectively refreshes
+the topology for every later handle. Handles that already hold live
+connections continue to use them until they themselves hit an error.
+
+=item patroni_cache_ttl
+
+Time-to-live (seconds) for entries in the shared cluster cache. Default: 30.
+Only used when C<patroni_shared_cache> is enabled.
 
 =back
 

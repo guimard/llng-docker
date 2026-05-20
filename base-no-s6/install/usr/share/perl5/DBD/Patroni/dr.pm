@@ -43,6 +43,16 @@ sub connect {
     my $patroni_ssl_key_file = delete $attr->{patroni_ssl_key_file}
       // $dsn_params->{patroni_ssl_key_file};
 
+    # Driver-level cluster discovery cache (opt-in, disabled by default).
+    my $patroni_shared_cache_raw = delete $attr->{patroni_shared_cache}
+      // $dsn_params->{patroni_shared_cache};
+    my $patroni_shared_cache =
+      defined($patroni_shared_cache_raw)
+      ? ( $patroni_shared_cache_raw =~ /^(1|yes|on|true)$/i ? 1 : 0 )
+      : 0;
+    my $patroni_cache_ttl = delete $attr->{patroni_cache_ttl}
+      // $dsn_params->{patroni_cache_ttl} // 30;
+
     # Build SSL options hash for _discover_cluster
     my %ssl_opts;
     if ( defined $patroni_ssl_verify ) {
@@ -60,10 +70,10 @@ sub connect {
         return;
     }
 
-    # Discover cluster
+    # Discover cluster (optionally via the driver-level shared cache)
     my ( $leader, @replicas ) =
-      DBD::Patroni::_discover_cluster( $patroni_url, $patroni_timeout,
-        \%ssl_opts );
+      DBD::Patroni::_discover_cluster_cached( $patroni_url, $patroni_timeout,
+        \%ssl_opts, $patroni_shared_cache, $patroni_cache_ttl );
 
     unless ($leader) {
         $DBD::Patroni::errstr = "Cannot discover cluster from: $patroni_url";
@@ -111,14 +121,16 @@ sub connect {
     $dbh->{patroni_leader_dbh}  = $leader_dbh;
     $dbh->{patroni_replica_dbh} = $replica_dbh;
     $dbh->{patroni_config}      = {
-        dsn              => $dsn,
-        user             => $user,
-        pass             => $pass,
-        attr             => $attr,
-        patroni_url      => $patroni_url,
-        patroni_lb       => $patroni_lb,
-        patroni_timeout  => $patroni_timeout,
-        patroni_ssl_opts => \%ssl_opts,
+        dsn                  => $dsn,
+        user                 => $user,
+        pass                 => $pass,
+        attr                 => $attr,
+        patroni_url          => $patroni_url,
+        patroni_lb           => $patroni_lb,
+        patroni_timeout      => $patroni_timeout,
+        patroni_ssl_opts     => \%ssl_opts,
+        patroni_shared_cache => $patroni_shared_cache,
+        patroni_cache_ttl    => $patroni_cache_ttl,
     };
 
     # Copy attributes from leader handle

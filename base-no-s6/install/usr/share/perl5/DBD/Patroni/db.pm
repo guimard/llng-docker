@@ -33,11 +33,18 @@ sub _rediscover_cluster {
         eval { $dbh->{patroni_replica_dbh}->disconnect };
     }
 
-    # Rediscover cluster
-    my ( $leader, @replicas ) = DBD::Patroni::_discover_cluster(
+    # A connection error means the cached cluster topology is likely stale —
+    # always drop it before rediscovering, even when the cache is enabled.
+    DBD::Patroni::_invalidate_cluster_cache( $config->{patroni_url} )
+      if $config->{patroni_shared_cache};
+
+    # Rediscover cluster (refills the shared cache if enabled)
+    my ( $leader, @replicas ) = DBD::Patroni::_discover_cluster_cached(
         $config->{patroni_url},
         $config->{patroni_timeout},
-        $config->{patroni_ssl_opts}
+        $config->{patroni_ssl_opts},
+        $config->{patroni_shared_cache},
+        $config->{patroni_cache_ttl},
     );
 
     return 0 unless $leader;
