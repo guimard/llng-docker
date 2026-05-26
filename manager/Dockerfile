@@ -48,6 +48,7 @@ RUN apt-get -y -o Dpkg::Options::="--force-confold" install \
       linagora-lemonldap-ng-plugin-twake \
       linagora-lemonldap-ng-plugin-vault-conf-backend \
       linagora-llng-crowdsec-filters \
+      linagora-lemonldap-ng-plugin-krb-provisioning \
       open-bastion-plugins \
       && \
     grep oidcRPMetaDataOptionsTokenXAuthorizedMatrix /usr/share/perl5/Lemonldap/NG/Manager/Attributes.pm && \
