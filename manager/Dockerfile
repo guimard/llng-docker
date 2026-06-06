@@ -20,10 +20,8 @@ RUN echo "# Install nginx and manager libs" && \
       libgd-securityimage-perl libmime-tools-perl libnet-ldap-perl \
       libio-socket-timeout-perl libunicode-string-perl \
       libio-string-perl libregexp-assemble-perl apache2-utils \
-      linagora-llng-build-manager-files \
       linagora-lemonldap-ng-store
 RUN apt-get -y -o Dpkg::Options::="--force-confold" install \
-      linagora-lemonldap-ng-plugin-external-menu \
       linagora-lemonldap-ng-plugin-fixed-logout-redirection \
       linagora-lemonldap-ng-plugin-json-file \
       linagora-lemonldap-ng-plugin-mail-autodiscover \
@@ -51,7 +49,6 @@ RUN apt-get -y -o Dpkg::Options::="--force-confold" install \
       linagora-lemonldap-ng-plugin-krb-provisioning \
       open-bastion-plugins \
       && \
-    grep oidcRPMetaDataOptionsTokenXAuthorizedMatrix /usr/share/perl5/Lemonldap/NG/Manager/Attributes.pm && \
     mv /etc/dpkg/dpkg.cfg.d /tmp/ && \
     apt-get -y --no-install-recommends install \
       lemonldap-ng-doc${LLNGDIST} && \
@@ -61,7 +58,6 @@ RUN apt-get -y -o Dpkg::Options::="--force-confold" install \
 COPY *.patch /
 
 RUN set -e && for p in \
-	better-cfgAuthor.patch \
 	bootstrap5.patch \
 	crowdsec-stats.patch \
     ; do echo patch $p && patch -p1 < $p || exit 1; done && \
@@ -75,7 +71,12 @@ COPY install /
 
 RUN echo "Regenerating manager files (in case of patches)" && \
     mkdir -p /usr/share/perl5/Lemonldap/NG/Portal/Main/ && \
+    echo "Fix llng-build-manager-files perl lib dir (workaround for debian/rules missing INSTALLSITELIB override)" && \
+    perl -i -pe 's#^my .DEFAULT_PERLLIBDIR\s*=.*#my \$DEFAULT_PERLLIBDIR = "/usr/share/perl5";#' \
+        /usr/share/lemonldap-ng/bin/llng-build-manager-files && \
+    export LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini && \
     /usr/share/lemonldap-ng/bin/lemonldap-ng-store rebuild && \
+    grep oidcRPMetaDataOptionsTokenXAuthorizedMatrix /usr/share/perl5/Lemonldap/NG/Manager/Attributes.pm && \
     echo "# Install nginx configuration files" && \
     rm -f /etc/nginx/sites-enabled/* && \
     ln -s ../../lemonldap-ng/manager-nginx.conf /etc/nginx/sites-enabled/ && \

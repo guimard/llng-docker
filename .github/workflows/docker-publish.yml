@@ -1,7 +1,7 @@
 name: Build and Publish Docker Images
 
 env:
-  VERSION: 2.22.3
+  VERSION: 2.23.0
   PGVERSION: 17
   DEBIANRELEASE: trixie
   DOCKERREVISION: 1

@@ -12,7 +12,6 @@ RUN echo "# Install nginx and portal and manager libs" && \
     apt-get -y upgrade && \
     apt-get -y --no-install-recommends install nginx \
       liblemonldap-ng-manager-perl${LLNGDIST} apache2-utils \
-      linagora-llng-build-manager-files \
     && \
     mv /etc/dpkg/dpkg.cfg.d /tmp/ && \
     apt-get -y --no-install-recommends install \
@@ -23,7 +22,6 @@ RUN echo "# Install nginx and portal and manager libs" && \
 COPY *.patch /
 
 RUN set -e && for p in \
-	better-cfgAuthor.patch \
 	bootstrap5.patch \
 	crowdsec-stats.patch \
     ; do echo patch $p && patch -p1 < $p || exit 1; done && \
@@ -36,6 +34,9 @@ RUN set -e && for p in \
 COPY install /
 
 RUN echo "Regenerating manager files (plugins installed in portal image)" && \
+    echo "Fix llng-build-manager-files perl lib dir (workaround for debian/rules missing INSTALLSITELIB override)" && \
+    perl -i -pe 's#^my .DEFAULT_PERLLIBDIR\s*=.*#my \$DEFAULT_PERLLIBDIR = "/usr/share/perl5";#' \
+        /usr/share/lemonldap-ng/bin/llng-build-manager-files && \
     export LLNG_DEFAULTCONFFILE=/etc/lemonldap-ng/lemonldap-ng.ini && \
     /usr/share/lemonldap-ng/bin/lemonldap-ng-store rebuild && \
     grep oidcRPMetaDataOptionsTokenXAuthorizedMatrix /usr/share/perl5/Lemonldap/NG/Manager/Attributes.pm && \

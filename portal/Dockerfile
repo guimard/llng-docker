@@ -32,7 +32,6 @@ RUN echo "# Install nginx and portal libs" && \
       openssh-client \
       linagora-lemonldap-ng-store
 RUN apt-get -y -o Dpkg::Options::="--force-confold" install \
-      linagora-lemonldap-ng-plugin-external-menu \
       linagora-lemonldap-ng-plugin-fixed-logout-redirection \
       linagora-lemonldap-ng-plugin-json-file \
       linagora-lemonldap-ng-plugin-mail-autodiscover \
@@ -70,9 +69,6 @@ RUN set -e && for p in \
     redirect-ajax.patch \
     getreftoken.patch \
     779-mail2f-api.patch \
-    874-geoip.patch \
-    2.23-oidc-hooks.patch \
-    crowdsec-2.23.patch \
     crowdsec-stats.patch \
     autoloader.patch \
     bootstrap5.patch \
