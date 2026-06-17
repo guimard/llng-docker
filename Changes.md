@@ -1,18 +1,29 @@
 # Changes
 
-## v2.22.3-1 _(dev)_
-* Use LLNG 2.22.0
+## v2.23.0-1 _(2026-06-17)_
+* Use LLNG 2.23.0
 * Replace patches by Linagora store entries when exist
 * Import Crowdsec filter from 2.23.0
 * Install named Crowdsec scenarii
-* Import #3596 fix
 * Enable autoLoader plugin
 * Install all plugins from https://linagora.github.io/lemonldap-ng-plugins
+  - Version: 0.3.8
 * Default to bootstrap5
 * Add Crowdsec statistics patch
-* Import CVE-2026-8503 fix
-* Use cached configuration when available if DB is down
 * Update DBD::Patroni
+
+## v2.21.4-4 _(2026-05-20)_
+* Use cached configuration when available if DB is down
+* Update Patroni driver
+
+## v2.21.4-3 _(2026-05-16)_
+* Rebuild with Debian 13.4
+
+## v2.21.4-2 _(2026-05-14)_
+* Import CVE-2026-8503 fix
+
+## v2.21.4-1 _(2026-04-20)_
+* Update to 2.21.4
 
 ## v2.21.3-4 _(2026-03-13)_
 * Rebuild with recents Debian updates (imagemagick)
