@@ -1,7 +1,7 @@
 # Changes
 
 ## v2.23.0-2 _(UNRELEASED)_
-* Update pam-access plugin to 0.3.9
+* Update pam-access plugin to 0.3.10
 
 ## v2.23.0-1 _(2026-06-17)_
 * Use LLNG 2.23.0
