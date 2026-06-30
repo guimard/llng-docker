@@ -15,6 +15,16 @@ else
     perl -i -pe 's/^type\s*=\s*(\w+)/type = Overlay\noverlayRealtype = $1\noverlayDirectory = \/over\n/' $INI
 fi
 
+# Enable %SERVERENV/%ENV placeholder resolution by default. useServerEnv is a
+# [configuration]-section (local) setting: it must live in the ini, not in the
+# stored conf — so the generic OVERRIDE_ mechanism (updateConf) cannot enable it.
+# Set it here so secrets injected as env can be referenced with %SERVERENV:NAME%
+# in the configuration out of the box. Safe: only %SERVERENV:…%/%ENV:…% strings
+# are affected.
+if ! grep -qE '^useServerEnv' $INI; then
+    perl -i -pe 's/^\[configuration\]\s*$/[configuration]\nuseServerEnv = 1/' $INI
+fi
+
 # Install Lemon commands in usr/bin
 for i in `find /usr/share/lemonldap-ng/bin -type f -perm -g=x`; do
     NAME=`basename $i`
