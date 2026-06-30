@@ -1,5 +1,8 @@
 # LTS 2.21.x Changes
 
+## v2.21.4-5 _(2026-06-30)_
+* Embed MailAutodiscover (not enabled)
+
 ## v2.21.4-4 _(2026-05-20)_
 * Use cached configuration when available if DB is down
 * Update Patroni driver
