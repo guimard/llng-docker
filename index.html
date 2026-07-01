@@ -53,6 +53,11 @@
 helm repo update
 helm install my-release llng/lemonldap</code></pre>
 
+  <p>For the 2.21 LTS line, use the <code>lts-2.21</code> channel instead:</p>
+  <pre><code>helm repo add llng-lts https://guimard.github.io/llng-docker/helm/lts-2.21
+helm repo update
+helm install my-release llng-lts/lemonldap</code></pre>
+
   <h2>Channels</h2>
   <div class="channels">
     <div class="card">
@@ -61,9 +66,9 @@ helm install my-release llng/lemonldap</code></pre>
       <p><a href="./helm/latest/index.yaml">helm/latest/index.yaml</a></p>
     </div>
     <div class="card">
-      <h3>lts-2.21 <small>(soon)</small></h3>
-      <p>Will track the <code>lts-2.21</code> branch.</p>
-      <p><code>helm/lts-2.21/index.yaml</code></p>
+      <h3>lts-2.21</h3>
+      <p>Tracks the <code>lts-2.21</code> branch (LemonLDAP::NG 2.21 LTS).</p>
+      <p><a href="./helm/lts-2.21/index.yaml">helm/lts-2.21/index.yaml</a></p>
     </div>
   </div>
 
