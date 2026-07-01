@@ -1,0 +1,27 @@
+apiVersion: v1
+entries:
+  lemonldap:
+  - apiVersion: v2
+    appVersion: 2.21.4-5
+    created: "2026-07-01T13:49:33.789318048Z"
+    dependencies:
+    - name: commons
+      repository: file://charts/commons
+      version: 1.0.0
+    description: A Helm chart for LemonLDAP::NG (manager, portal and maintenance cronjob)
+    digest: 2ccf5b5c1de8aa918bb8fa65bad36820f0f1aa4b27f85df7bf48088b81ee7a5c
+    home: https://github.com/guimard/llng-docker
+    icon: https://lemonldap-ng.org/images/llng_opengraph.png
+    kubeVersion: '>=1.22'
+    maintainers:
+    - email: yadd@debian.org
+      name: Xavier Guimard
+      url: https://github.com/guimard
+    name: lemonldap
+    sources:
+    - https://github.com/guimard/llng-docker
+    - https://github.com/LemonLDAPNG/lemonldap-ng
+    urls:
+    - https://guimard.github.io/llng-docker/helm/lts-2.21/lemonldap-2.21.4.tgz
+    version: 2.21.4
+generated: "2026-07-01T13:49:33.786908744Z"
