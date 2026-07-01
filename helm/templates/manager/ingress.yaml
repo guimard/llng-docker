@@ -1,0 +1,36 @@
+{{- if and (.Values.ingress.enabled) (.Values.manager.enabled) (.Values.ingress.manager.enabled) }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "lemonldap.fullname" . }}-manager
+  labels:
+    {{- include "lemonldap.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.ingress.manager.annotations }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.ingress.ingressClassName }}
+  ingressClassName: {{ .Values.ingress.ingressClassName }}
+  {{- end }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.config.domain.manager }}
+      secretName: {{ printf "%s-tls" .Values.config.domain.manager }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.config.domain.manager | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "lemonldap.fullname" . }}-manager
+                port:
+                  number: 80
+{{- end }}

@@ -1,0 +1,67 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "lemonldap.fullname" . }}-portal
+  labels:
+    {{- include "lemonldap.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.ingress.ingressClassName }}
+  ingressClassName: {{ .Values.ingress.ingressClassName }}
+  {{- end }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.portal.host | default .Values.config.domain.portal }}
+      secretName: {{ .Values.ingress.portal.host | default .Values.config.domain.portal }}-tls
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.portal.host | default .Values.config.domain.portal }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "lemonldap.fullname" . }}-portal
+                port:
+                  number: 80
+---
+{{- if .Values.ingress.imapAutoDiscovery.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "lemonldap.fullname" . }}-imap-autodiscover
+  labels:
+    {{- include "lemonldap.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.ingress.ingressClassName }}
+  ingressClassName: {{ .Values.ingress.ingressClassName }}
+  {{- end }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.imapAutoDiscovery.host }}
+      secretName: {{ .Values.ingress.imapAutoDiscovery.host }}-tls
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.imapAutoDiscovery.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "lemonldap.fullname" . }}-portal
+                port:
+                  number: 80
+{{- end }}
+{{- end }}

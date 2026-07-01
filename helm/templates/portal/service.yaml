@@ -1,0 +1,11 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: {{ include "lemonldap.fullname" . }}-portal
+spec:
+  selector:
+    app: lemonldap-portal
+  ports:
+    - name: auth
+      port: 80
+      protocol: TCP

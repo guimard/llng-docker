@@ -1,0 +1,83 @@
+{{- if .Values.manager.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "lemonldap.fullname" . }}-manager
+spec:
+  replicas: {{ .Values.manager.replicaCount }}
+  selector:
+    matchLabels:
+      app: lemonldap-manager
+  template:
+    metadata:
+      labels:
+        app: lemonldap-manager
+      annotations:
+        roll: {{ randAlphaNum 5 | quote }}
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      containers:
+        - name: manager
+          image: {{ template "lemonldap.manager.image" . }}
+          imagePullPolicy: {{ .Values.manager.image.pullPolicy }}
+          {{- if .Values.manager.diagnosticMode.enabled }}
+          command: {{- include "common.tplvalues.render" (dict "value" .Values.manager.diagnosticMode.command "context" $) | nindent 12 }}
+          args: {{- include "common.tplvalues.render" (dict "value" .Values.manager.diagnosticMode.args "context" $) | nindent 12 }}
+          {{- end }}
+          ports:
+            - containerPort: 80
+              name: manager
+          env:
+          {{- if .Values.extraEnv }}
+            {{- include "common.tplvalues.render" (dict "value" .Values.extraEnv "context" $) | nindent 12 }}
+          {{- end }}
+          {{- if .Values.manager.extraEnv }}
+            {{- include "common.tplvalues.render" (dict "value" .Values.manager.extraEnv "context" $) | nindent 12 }}
+          {{- end }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "lemonldap.fullname" . }}-configs-env
+            {{- if .Values.config.postgres.enabled }}
+            - secretRef:
+                name: {{ include "lemonldap.fullname" . }}-secrets-env
+            {{- end }}
+          {{- with .Values.manager.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.manager.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.manager.resources | nindent 12 }}
+          volumeMounts:
+            {{- if .Values.extraVolumeMounts }}
+            {{- include "common.tplvalues.render" (dict "value" .Values.extraVolumeMounts "context" $) | nindent 12 }}
+            {{- end }}
+            {{- if .Values.manager.extraVolumeMounts }}
+            {{- include "common.tplvalues.render" (dict "value" .Values.manager.extraVolumeMounts "context" $) | nindent 12 }}
+            {{- end }}
+            {{- if .Values.config.externalFileConfig }}
+            - name: external-lmconf-1
+              mountPath: /var/lib/lemonldap-ng/conf/lmConf-1.json
+              subPath: lmConf-1.json
+            {{- end }}
+      volumes:
+        {{- if .Values.extraVolumes }}
+        {{- include "common.tplvalues.render" (dict "value" .Values.extraVolumes  "context" $) | nindent 8 }}
+        {{- end }}
+        {{- if .Values.manager.extraVolumes }}
+        {{- include "common.tplvalues.render" (dict "value" .Values.manager.extraVolumes  "context" $) | nindent 8 }}
+        {{- end }}
+        {{- if .Values.config.externalFileConfig }}
+        - name: external-lmconf-1
+          configMap:
+            name: {{ include "lemonldap.fullname" . }}-lmconf-1
+        {{- end }}
+      {{- with .Values.manager.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

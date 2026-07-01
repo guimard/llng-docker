@@ -4,7 +4,7 @@ env:
   VERSION: 2.21.4
   PGVERSION: 17
   DEBIANRELEASE: trixie
-  DOCKERREVISION: 4
+  DOCKERREVISION: 5
 
 on:
   push:
@@ -341,3 +341,113 @@ jobs:
           IMAGE_SUFFIX: "-no-s6"
           SHORT_DESCRIPTION: no
           NON_ROOT: yes
+
+  # Package and publish the Helm chart AFTER the images the chart uses have been
+  # built and pushed (they take ~40 min), so the chart never references an image
+  # tag that does not exist yet. Runs on version tags only and publishes to
+  # https://guimard.github.io/llng-docker/helm/<CHANNEL> (gh-pages branch).
+  # This is the lts-2.21 channel; the master copy of this job uses CHANNEL=latest.
+  publish-helm:
+    needs:
+      - build-and-push-manager-no-s6
+      - build-and-push-portal-hiperf-no-s6
+      - build-and-push-cron-task-no-s6
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    # Serialize gh-pages publishing repo-wide (same group string on every branch,
+    # e.g. the lts-2.21 copy) so two channels tagged at once don't race.
+    concurrency:
+      group: helm-gh-pages-publish
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    env:
+      CHANNEL: lts-2.21
+      PAGES_URL: https://guimard.github.io/llng-docker
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.4
+
+      - name: Compute version from tag
+        id: v
+        # VERSION = full tag (e.g. 2.23.0-2) -> appVersion + image tags.
+        # CHART_VERSION = upstream version without the docker revision
+        # (e.g. 2.23.0) -> a clean SemVer chart version, visible to
+        # `helm search`/`helm install` without --devel.
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "chart_version=${VERSION%-*}" >> "$GITHUB_OUTPUT"
+
+      - name: Align chart image tags with the release
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        # yq (mikefarah) is preinstalled on ubuntu-latest runners.
+        run: |
+          yq -i ".manager.image.tag = \"${VERSION}-no-s6\""        helm/values.yaml
+          yq -i ".portal.image.tag  = \"${VERSION}-no-s6-hiperf\"" helm/values.yaml
+          yq -i ".cronjob.image.tag = \"${VERSION}-no-s6\""        helm/values.yaml
+
+      - name: Package chart
+        run: |
+          helm dependency build helm
+          mkdir -p .cr-release-packages
+          helm package helm \
+            --version "${{ steps.v.outputs.chart_version }}" \
+            --app-version "${{ steps.v.outputs.version }}" \
+            --destination .cr-release-packages
+
+      - name: Publish to gh-pages
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          DEST="helm/${CHANNEL}"
+          REMOTE="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+          rm -rf gh-pages
+          if git ls-remote --exit-code --heads "$REMOTE" gh-pages >/dev/null 2>&1; then
+            git clone --branch gh-pages --single-branch "$REMOTE" gh-pages
+          else
+            git clone "$REMOTE" gh-pages
+            ( cd gh-pages && git checkout --orphan gh-pages && git rm -rf . >/dev/null 2>&1 || true )
+          fi
+
+          mkdir -p "gh-pages/${DEST}"
+          cp .cr-release-packages/*.tgz "gh-pages/${DEST}/"
+
+          if [ -f "gh-pages/${DEST}/index.yaml" ]; then
+            helm repo index "gh-pages/${DEST}" --url "${PAGES_URL}/${DEST}" --merge "gh-pages/${DEST}/index.yaml"
+          else
+            helm repo index "gh-pages/${DEST}" --url "${PAGES_URL}/${DEST}"
+          fi
+
+          cd gh-pages
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "${DEST}"
+          if git diff --cached --quiet; then
+            echo "Nothing to publish."
+            exit 0
+          fi
+          git commit -m "helm: publish lemonldap ${VERSION} to ${CHANNEL}"
+
+          # Push with retry: a concurrent publish from another channel only
+          # advances the branch tip; our commit touches a distinct sub-dir
+          # (helm/${CHANNEL}) so rebasing onto the new tip is conflict-free.
+          for attempt in 1 2 3 4 5; do
+            if git push origin HEAD:gh-pages; then
+              echo "published"; exit 0
+            fi
+            echo "push rejected (attempt ${attempt}), syncing with origin/gh-pages"
+            git fetch origin gh-pages
+            git rebase origin/gh-pages || { git rebase --abort; exit 1; }
+          done
+          echo "could not push after retries" >&2
+          exit 1
