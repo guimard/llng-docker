@@ -13,7 +13,31 @@ on:
       - 'v*'
 
 jobs:
+  # Gate for version tags: the images and the Helm chart are versioned from
+  # VERSION-DOCKERREVISION below, NOT from the git tag name. Refuse to run the
+  # whole pipeline if a pushed tag `vX.Y.Z-N` does not match that env, so a
+  # release tag can never disagree with what is actually built and published.
+  # The job always runs (only the check step is tag-gated), so branch builds
+  # pass it as a no-op; `test` depends on it, and every other job depends on
+  # `test`, so a mismatch blocks everything.
+  check-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tag must equal v${VERSION}-${DOCKERREVISION}
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          expected="${VERSION}-${DOCKERREVISION}"
+          got="${GITHUB_REF_NAME#v}"
+          if [ "$got" != "$expected" ]; then
+            echo "::error::Tag '${GITHUB_REF_NAME}' does not match VERSION-DOCKERREVISION." \
+                 "Expected 'v${expected}'. Update env in" \
+                 ".github/workflows/docker-publish.yml (VERSION / DOCKERREVISION) or retag."
+            exit 1
+          fi
+          echo "Tag '${GITHUB_REF_NAME}' matches VERSION-DOCKERREVISION (${expected})."
+
   test:
+    needs: check-tag
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
