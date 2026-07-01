@@ -354,6 +354,11 @@ jobs:
       - build-and-push-cron-task-no-s6
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
+    # Serialize gh-pages publishing repo-wide (same group string on every branch,
+    # e.g. the lts-2.21 copy) so two channels tagged at once don't race.
+    concurrency:
+      group: helm-gh-pages-publish
+      cancel-in-progress: false
     permissions:
       contents: write
     env:
@@ -432,4 +437,17 @@ jobs:
             exit 0
           fi
           git commit -m "helm: publish lemonldap ${VERSION} to ${CHANNEL}"
-          git push origin HEAD:gh-pages
+
+          # Push with retry: a concurrent publish from another channel only
+          # advances the branch tip; our commit touches a distinct sub-dir
+          # (helm/${CHANNEL}) so rebasing onto the new tip is conflict-free.
+          for attempt in 1 2 3 4 5; do
+            if git push origin HEAD:gh-pages; then
+              echo "published"; exit 0
+            fi
+            echo "push rejected (attempt ${attempt}), syncing with origin/gh-pages"
+            git fetch origin gh-pages
+            git rebase origin/gh-pages || { git rebase --abort; exit 1; }
+          done
+          echo "could not push after retries" >&2
+          exit 1
