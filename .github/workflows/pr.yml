@@ -3,6 +3,21 @@ name: Build and test Docker Images
 on:
   push:
     branches-ignore: [master,stable,experimental]
+    # The full ./build-all (every image, one runner) is heavy. Skip it for
+    # changes that don't affect the images — Helm chart, CI workflows, docs —
+    # so CI-only branches don't spend ~an hour building nothing relevant.
+    paths-ignore:
+      - 'helm/**'
+      - '.github/**'
+      - '**.md'
+      - LICENSE
+      - cleanup-old-tags.sh
+
+# Cancel a previous run still building when a new commit is pushed to the same
+# branch, instead of letting runs pile up.
+concurrency:
+  group: pr-build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
