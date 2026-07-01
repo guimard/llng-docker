@@ -1,0 +1,47 @@
+{{- $postgresUrl := include "postgres.url" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "lemonldap.fullname" . }}-configs-env
+  labels:
+    {{- include "lemonldap.labels" . | nindent 4 }}
+data:
+  SSODOMAIN: {{ .Values.config.domain.root | quote }}
+  PORTAL: {{ .Values.config.domain.portal | quote }}
+  PROTECTION: {{ .Values.config.manager.protection | quote }}
+  LOGLEVEL: {{ .Values.config.log.level | quote }}
+  LOGGER: {{ .Values.config.log.logger | quote }}
+  USERLOGGER: {{ .Values.config.log.userLogger | quote }}
+  HANDLER_CRON: {{ .Values.config.cron.handler.enabled | quote }}
+  PORTAL_CRON: {{ .Values.config.cron.portal.enabled | quote }}
+  SERVERNAME: {{ .Values.config.portal.serverName | quote }}
+  FIXED_LOGOUT_REDIRECTION: {{ .Values.config.logoutRedirection | quote }}
+  {{- if .Values.config.postgres.enabled }}
+  DBI_CHAIN: {{ $postgresUrl | quote }}
+  {{- end }}
+  FORWARDED_BY: {{ .Values.config.proxy.forwardedBy | quote }}
+  FORWARDED_HEADER: {{ .Values.config.proxy.forwardedHeader | quote }}
+---
+{{- if and .Values.config.postgres.enabled .Values.config.postgres.initJob.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "lemonldap.fullname" . }}-init-user-db
+  labels:
+    {{- include "lemonldap.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install
+    helm.sh/hook-weight: "5"
+data:
+{{ (tpl (.Files.Glob "configs/*").AsConfig  .)| indent 2 }}
+{{- end }}
+---
+{{- if .Values.config.externalFileConfig }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "lemonldap.fullname" . }}-lmconf-1
+data:
+  lmConf-1.json: |
+  {{- tpl .Values.config.externalFileConfig . | nindent 4 }}
+{{- end }}

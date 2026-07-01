@@ -1,0 +1,96 @@
+name: Publish Helm chart
+
+# On every version tag (v*), package the chart aligned with that tag and push it
+# to the Helm repository served by GitHub Pages:
+#   https://guimard.github.io/llng-docker/helm/<CHANNEL>
+#
+# CHANNEL selects the sub-path / release channel. This file lives on `master`
+# and publishes to `helm/latest`. When the `lts-2.21` branch is created, its
+# copy of this workflow only needs CHANNEL changed to `lts-2.21` so the two
+# channels are published side by side (the workflow is read from the tagged
+# commit, so a tag on the lts history uses the lts copy automatically).
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  CHANNEL: latest
+  PAGES_URL: https://guimard.github.io/llng-docker
+
+jobs:
+  publish-helm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.4
+
+      - name: Compute version from tag
+        id: v
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Align chart image tags with the release
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        # yq (mikefarah) is preinstalled on ubuntu-latest runners.
+        run: |
+          yq -i ".manager.image.tag = \"${VERSION}-no-s6\""        helm/values.yaml
+          yq -i ".portal.image.tag  = \"${VERSION}-no-s6-hiperf\"" helm/values.yaml
+          yq -i ".cronjob.image.tag = \"${VERSION}-no-s6\""        helm/values.yaml
+
+      - name: Package chart
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          helm dependency build helm
+          mkdir -p .cr-release-packages
+          helm package helm \
+            --version "$VERSION" \
+            --app-version "$VERSION" \
+            --destination .cr-release-packages
+
+      - name: Publish to gh-pages
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          DEST="helm/${CHANNEL}"
+          REMOTE="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+          rm -rf gh-pages
+          if git ls-remote --exit-code --heads "$REMOTE" gh-pages >/dev/null 2>&1; then
+            git clone --branch gh-pages --single-branch "$REMOTE" gh-pages
+          else
+            git clone "$REMOTE" gh-pages
+            ( cd gh-pages && git checkout --orphan gh-pages && git rm -rf . >/dev/null 2>&1 || true )
+          fi
+
+          mkdir -p "gh-pages/${DEST}"
+          cp .cr-release-packages/*.tgz "gh-pages/${DEST}/"
+
+          if [ -f "gh-pages/${DEST}/index.yaml" ]; then
+            helm repo index "gh-pages/${DEST}" --url "${PAGES_URL}/${DEST}" --merge "gh-pages/${DEST}/index.yaml"
+          else
+            helm repo index "gh-pages/${DEST}" --url "${PAGES_URL}/${DEST}"
+          fi
+
+          cd gh-pages
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "${DEST}"
+          if git diff --cached --quiet; then
+            echo "Nothing to publish."
+            exit 0
+          fi
+          git commit -m "helm: publish lemonldap ${VERSION} to ${CHANNEL}"
+          git push origin HEAD:gh-pages

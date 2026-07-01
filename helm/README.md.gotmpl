@@ -1,0 +1,36 @@
+{{ template "chart.header" . }}
+
+{{ template "chart.description" . }}
+
+{{ template "chart.versionBadge" . }}{{ template "chart.typeBadge" . }}{{ template "chart.appVersionBadge" . }}
+
+{{ template "chart.maintainersSection" . }}
+
+{{ template "chart.sourcesSection" . }}
+
+## Prerequisites
+
+- Kubernetes 1.22+
+- Helm 3.2.0+
+
+{{ template "chart.requirementsSection" . }}
+
+The `commons` library chart is vendored under `charts/` (`file://charts/commons`),
+so no external Helm repository is required to build or install this chart.
+
+## Installing/Upgrading the Chart
+
+Clone the repository and install the chart from its local path:
+
+```
+helm upgrade --install my-release ./helm
+```
+> **Tip**: Use the `helm diff` plugin to preview what a helm upgrade would change.
+
+## Uninstalling the Chart
+To uninstall/delete the `my-release` deployment:
+
+```
+helm delete my-release
+```
+{{ template "chart.valuesSection" . }}

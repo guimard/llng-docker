@@ -1,0 +1,273 @@
+nameOverride: ""
+fullnameOverride: ""
+
+global:
+  image:
+    pullSecrets: []
+
+manager:
+  enabled: false
+  image:
+    # -- Image registry
+    registry: docker.io
+    # -- Image repository
+    repository: yadd/lemonldap-ng-manager
+    # -- Image tag (immutable tags are recommended)
+    tag: 2.23.0-1-no-s6
+    # -- Image digest in SHA. If set, will override the tag
+    digest: ""
+    # --  Defaults to `Always` if image tag is `latest`, else set to `IfNotPresent`
+    pullPolicy: IfNotPresent
+    # -- Optional - Specify an array of imagePullSecrets
+    pullSecrets: []
+
+  # -- Debug mode - Sleep pod
+  diagnosticMode:
+    enabled: false
+    command:
+      - sleep
+    args:
+      - infinity
+
+  replicaCount: 1
+  # -- Configuration for Readiness Probes
+  readinessProbe:
+  # -- Configuration for Liveness Probes
+  livenessProbe:
+
+  # -- Affinity for pod assignment
+  affinity:
+    {}
+    # podAntiAffinity:
+    #   preferredDuringSchedulingIgnoredDuringExecution:
+    #   - weight: 100
+    #     podAffinityTerm:
+    #       labelSelector:
+    #         matchExpressions:
+    #         - key: app
+    #           operator: In
+    #           values:
+    #           - lemonldap
+    #       topologyKey: "kubernetes.io/hostname"
+
+  resources:
+    # -- Resources limits for the container
+    limits:
+      cpu: "250m"
+      memory: "500Mi"
+    # -- Requested resources for the container
+    requests:
+      cpu: "50m"
+      memory: "100Mi"
+
+  # Extra Configuration for Manager
+  # @ignored
+  extraEnv: []
+  # @ignored
+  extraEnvCm: []
+  # @ignored
+  extraEnvSecret: []
+  # @ignored
+  extraVolumes: []
+  # @ignored
+  extraVolumeMounts: []
+
+portal:
+  image:
+    # -- Image registry
+    registry: docker.io
+    # -- Image repository
+    repository: yadd/lemonldap-ng-portal
+    # -- Image tag (immutable tags are recommended)
+    tag: 2.23.0-1-no-s6-hiperf
+    # -- Image digest in SHA. If set, will override the tag
+    digest: ""
+    # --  Defaults to `Always` if image tag is `latest`, else set to `IfNotPresent`
+    pullPolicy: IfNotPresent
+    # -- Optional - Specify an array of imagePullSecrets
+    pullSecrets: []
+  replicaCount: 1
+
+  diagnosticMode:
+    enabled: false
+    command:
+      - sleep
+    args:
+      - infinity
+
+  # -- Configuration for Readiness Probes
+  readinessProbe:
+  # -- Configuration for Liveness Probes
+  livenessProbe:
+
+  # -- Servername override
+
+  # -- Affinity for pod assignment
+  affinity: 
+    {}
+  resources:
+    # -- Resources limits for the container
+    limits:
+      cpu: "250m"
+      memory: "500Mi"
+    # -- Requested resources for the container
+    requests:
+      cpu: "50m"
+      memory: "100Mi"
+
+  # Extra Configuration for Portal
+  # @ignored
+  extraEnv: []
+  # @ignored
+  extraEnvCm: []
+  # @ignored
+  extraEnvSecret: []
+  # @ignored
+  extraVolumes: []
+  # @ignored
+  extraVolumeMounts: []
+
+cronjob:
+  enabled: true
+  schedule: "0 */3 * * *"
+  # Do not start a new Job while the previous one is still running: avoids
+  # piling up stuck Jobs (e.g. a broken image tag -> ImagePullBackOff).
+  concurrencyPolicy: Forbid
+  # Keep a single finished Job (enough to inspect its logs).
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  # Delete a finished Job 6h after it completes (time to inspect its logs).
+  ttl: 21600
+  image:
+    # -- Image registry
+    registry: docker.io
+    # -- Image repository
+    repository: yadd/lemonldap-ng-cron-task
+    # -- Image tag (immutable tags are recommended)
+    tag: 2.23.0-1-no-s6
+    # -- Image digest in SHA. If set, will override the tag
+    digest: ""
+    # --  Defaults to `Always` if image tag is `latest`, else set to `IfNotPresent`
+    pullPolicy: IfNotPresent
+    # -- Optional - Specify an array of imagePullSecrets
+    pullSecrets: []
+  resources:
+    # -- Resources limits for the container
+    limits:
+      cpu: "250m"
+      memory: "500Mi"
+    # -- Requested resources for the container
+    requests:
+      cpu: "50m"
+      memory: "100Mi"
+
+config:
+  # -- Logout Redirection URL - Empty value by default to not modify Lemon behavior
+  logoutRedirection: ""
+
+  # -- Domain Configuration
+  domain:
+    # -- Root Domain
+    root: example.com
+    # -- Portal URL - Used as Ingress if enabled
+    portal: auth.example.com
+    # -- Manager URL - Used as Ingress if enabled
+    manager: manager.example.com
+
+  portal:
+    serverName:
+
+  cronjob:
+
+  # -- Manager specific configurations
+  manager:
+    # -- By default, the manager is protected by a demo account.
+    # Supported values:
+    # * authenticate : all authenticated users can access
+    # * manager      : manager is protected like other virtual hosts: you have to set rules in the corresponding virtual host
+    # * <rule>       : you can set here directly the rule to apply
+    # * none         : no protection
+    protection: manager
+
+  log:
+    # -- Possible values: debug, info, notice, warn, error
+    level: info
+    # -- Possible values: stderr, syslog
+    logger: syslog
+    # -- Possible values: stderr, syslog
+    userLogger: syslog
+
+  # -- Enable Session purge cron tasks
+  cron:
+    # @ignored
+    handler:
+      enabled: false
+    # @ignored  
+    portal:
+      enabled: false
+
+  # Postgres as LemonLDAP backend database
+  postgres:
+     # -- Enable Postgres as LemonLDAP backend database
+    enabled: false
+    host: postgresql
+    port: 5432
+    sslMode: prefer
+    dbName: lemonldapng
+    username: lemonldap
+    password: change-me
+    # -- Admin credentials for init-job to create LemonLDAP DB User and Schema
+    admin:
+      dbName: ""
+      username: ""
+      password: ""
+    # -- Built-in schema init-job (pre-install hook). It runs CREATE USER /
+    # CREATE DATABASE, so it needs a PostgreSQL superuser. Set to false when the
+    # database/user already exist (e.g. a managed PostgreSQL) and you initialise
+    # the schema out-of-band.
+    initJob:
+      enabled: true
+
+  proxy:
+    forwardedBy: 0.0.0.0/0
+    forwardedHeader: X-Remote-IP
+
+  # -- Override default lmConf.json
+  externalFileConfig: {}
+# Ingresses
+ingress:
+  # -- Set to true to enable ingress record generation
+  enabled: false
+  # -- IngressClass that will be be used to implement the Ingress
+  ingressClassName: nginx
+  # -- Annotations for the Ingress resource. Use cert-manager annotations to enable certificate autogeneration.
+  annotations: {}
+    # cert-manager.io/cluster-issuer: letsencrypt
+    # kubernetes.io/tls-acme: "true"
+  tls:
+    # -- Enable TLS for ingress
+    enabled: false
+  
+  # -- Manager ingress config
+  manager:
+    enabled: false
+    # -- Annotations for Manager Ingress resource. Extra security layer to manager endpoint
+    annotations: {}
+      # nginx.ingress.kubernetes.io/whitelist-source-range: "54.36.52.8/32"
+
+  # -- IMAP Auto Discovery sconfig
+  imapAutoDiscovery:
+    enabled: false
+    host: autodiscover.example.com
+    # -- Annotations for IMAP Auto Discovery Ingress resource.
+    annotations: {}
+
+# -- Portal ingress config
+  portal: 
+    # Override default domain portal url
+    host: ""
+
+## Convert back top JSON in Configmap
+# -- YAML config converter for lmConf-1.json
+# ref: https://lemonldap-ng.org/documentation/latest/parameterlist.html
+

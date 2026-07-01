@@ -1,0 +1,37 @@
+global:
+  images:
+    dockerCredentials:
+      # registry: ""
+      # username: ""
+      # password: ""
+
+gitSync:
+  enabled: false
+  image:
+    tag: v3.6.9
+    pullPolicy: IfNotPresent
+  # -- Supported type: init, sidecar
+  type: "init"
+  repo:
+  username: 
+  branch: main
+  secretMounthPath: "/k8s/secret"
+  secretName: git_token
+  syncRoot: "/k8s/git"
+  syncDest: ""
+  sparseCheckOut: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  securityContext:
+    allowPrivilegeEscalation: false
+    runAsNonRoot: true
+    readOnlyRootFilesystem: true
+    runAsUser: 65533
+    capabilities:
+      drop: ["ALL"]
+

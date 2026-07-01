@@ -1,0 +1,6 @@
+dependencies:
+- name: commons
+  repository: file://charts/commons
+  version: 1.0.0
+digest: sha256:93836512c6e8742f5114a336306df4a56709f8553d56461f08ea61aa6df8f355
+generated: "2026-07-01T12:42:36.784452727+02:00"

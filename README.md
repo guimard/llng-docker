@@ -5,18 +5,19 @@ installation, ready to use with a Redis server to share sessions and a
 PostgreSQL server to share configuration. See docker-compose example.
 
 List:
- - [yadd/lemonldap-ng-portal](./portal): the portal
-   * [yadd/lemonldap-ng-portal:\<tag>-hiperf](./uwsgi-portal): portal with better performances
- - [yadd/lemonldap-ng-manager](./manager): the manager
- - [yadd/lemonldap-ng-full](./full): the portal and the manager in the same image
- - [yadd/lemonldap-ng-ssoaas-fastcgi-server](./ssoaas-fastcgi-server): a FastCGI
-   server to enable [SSOaaS](https://lemonldap-ng.org/documentation/latest/ssoaas.html)
- - [yadd/lemonldap-ng-pg-database](./pg): a ready to use PostgreSQL database
- - [yadd/lemonldap-ng-cron](./cron): a simple LLNG maintenance tasks runner,
-   to be used if tasks are disabled on portals. See examples.
-   * [yadd/lemonldap-ng-crontask](./cron-task): simply launch portal cron task and exit
- - [yadd/lemonldap-ng-sessions-backup](./sessions-backup): backup sessions and exit
- - [yadd/lemonldap-ng-webpubsub](./webpubsub): a Pub/Sub server based on HTTP
+
+- [yadd/lemonldap-ng-portal](./portal): the portal
+  - [yadd/lemonldap-ng-portal:\<tag>-hiperf](./uwsgi-portal): portal with better performances
+- [yadd/lemonldap-ng-manager](./manager): the manager
+- [yadd/lemonldap-ng-full](./full): the portal and the manager in the same image
+- [yadd/lemonldap-ng-ssoaas-fastcgi-server](./ssoaas-fastcgi-server): a FastCGI
+  server to enable [SSOaaS](https://lemonldap-ng.org/documentation/latest/ssoaas.html)
+- [yadd/lemonldap-ng-pg-database](./pg): a ready to use PostgreSQL database
+- [yadd/lemonldap-ng-cron](./cron): a simple LLNG maintenance tasks runner,
+  to be used if tasks are disabled on portals. See examples.
+  - [yadd/lemonldap-ng-crontask](./cron-task): simply launch portal cron task and exit
+- [yadd/lemonldap-ng-sessions-backup](./sessions-backup): backup sessions and exit
+- [yadd/lemonldap-ng-webpubsub](./webpubsub): a Pub/Sub server based on HTTP
 
 The [yadd/lemonldap-ng-base](./base) isn't directly usable, just a base
 to build Lemonldap::NG components.
@@ -30,6 +31,21 @@ last published version.
 
 You can also use [dev](./dev) to build an image using the upstream repository.
 Set `BRANCH` to choose the upstream branch to clone.
+
+## Kubernetes: Helm chart
+
+A Helm chart is available in [`helm/`](./helm) and published on GitHub Pages at
+each release tag. It deploys the portal, the manager and the maintenance
+cronjob.
+
+```bash
+helm repo add llng https://guimard.github.io/llng-docker/helm/latest
+helm repo update
+helm install my-release llng/lemonldap
+```
+
+The `latest` channel tracks the `master` branch. See the
+[chart README](./helm/README.md) for the full list of values.
 
 ## Docker-compose examples:
 
@@ -228,7 +244,8 @@ services:
 ## Copyright and license
 
 Copyright:
- * 2018-2024, Xavier Guimard <yadd@debian.org>
- * 2023-2024, LINAGORA <https://linagora.com>
+
+- 2018-2024, Xavier Guimard <yadd@debian.org>
+- 2023-2024, LINAGORA <https://linagora.com>
 
 License: [GNU General Public License v2.0](./LICENSE)

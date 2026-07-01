@@ -1,0 +1,37 @@
+{{- if and .Values.config.postgres.enabled .Values.config.postgres.initJob.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "lemonldap.fullname" . }}-postgres-init
+  labels:
+    {{- include "lemonldap.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install
+    helm.sh/hook-weight: "15"
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      containers:
+      - name: postgres-init
+        image: yadd/lemonldap-ng-pg-database
+        command: ["/bin/sh", "/tmp/init-user-db.sh"]
+        envFrom:
+          - secretRef:
+              name: {{ include "lemonldap.fullname" . }}-init-secrets-env
+        env:
+          - name: POSTGRES_HOST
+            value: {{ .Values.config.postgres.host | quote }}
+          - name: POSTGRES_PORT
+            value: {{ .Values.config.postgres.port | quote }}
+          - name: PG_DATABASE
+            value: {{ .Values.config.postgres.dbName | quote }}
+        volumeMounts:
+        - name: db-schema
+          mountPath: /tmp/
+      volumes:
+      - name: db-schema
+        configMap:
+          name: {{ include "lemonldap.fullname" . }}-init-user-db
+      restartPolicy: Never
+{{- end }}

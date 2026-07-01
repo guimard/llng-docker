@@ -1,0 +1,13 @@
+{{- if .Values.manager.enabled }}
+kind: Service
+apiVersion: v1
+metadata:
+  name: {{ include "lemonldap.fullname" . }}-manager
+spec:
+  selector:
+    app: lemonldap-manager
+  ports:
+    - name: manager
+      port: 80
+      protocol: TCP
+{{- end }}

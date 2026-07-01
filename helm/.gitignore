@@ -1,0 +1,2 @@
+# Helm dependency build artifacts (commons is vendored unpacked under charts/commons)
+charts/*.tgz

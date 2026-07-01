@@ -1,0 +1,72 @@
+{{- if .Values.cronjob.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "lemonldap.fullname" . }}-cronjob
+spec:
+  schedule: "{{ .Values.cronjob.schedule }}"
+  # Do not start a new Job while the previous one is still running: avoids
+  # piling up stuck Jobs (e.g. a broken image tag -> ImagePullBackOff).
+  concurrencyPolicy: {{ .Values.cronjob.concurrencyPolicy | default "Forbid" }}
+  # Keep a single finished Job (enough to inspect its logs).
+  successfulJobsHistoryLimit: {{ .Values.cronjob.successfulJobsHistoryLimit | default 1 }}
+  failedJobsHistoryLimit: {{ .Values.cronjob.failedJobsHistoryLimit | default 1 }}
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: {{ .Values.cronjob.ttl }}
+      template:
+        metadata:
+          labels:
+            app: lemonldap-cronjob
+          annotations:
+            roll: {{ randAlphaNum 5 | quote }}
+            checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+            checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        spec:
+          containers:
+            - name: cronjob
+              image: {{ template "lemonldap.cronjob.image" . }}
+              imagePullPolicy: {{ .Values.cronjob.image.pullPolicy }}
+              env:
+              {{- if .Values.extraEnv }}
+                {{- include "common.tplvalues.render" (dict "value" .Values.extraEnv "context" $) | nindent 16 }}
+              {{- end }}
+              {{- if .Values.cronjob.extraEnv }}
+                {{- include "common.tplvalues.render" (dict "value" .Values.cronjob.extraEnv "context" $) | nindent 16 }}
+              {{- end }}
+              envFrom:
+                - configMapRef:
+                    name: {{ include "lemonldap.fullname" . }}-configs-env
+                {{- if .Values.config.postgres.enabled }}
+                - secretRef:
+                    name: {{ include "lemonldap.fullname" . }}-secrets-env
+                {{- end }}
+              resources:
+                {{- toYaml .Values.cronjob.resources | nindent 16 }}
+              volumeMounts:
+                {{- if .Values.extraVolumeMounts }}
+                {{- include "common.tplvalues.render" (dict "value" .Values.extraVolumeMounts "context" $) | nindent 16 }}
+                {{- end }}
+                {{- if .Values.cronjob.extraVolumeMounts }}
+                {{- include "common.tplvalues.render" (dict "value" .Values.cronjob.extraVolumeMounts "context" $) | nindent 16 }}
+                {{- end }}
+                {{- if .Values.config.externalFileConfig }}
+                - name: external-lmconf-1
+                  mountPath: /var/lib/lemonldap-ng/conf/lmConf-1.json
+                  subPath: lmConf-1.json
+                {{- end }}
+          volumes:
+            {{- if .Values.extraVolumes }}
+            {{- include "common.tplvalues.render" (dict "value" .Values.extraVolumes  "context" $) | nindent 12 }}
+            {{- end }}
+            {{- if .Values.cronjob.extraVolumes }}
+            {{- include "common.tplvalues.render" (dict "value" .Values.cronjob.extraVolumes  "context" $) | nindent 12 }}
+            {{- end }}
+            {{- if .Values.config.externalFileConfig }}
+            - name: external-lmconf-1
+              configMap:
+                name: {{ include "lemonldap.fullname" . }}-lmconf-1
+            {{- end }}
+          restartPolicy: OnFailure
+{{- end }}
+
