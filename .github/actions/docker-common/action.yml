@@ -38,11 +38,11 @@ runs:
         shell: bash
         run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v4
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v4
       - name: Login to Docker Hub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v4
         with:
           username: ${{ inputs.DOCKER_USERNAME }}
           password: ${{ inputs.DOCKER_PASSWORD }}
@@ -68,7 +68,7 @@ runs:
           fi
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v6
         with:
           images: ${{ inputs.DOCKER_IMAGE }}
       - name: Generate tags
@@ -112,7 +112,7 @@ runs:
             echo "tag=${{ steps.date.outputs.date }}${{ inputs.IMAGE_SUFFIX }}-lts" >> $GITHUB_OUTPUT
           fi
       - name: Build and push Docker image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v7
         with:
           context: ${{ inputs.DIRNAME }}
           build-args: |
@@ -133,7 +133,7 @@ runs:
           fi
       - name: Build and publish non-root image
         if: inputs.NON_ROOT == 'yes'
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v7
         with:
           context: no-root
           build-args: |
