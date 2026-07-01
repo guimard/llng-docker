@@ -16,4 +16,4 @@ maintainers:
     email: yadd@debian.org
     url: https://github.com/guimard
 name: lemonldap
-version: 2.23.0-1
+version: 2.23.0
