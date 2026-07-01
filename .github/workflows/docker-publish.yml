@@ -373,16 +373,17 @@ jobs:
         with:
           version: v3.14.4
 
-      - name: Compute version from tag
+      - name: Compute version from workflow env
         id: v
-        # VERSION = full tag (e.g. 2.23.0-2) -> appVersion + image tags.
-        # CHART_VERSION = upstream version without the docker revision
-        # (e.g. 2.23.0) -> a clean SemVer chart version, visible to
-        # `helm search`/`helm install` without --devel.
+        # Image tags come from docker-common as VERSION-DOCKERREVISION, NOT from
+        # the git tag name (a tag can be re-cut without bumping the revision).
+        # Derive the chart from the SAME env so it always references images that
+        # actually exist:
+        #   version      = VERSION-DOCKERREVISION  -> appVersion + image tags
+        #   chart_version = VERSION                -> clean SemVer, no --devel
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "chart_version=${VERSION%-*}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}-${DOCKERREVISION}" >> "$GITHUB_OUTPUT"
+          echo "chart_version=${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Align chart image tags with the release
         env:
