@@ -16,7 +16,7 @@ RUN echo "# Install nginx and portal libs" && \
       lemonldap-ng-fastcgi-server"${LLNGDIST}" \
       liblemonldap-ng-portal-perl"${LLNGDIST}" \
       gsfonts patch libconvert-pem-perl \
-      libcrypt-u2f-server-perl libgeoip2-perl \
+      libcrypt-u2f-server-perl libgeoip2-perl libapache-htpasswd-perl \
       libglib-perl libgssapi-perl libhttp-browserdetect-perl \
       libimage-magick-perl liblasso-perl libnet-facebook-oauth2-perl \
       libnet-openid-consumer-perl libnet-openid-server-perl \

@@ -15,7 +15,7 @@ RUN echo "# Install nginx and manager libs" && \
       lemonldap-ng-fastcgi-server${LLNGDIST} \
       liblemonldap-ng-manager-perl${LLNGDIST} \
       libglib-perl libgssapi-perl libsoap-lite-perl fonts-urw-base35 \
-      libcrypt-openssl-bignum-perl libemail-sender-perl \
+      libcrypt-openssl-bignum-perl libemail-sender-perl libapache-htpasswd-perl \
       libconvert-base32-perl libio-string-perl libipc-run-perl \
       libgd-securityimage-perl libmime-tools-perl libnet-ldap-perl \
       libio-socket-timeout-perl libunicode-string-perl \
