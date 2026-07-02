@@ -1,5 +1,9 @@
 # Changes
 
+## v2.23.0-3 _(UNRELEASED)_
+- add perlHtPasswd utility
+- accept "false" as value for CRON variables
+
 ## v2.23.0-2 _(2026-07-01)_
 
 - Update pam-access plugin to 0.3.10
