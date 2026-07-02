@@ -108,12 +108,12 @@ portal:
   resources:
     # -- Resources limits for the container
     limits:
-      cpu: "250m"
-      memory: "500Mi"
+      cpu: "2"
+      memory: "4Gi"
     # -- Requested resources for the container
     requests:
-      cpu: "50m"
-      memory: "100Mi"
+      cpu: "500m"
+      memory: "1Gi"
 
   # Extra Configuration for Portal
   # @ignored
