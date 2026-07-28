@@ -9,6 +9,7 @@ RUN echo "# Install libs" && \
     apt-get -y upgrade && \
     apt-get install -y --no-install-recommends \
         lemonldap-ng-fastcgi-server${LLNGDIST} \
+	linagora-lemonldap-ng-plugin-custom-functions \
         libfcgi-engine-perl && \
     apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/*
 

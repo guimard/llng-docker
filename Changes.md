@@ -1,8 +1,13 @@
 # Changes
 
-## v2.23.0-3 _(UNRELEASED)_
-- add perlHtPasswd utility
-- accept "false" as value for CRON variables
+## v2.23.2-1 _(2026-07-28)_
+- Add perlHtPasswd utility
+- Accept "false" as value for CRON variables
+- Update to 2.23.2
+- Updates from store:
+  * crowdsec-filters: add CVE-2026-63030 detection
+  * add linagora-lemonldap-ng-plugin-custom-functions
+  * pam-access, twake, json-file: fix for future 3.0.0
 
 ## v2.23.0-2 _(2026-07-01)_
 

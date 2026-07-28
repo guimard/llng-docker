@@ -31,6 +31,7 @@ RUN echo "# Install nginx and portal libs" && \
       openssh-client \
       linagora-lemonldap-ng-store
 RUN apt-get -y -o Dpkg::Options::="--force-confold" install \
+      linagora-lemonldap-ng-plugin-custom-functions \
       linagora-lemonldap-ng-plugin-fixed-logout-redirection \
       linagora-lemonldap-ng-plugin-json-file \
       linagora-lemonldap-ng-plugin-mail-autodiscover \
