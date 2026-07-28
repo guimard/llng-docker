@@ -22,6 +22,7 @@ RUN echo "# Install nginx and manager libs" && \
       libio-string-perl libregexp-assemble-perl apache2-utils \
       linagora-lemonldap-ng-store
 RUN apt-get -y -o Dpkg::Options::="--force-confold" install \
+      linagora-lemonldap-ng-plugin-custom-functions \
       linagora-lemonldap-ng-plugin-fixed-logout-redirection \
       linagora-lemonldap-ng-plugin-json-file \
       linagora-lemonldap-ng-plugin-mail-autodiscover \
