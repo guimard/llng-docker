@@ -10,8 +10,8 @@ our $VERSION = "2.22.0";
 # Options
 my $opts = {};
 my $help;
-my $opt_user  = '__APACHEUSER__';
-my $opt_group = '__APACHEGROUP__';
+my $opt_user  = 'www-data';
+my $opt_group = 'www-data';
 
 my @CMDLINE = @ARGV;
 
