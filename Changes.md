@@ -1,5 +1,8 @@
 # LTS 2.21.x Changes
 
+## v2.21.5-1 _(2026-08-14)_
+* Import 2.21.5 changes
+
 ## v2.21.4-6 _(2026-07-30)_
 * Rebuild with recents Debian updates (imagemagick, Crypt::Urandom)
 

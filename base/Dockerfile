@@ -111,6 +111,7 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     echo "# 769-loki.patch" && patch -p1 <769-loki.patch && \
     echo "# 784-Crowdsec.patch" && patch -p1 < 784-Crowdsec.patch && \
     echo "# conf-cache.patch" && patch -p1 < conf-cache.patch && \
+    echo "# 2.21.5.patch" && patch -p1 < 2.21.5.patch && \
     perl -000 -MJSON -i -ne '$_=JSON::from_json($_);$_->{reloadUrls}={};print JSON->new->pretty->canonical->encode($_)' /var/lib/lemonldap-ng/conf/lmConf-1.json && \
     perl -i -pe 's/\r//g' /usr/share/perl5/Lemonldap/NG/Common/Conf/DefaultValues.pm && \
     echo rm -f *.patch && \

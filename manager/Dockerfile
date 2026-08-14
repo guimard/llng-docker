@@ -40,6 +40,7 @@ RUN \
 	twake-plugins.patch \
 	875-externalMenu.patch \
 	better-cfgAuthor.patch \
+	2.21.5.patch \
     ; do echo patch $p && patch -p1 < $p || exit 1; done && \
     rm -f *.patch && \
     find /usr/share/perl5/Lemonldap -name '*.orig' -delete && \

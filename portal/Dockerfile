@@ -44,11 +44,11 @@ RUN set -e && for p in \
     717-introspection.patch 718-iat-and-nbf-in-at.patch \
     779-mail2f-api.patch \
     722-adminlogout.patch \
-    808-oidc-fix.patch \
     twake-wellknown.patch \
     crowdsec.patch \
     874-geoip.patch \
     875-externalMenu.patch \
+    2.21.5.patch \
     ; do echo patch $p && patch -p1 < $p; done && \
     cp -f /usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.js /usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.min.js && \
     rm -f /*.patch && \
