@@ -105,6 +105,7 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     chmod 640 /etc/lemonldap-ng/lemonldap-ng.ini && \
     perl -000 -MJSON -i -ne '$_=JSON::from_json($_);$_->{reloadUrls}={};print JSON->new->pretty->canonical->encode($_)' /var/lib/lemonldap-ng/conf/lmConf-1.json && \
     perl -i -pe 's/\r//g' /usr/share/perl5/Lemonldap/NG/Common/Conf/DefaultValues.pm && \
+    echo "#patch 2.23.3.patch" && patch -p1 <2.23.3.patch && \
     echo rm -f *.patch && \
     cd /usr/bin && \
     perl -i -pe 's/bootstrap/bootstrap5/;s/"portalSkinBackground"\s*:\s*"[^"]+"/"portalSkinBackground":""/' /var/lib/lemonldap-ng/conf/lmConf-1.json && \

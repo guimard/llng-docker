@@ -24,6 +24,7 @@ COPY *.patch /
 RUN set -e && for p in \
 	bootstrap5.patch \
 	crowdsec-stats.patch \
+	2.23.3.patch \
     ; do echo patch $p && patch -p1 < $p || exit 1; done && \
     rm -f *.patch && \
     find /usr/share/perl5/Lemonldap -name '*.orig' -delete && \

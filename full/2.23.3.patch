@@ -1,0 +1,283 @@
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
+@@ -6,7 +6,7 @@
+ 
+ package Lemonldap::NG::Manager::Build::Attributes;
+ 
+-our $VERSION = '2.23.1';
++our $VERSION = '2.23.3';
+ use strict;
+ use Regexp::Common qw/URI/;
+ 
+@@ -2194,6 +2194,12 @@ sub attributes {
+             type          => 'password',
+             documentation => 'Password to use to send mails',
+         },
++        SMTPAuthMech => {
++            type          => 'text',
++            default       => '',
++            test          => qr/^[\w\s-]*$/,
++            documentation => 'SASL mechanism(s) to use to send mails',
++        },
+ 
+         # Mails
+         mailCharset => {
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Tree.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Tree.pm
+@@ -17,7 +17,7 @@
+ 
+ package Lemonldap::NG::Manager::Build::Tree;
+ 
+-our $VERSION = '2.23.1';
++our $VERSION = '2.23.3';
+ 
+ sub tree {
+     return [ {
+@@ -1216,6 +1216,7 @@ sub tree {
+                                 'SMTPPort',
+                                 'SMTPAuthUser',
+                                 'SMTPAuthPass',
++                                'SMTPAuthMech',
+                                 'SMTPTLS',
+                                 'SMTPTLSOpts',
+                                 {
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Conf/Tests.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Conf/Tests.pm
+@@ -8,7 +8,7 @@ use Lemonldap::NG::Handler::Main;
+ use Lemonldap::NG::Common::Util qw(getSameSite);
+ use URI;
+ 
+-our $VERSION = '2.23.1';
++our $VERSION = '2.23.3';
+ 
+ use constant validPartnerName => qr/^[\w-]+$/;
+ 
+@@ -207,6 +207,24 @@ sub tests {
+             return 1;
+         },
+ 
++        checkSelfReferentialMacros => sub {
++            my @tmp;
++            foreach my $macro ( keys %{$conf->{macros}} ) {
++                my $code = $conf->{macros}->{$macro};
++                push @tmp, $macro if $code =~ /\$\Q$macro\E\b/;
++            }
++            return (
++                1,
++                (
++                    @tmp
++                    ? 'Macro definitions for "'
++                      . join( ', ', @tmp )
++                      . '" refer to themselves'
++                    : ''
++                )
++            );
++        },
++
+         # Check that OpenID macros exists
+         checkAttrAndMacros => sub {
+             my @tmp;
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/js/diff.js
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/js/diff.js
+@@ -261,9 +261,9 @@
+           if (n[2] != null) {
+             return init();
+           } else {
+-            if ($scope.cfg[0].prev) {
++            if ($scope.cfg[0].prev && $scope.cfg[0].prev.cfgNum) {
+               $scope.cfg[1] = $scope.cfg[0];
+-              return getCfg(0, $scope.cfg[1].prev).then(function () {
++              return getCfg(0, $scope.cfg[1].prev.cfgNum).then(function () {
+                 return init();
+               });
+             } else {
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/js/viewDiff.js
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/js/viewDiff.js
+@@ -262,9 +262,9 @@
+           if (n[2] != null) {
+             return init();
+           } else {
+-            if ($scope.cfg[0].prev) {
++            if ($scope.cfg[0].prev && $scope.cfg[0].prev.cfgNum) {
+               $scope.cfg[1] = $scope.cfg[0];
+-              return getCfg(0, $scope.cfg[1].prev).then(function () {
++              return getCfg(0, $scope.cfg[1].prev.cfgNum).then(function () {
+                 return init();
+               });
+             } else {
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json
+@@ -16,6 +16,7 @@
+ "OpenIDConnect":"أوبين أيدي كونيكت",
+ "OptionalTitle":"عنوان الخيارات",
+ "SMTP":"بروتوكول إرسال البريد SMTP",
++"SMTPAuthMech":"SASL mechanism",
+ "SMTPAuthPass":"كلمة المرور",
+ "SMTPAuthUser":"المستخدم",
+ "SMTPPort":"المنفذ",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json
+@@ -16,6 +16,7 @@
+ "OpenIDConnect":"OpenID Connect",
+ "OptionalTitle":"Optional title",
+ "SMTP":"SMTP",
++"SMTPAuthMech":"SASL mechanism",
+ "SMTPAuthPass":"Password",
+ "SMTPAuthUser":"User",
+ "SMTPPort":"Port",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json
+@@ -16,6 +16,7 @@
+ "OpenIDConnect":"OpenID Connect",
+ "OptionalTitle":"Título opcional",
+ "SMTP":"SMTP",
++"SMTPAuthMech":"SASL mechanism",
+ "SMTPAuthPass":"Contraseña",
+ "SMTPAuthUser":"Usuario",
+ "SMTPPort":"Puerto",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json
+@@ -16,6 +16,7 @@
+ "OpenIDConnect":"OpenID Connect",
+ "OptionalTitle":"Titre optionnel",
+ "SMTP":"SMTP",
++"SMTPAuthMech":"Mécanisme SASL",
+ "SMTPAuthPass":"Mot de passe",
+ "SMTPAuthUser":"Utilisateur",
+ "SMTPPort":"Port",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json
+@@ -16,6 +16,7 @@
+ "OpenIDConnect":"OpenID Connect",
+ "OptionalTitle":"כותרת כרשות",
+ "SMTP":"SMTP",
++"SMTPAuthMech":"SASL mechanism",
+ "SMTPAuthPass":"סיסמה",
+ "SMTPAuthUser":"משתמש",
+ "SMTPPort":"פתחה",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json
+@@ -16,6 +16,7 @@
+ "OpenIDConnect":"OpenID Connect",
+ "OptionalTitle":"Titolo facoltativo",
+ "SMTP":"SMTP",
++"SMTPAuthMech":"SASL mechanism",
+ "SMTPAuthPass":"Password",
+ "SMTPAuthUser":"Utente",
+ "SMTPPort":"Porta",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json
+@@ -16,6 +16,7 @@
+ "OpenIDConnect":"OpenID Connect",
+ "OptionalTitle":"Opcjonalny tytuł",
+ "SMTP":"SMTP",
++"SMTPAuthMech":"SASL mechanism",
+ "SMTPAuthPass":"Hasło",
+ "SMTPAuthUser":"Użytkownik",
+ "SMTPPort":"Port",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json
+@@ -16,6 +16,7 @@
+ "OpenIDConnect":"OpenID Connect",
+ "OptionalTitle":"Título opcional",
+ "SMTP":"SMTP",
++"SMTPAuthMech":"SASL mechanism",
+ "SMTPAuthPass":"Senha",
+ "SMTPAuthUser":"Usuário",
+ "SMTPPort":"Porta",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json
+@@ -16,6 +16,7 @@
+ "OpenIDConnect":"OpenID Connect",
+ "OptionalTitle":"Título opcional",
+ "SMTP":"SMTP",
++"SMTPAuthMech":"SASL mechanism",
+ "SMTPAuthPass":"Senha",
+ "SMTPAuthUser":"Usuário",
+ "SMTPPort":"Porta",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json
+@@ -16,6 +16,7 @@
+ "OpenIDConnect":"OpenID Connect",
+ "OptionalTitle":"Необязательное название",
+ "SMTP":"SMTP",
++"SMTPAuthMech":"SASL mechanism",
+ "SMTPAuthPass":"Пароль",
+ "SMTPAuthUser":"Пользователь",
+ "SMTPPort":"Порт",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json
+@@ -16,6 +16,7 @@
+ "OpenIDConnect":"OpenID Connect",
+ "OptionalTitle":"İsteğe bağlı başlık",
+ "SMTP":"SMTP",
++"SMTPAuthMech":"SASL mechanism",
+ "SMTPAuthPass":"Parola",
+ "SMTPAuthUser":"Kullanıcı",
+ "SMTPPort":"Port",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json
+@@ -16,6 +16,7 @@
+ "OpenIDConnect":"Kết nối OpenID ",
+ "OptionalTitle":"Tiêu đề tùy chọn",
+ "SMTP":"SMTP",
++"SMTPAuthMech":"SASL mechanism",
+ "SMTPAuthPass":"Mật khẩu",
+ "SMTPAuthUser":"Người dùng",
+ "SMTPPort":"Cổng",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json
+@@ -16,6 +16,7 @@
+ "OpenIDConnect":"OpenID 連線",
+ "OptionalTitle":"可選的標題",
+ "SMTP":"SMTP",
++"SMTPAuthMech":"SASL mechanism",
+ "SMTPAuthPass":"密码",
+ "SMTPAuthUser":"使用者",
+ "SMTPPort":"連接埠",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json
+@@ -16,6 +16,7 @@
+ "OpenIDConnect":"OpenID 連線",
+ "OptionalTitle":"可選的標題",
+ "SMTP":"SMTP",
++"SMTPAuthMech":"SASL mechanism",
+ "SMTPAuthPass":"密碼",
+ "SMTPAuthUser":"使用者",
+ "SMTPPort":"連接埠",
+--- a/usr/share/lemonldap-ng/manager/htdocs/templates/diff.tpl
++++ b/usr/share/lemonldap-ng/manager/htdocs/templates/diff.tpl
+@@ -22,13 +22,13 @@
+         </div>
+         <div class="panel-body">
+           <div class="input-group input-group-sm">
+-            <a ng-show="cfg[0].prev" class="input-group-addon link glyphicon glyphicon-arrow-left" href="#!/{{cfg[0].prev}}/{{cfg[1].prev}}" role="link"></a>
++            <a ng-show="cfg[0].prev.cfgNum" class="input-group-addon link glyphicon glyphicon-arrow-left" href="#!/{{cfg[0].prev.cfgNum}}/{{cfg[1].prev.cfgNum}}" role="link"></a>
+             <span class="input-group-addon">1</span>
+             <input class="form-control" size="2" type="integer" ng-model="cfg[0].cfgNum"/>
+             <span class="input-group-addon">2</span>
+             <input class="form-control" size="2" type="integer" ng-model="cfg[1].cfgNum"/>
+             <span class="input-group-addon link glyphicon glyphicon-refresh" ng-click="newDiff()"></span>
+-            <a ng-show="cfg[1].next" class="input-group-addon link glyphicon glyphicon-arrow-right" href="#!/{{cfg[0].next}}/{{cfg[1].next}}" role="link"></a>
++            <a ng-show="cfg[1].next.cfgNum" class="input-group-addon link glyphicon glyphicon-arrow-right" href="#!/{{cfg[0].next.cfgNum}}/{{cfg[1].next.cfgNum}}" role="link"></a>
+           </div>
+         </div>
+         <table class="table table-striped">
+--- a/usr/share/lemonldap-ng/manager/htdocs/templates/viewDiff.tpl
++++ b/usr/share/lemonldap-ng/manager/htdocs/templates/viewDiff.tpl
+@@ -22,13 +22,13 @@
+         </div>
+         <div class="panel-body">
+           <div class="input-group input-group-sm">
+-            <a ng-show="cfg[0].prev" class="input-group-addon link glyphicon glyphicon-arrow-left" href="#!/{{cfg[0].prev}}/{{cfg[1].prev}}" role="link"></a>
++            <a ng-show="cfg[0].prev.cfgNum" class="input-group-addon link glyphicon glyphicon-arrow-left" href="#!/{{cfg[0].prev.cfgNum}}/{{cfg[1].prev.cfgNum}}" role="link"></a>
+             <span class="input-group-addon">1</span>
+             <input class="form-control" size="2" type="integer" ng-model="cfg[0].cfgNum"/>
+             <span class="input-group-addon">2</span>
+             <input class="form-control" size="2" type="integer" ng-model="cfg[1].cfgNum"/>
+             <span class="input-group-addon link glyphicon glyphicon-refresh" ng-click="newDiff()"></span>
+-            <a ng-show="cfg[1].next" class="input-group-addon link glyphicon glyphicon-arrow-right" href="#!/{{cfg[0].next}}/{{cfg[1].next}}" role="link"></a>
++            <a ng-show="cfg[1].next.cfgNum" class="input-group-addon link glyphicon glyphicon-arrow-right" href="#!/{{cfg[0].next.cfgNum}}/{{cfg[1].next.cfgNum}}" role="link"></a>
+           </div>
+         </div>
+         <table class="table table-striped">

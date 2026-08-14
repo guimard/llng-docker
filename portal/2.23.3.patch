@@ -1,0 +1,352 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal.pm
+@@ -1,7 +1,7 @@
+ # Alias for Lemonldap::NG::Portal::Main
+ package Lemonldap::NG::Portal;
+ 
+-our $VERSION = '2.23.2';
++our $VERSION = '2.23.3';
+ use Lemonldap::NG::Portal::Main;
+ use base 'Lemonldap::NG::Portal::Main';
+ 
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Auth/GitHub.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Auth/GitHub.pm
+@@ -8,7 +8,7 @@ use Lemonldap::NG::Common::FormEncode;
+ use Lemonldap::NG::Common::UserAgent;
+ use Lemonldap::NG::Portal::Main::Constants qw(PE_OK PE_ERROR PE_REDIRECT);
+ 
+-our $VERSION = '2.19.0';
++our $VERSION = '2.23.3';
+ 
+ extends 'Lemonldap::NG::Portal::Main::Auth';
+ 
+@@ -27,6 +27,23 @@ has ua => (
+     }
+ );
+ 
++# Used to protect the authorization request against CSRF and to restore the
++# initial request across the GitHub round trip
++has state_ott => (
++    is      => 'rw',
++    lazy    => 1,
++    default => sub {
++        my $ott = $_[0]->{p}->loadModule('::Lib::OneTimeToken');
++        $ott->timeout( $_[0]->conf->{timeout} );
++
++        # GitHub sends the user back to any portal of the farm, so the state
++        # must not be stored in the local cache, whatever tokenUseGlobalStorage
++        # says
++        $ott->cache(undef);
++        return $ott;
++    }
++);
++
+ has githubAuthorizationEndpoint => (
+     is      => 'ro',
+     lazy    => 1,
+@@ -101,6 +118,22 @@ sub extractFormInfo {
+ 
+     # Code
+     if ($code) {
++
++        # Restore initial request. This also protects against login CSRF: the
++        # state token can only have been created by this portal
++        unless ($state) {
++            $self->userLogger->error('GitHub response without state parameter');
++            return PE_ERROR;
++        }
++        my $stateData = $self->state_ott->getToken($state);
++        unless ( $stateData and ( $stateData->{_type} // '' ) eq 'githubState' )
++        {
++            $self->userLogger->error('Invalid or expired GitHub state');
++            return PE_ERROR;
++        }
++        $req->urldc( $stateData->{urldc} ) if $stateData->{urldc};
++        $req->{checkLogins} = $stateData->{checkLogins};
++
+         my %form;
+         $form{"code"}          = $code;
+         $form{"state"}         = $state if $state;
+@@ -231,16 +264,6 @@ sub extractFormInfo {
+             $req->data->{githubData}->{"gpg_keys"} = $json_hash;
+         }
+ 
+-        # Extract state
+-        if ($state) {
+-            my $stateSession = $self->p->getApacheSession( $state, 1 );
+-
+-            $req->urldc( $stateSession->data->{urldc} );
+-            $req->{checkLogins} = $stateSession->data->{checkLogins};
+-
+-            $stateSession->remove;
+-        }
+-
+         $req->user(
+             $req->data->{githubData}->{ $self->conf->{githubUserField} } );
+ 
+@@ -254,15 +277,16 @@ sub extractFormInfo {
+         $self->logger->debug('Redirection to GitHub');
+ 
+         # Store state
+-        my $stateSession =
+-          $self->p->getApacheSession( undef, 1, 0, 'GitHubState' );
+-
+-        my $stateInfos = {};
+-        $stateInfos->{_utime}      = time() + $self->conf->{timeout};
+-        $stateInfos->{urldc}       = $req->urldc;
+-        $stateInfos->{checkLogins} = $req->{checkLogins};
+-
+-        $stateSession->update($stateInfos);
++        my $stateToken = $self->state_ott->createToken( {
++                _type       => 'githubState',
++                urldc       => $req->urldc,
++                checkLogins => $req->{checkLogins},
++            }
++        );
++        unless ($stateToken) {
++            $self->logger->error('Unable to create GitHub state token');
++            return PE_ERROR;
++        }
+ 
+         my $authn_uri = $self->githubAuthorizationEndpoint;
+         my $client_id = $self->conf->{githubClientID};
+@@ -273,7 +297,7 @@ sub extractFormInfo {
+             client_id     => $client_id,
+             redirect_uri  => $callback_url,
+             scope         => $scope,
+-            state         => $stateSession->id,
++            state         => $stateToken,
+           );
+ 
+         $req->urldc($authn_uri);
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Auth/LinkedIn.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Auth/LinkedIn.pm
+@@ -8,7 +8,7 @@ use Lemonldap::NG::Common::FormEncode;
+ use Lemonldap::NG::Common::UserAgent;
+ use Lemonldap::NG::Portal::Main::Constants qw(PE_OK PE_ERROR PE_REDIRECT);
+ 
+-our $VERSION = '2.19.0';
++our $VERSION = '2.23.3';
+ 
+ extends 'Lemonldap::NG::Portal::Main::Auth';
+ 
+@@ -27,6 +27,23 @@ has ua => (
+     }
+ );
+ 
++# Used to protect the authorization request against CSRF and to restore the
++# initial request across the LinkedIn round trip
++has state_ott => (
++    is      => 'rw',
++    lazy    => 1,
++    default => sub {
++        my $ott = $_[0]->{p}->loadModule('::Lib::OneTimeToken');
++        $ott->timeout( $_[0]->conf->{timeout} );
++
++        # LinkedIn sends the user back to any portal of the farm, so the state
++        # must not be stored in the local cache, whatever tokenUseGlobalStorage
++        # says
++        $ott->cache(undef);
++        return $ott;
++    }
++);
++
+ has linkedInAuthorizationEndpoint => (
+     is      => 'ro',
+     lazy    => 1,
+@@ -100,6 +117,24 @@ sub extractFormInfo {
+ 
+     # Code
+     if ($code) {
++
++        # Restore initial request. This also protects against login CSRF: the
++        # state token can only have been created by this portal
++        unless ($state) {
++            $self->userLogger->error(
++                'LinkedIn response without state parameter');
++            return PE_ERROR;
++        }
++        my $stateData = $self->state_ott->getToken($state);
++        unless ( $stateData
++            and ( $stateData->{_type} // '' ) eq 'linkedInState' )
++        {
++            $self->userLogger->error('Invalid or expired LinkedIn state');
++            return PE_ERROR;
++        }
++        $req->urldc( $stateData->{urldc} ) if $stateData->{urldc};
++        $req->{checkLogins} = $stateData->{checkLogins};
++
+         my %form;
+         $form{"code"}          = $code;
+         $form{"client_id"}     = $self->conf->{linkedInClientID};
+@@ -202,16 +237,6 @@ sub extractFormInfo {
+         $self->logger->debug(
+             "Good LinkedIn authentication for " . $req->user );
+ 
+-        # Extract state
+-        if ($state) {
+-            my $stateSession = $self->p->getApacheSession( $state, 1 );
+-
+-            $req->urldc( $stateSession->data->{urldc} );
+-            $req->{checkLogins} = $stateSession->data->{checkLogins};
+-
+-            $stateSession->remove;
+-        }
+-
+         return PE_OK;
+     }
+ 
+@@ -220,15 +245,17 @@ sub extractFormInfo {
+         $self->logger->debug('Redirection to LinkedIn');
+ 
+         # Store state
+-        my $stateSession =
+-          $self->p->getApacheSession( undef, 1, 0, 'LinkedInState' );
+-
+-        my $stateInfos = {};
+-        $stateInfos->{_utime}      = time() + $self->conf->{timeout};
+-        $stateInfos->{urldc}       = $req->urldc;
+-        $stateInfos->{checkLogins} = $req->{checkLogins};
+-
+-        $stateSession->update($stateInfos);
++        my $stateToken = $self->state_ott->createToken(
++            {
++                _type       => 'linkedInState',
++                urldc       => $req->urldc,
++                checkLogins => $req->{checkLogins},
++            }
++        );
++        unless ($stateToken) {
++            $self->logger->error('Unable to create LinkedIn state token');
++            return PE_ERROR;
++        }
+ 
+         my $authn_uri = $self->linkedInAuthorizationEndpoint;
+         my $client_id = $self->conf->{linkedInClientID};
+@@ -239,7 +266,7 @@ sub extractFormInfo {
+             client_id     => $client_id,
+             redirect_uri  => $callback_url,
+             scope         => $scope,
+-            state         => $stateSession->id,
++            state         => $stateToken,
+           );
+ 
+         $req->urldc($authn_uri);
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/SMTP.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/SMTP.pm
+@@ -17,7 +17,7 @@ use Lemonldap::NG::Common::EmailTransport;
+ use MIME::Base64;
+ use Encode;
+ 
+-our $VERSION = '2.21.0';
++our $VERSION = '2.23.3';
+ 
+ our $transport;
+ 
+@@ -52,6 +52,16 @@ has htmlParser => (
+     },
+ );
+ 
++# Refuse to load any mail related plugin if SMTPAuthMech is set but can't be
++# used: without this check mails would be sent using another mechanism than the
++# configured one, which is exactly what this parameter tries to avoid
++sub BUILD {
++    my ($self) = @_;
++    my $error =
++      Lemonldap::NG::Common::EmailTransport->checkSasl( $self->{conf} );
++    die "$error\n" if $error;
++}
++
+ sub loadMailTemplate {
+     my ( $self, $req, $name, %prm ) = @_;
+ 
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm
+@@ -9,7 +9,7 @@
+ #
+ package Lemonldap::NG::Portal::Main::Run;
+ 
+-our $VERSION = '2.23.0';
++our $VERSION = '2.23.3';
+ 
+ package Lemonldap::NG::Portal::Main;
+ 
+@@ -1366,7 +1366,16 @@ sub registerLogin {
+     }
+ 
+     my $history = $req->sessionInfo->{_loginHistory} ||= {};
+-    my $type    = ( $req->authResult > 0 ? 'failed' : 'success' ) . 'Login';
++
++    # Only negative results are real login failures. Positive/warning results
++    # such as PE_PP_CHANGE_AFTER_RESET or PE_PASSWORD_OK must not be stored as
++    # failed logins, else they wrongly feed BruteForceProtection (#3634).
++    my $type = (
++        ( $req->authResult > 0
++              && $req->error_type( $req->authResult ) eq 'negative' )
++        ? 'failed'
++        : 'success'
++    ) . 'Login';
+     $history->{$type} ||= [];
+     $self->logger->debug("Current login saved into $type");
+ 
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/PublicNotifications.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/PublicNotifications.pm
+@@ -8,7 +8,7 @@ use Lemonldap::NG::Portal::Main::Constants qw(
+   PE_ERROR
+ );
+ 
+-our $VERSION = '2.23.0';
++our $VERSION = '2.23.3';
+ 
+ extends 'Lemonldap::NG::Portal::Main::Plugin';
+ 
+@@ -52,9 +52,12 @@ sub getPublicNotifs {
+     my $infos =
+       $self->notifObject->module->notifObject->getNotifications("public-info");
+ 
+-    my $public_errors = [ map { from_json( $errors->{$_} ) } keys %$errors ];
+-    my $public_warns  = [ map { from_json( $warns->{$_} ) } keys %$warns ];
+-    my $public_infos  = [ map { from_json( $infos->{$_} ) } keys %$infos ];
++    my $public_errors =
++      [ map { $self->_extractNotification( $errors->{$_} ) } keys %$errors ];
++    my $public_warns =
++      [ map { $self->_extractNotification( $warns->{$_} ) } keys %$warns ];
++    my $public_infos =
++      [ map { $self->_extractNotification( $infos->{$_} ) } keys %$infos ];
+ 
+     if ( @$public_errors || @$public_warns || @$public_infos ) {
+         my $res = to_json( {
+@@ -63,17 +66,31 @@ sub getPublicNotifs {
+                 public_infos  => $public_infos,
+             }
+         );
++        my $cacheTag = $self->p->cacheTag;
+         $req->env->{DISPLAY_PUBLIC_NOTIFICATIONS} = 1 if $res;
+-        $req->data->{customScript} .= <<EOF           if $res;
++        $req->data->{customScript} .= <<EOF if $res;
+ <script type="application/init">
+ {
+   "publicNotifications": $res
+ }
+ </script>
+-<script type="text/javascript" src="$self->{p}->{staticPrefix}/common/js/carousel.js?v=$self->{p}->cacheTag"></script>
++<script type="text/javascript" src="$self->{p}->{staticPrefix}/common/js/carousel.min.js?v=$cacheTag"></script>
+ EOF
+     }
+     return PE_OK;
+ }
+ 
++sub _extractNotification {
++    my ( $self, $notif ) = @_;
++    $notif = from_json($notif);
++    $notif = $notif->[0] if ( ref($notif) eq 'ARRAY' );
++    if ( my $content = $notif->{xml} ) {
++        $self->logger->debug("Notification content: $content");
++        $content = from_json($content);
++        delete $notif->{xml};
++        return { %$notif, %$content };
++    }
++    else { return $notif; }
++}
++
+ 1;
