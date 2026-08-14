@@ -72,6 +72,7 @@ RUN set -e && for p in \
     779-mail2f-api.patch \
     crowdsec-stats.patch \
     autoloader.patch \
+    2.23.3.patch \
     bootstrap5.patch \
     ; do echo patch $p && patch -p1 < $p || exit 1; done && \
     rm -f /usr/share/lemonldap-ng/portal/htdocs/static/common/js/carousel.min.js && \
