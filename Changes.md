@@ -1,5 +1,8 @@
 # Changes
 
+## v2.23.3-1 _(2026-08-14)_
+- Import 2.23.3 changes
+
 ## v2.23.2-1 _(2026-07-28)_
 - Add perlHtPasswd utility
 - Accept "false" as value for CRON variables
