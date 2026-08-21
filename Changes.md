@@ -1,5 +1,8 @@
 # Changes
 
+## v2.23.3-2 _(2026-08-21)_
+- Update plugins to 0.4.1
+
 ## v2.23.3-1 _(2026-08-14)_
 - Import 2.23.3 changes
 
