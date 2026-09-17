@@ -11,6 +11,7 @@ RUN echo "# Install nginx and portal and manager libs" && \
     apt-get -y update && \
     apt-get -y upgrade && \
     apt-get -y --no-install-recommends install nginx \
+      linagora-llng-build-manager-files \
       liblemonldap-ng-manager-perl${LLNGDIST} apache2-utils \
     && \
     mv /etc/dpkg/dpkg.cfg.d /tmp/ && \
