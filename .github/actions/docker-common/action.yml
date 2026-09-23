@@ -77,6 +77,7 @@ runs:
         run: |
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             TAGS="${{ inputs.DOCKER_IMAGE }}:lts-2.21${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}"
+            TAGS+=$'\n'"${{ inputs.DOCKER_IMAGE }}:stable${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}"
             TAGS+=$'\n'"${{ inputs.DOCKER_IMAGE }}:${{ steps.setversion.outputs.version }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}"
             TAGS+=$'\n'"${{ inputs.DOCKER_IMAGE }}:${{ steps.setversion.outputs.version }}-${{ env.DEBIANRELEASE }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}"
           else
@@ -93,6 +94,7 @@ runs:
         run: |
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             TAGS="${{ inputs.DOCKER_IMAGE }}:lts-2.21-non-root"
+            TAGS+=$'\n'"${{ inputs.DOCKER_IMAGE }}:stable-non-root"
             TAGS+=$'\n'"${{ inputs.DOCKER_IMAGE }}:${{ steps.setversion.outputs.version }}-non-root"
             TAGS+=$'\n'"${{ inputs.DOCKER_IMAGE }}:${{ steps.setversion.outputs.version }}-${{ env.DEBIANRELEASE }}-non-root"
           else
