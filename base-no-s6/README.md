@@ -5,7 +5,7 @@ LemonLDAP::NG.
 
 ## Tags
 
-- `stable`: latest lemonldap-ng\* packages from Debian backports with stable patches
+- `stable`: alias of `lts-2.21`, the current LTS release
 - `stable-no-s6`: the same without [S6-overlay](https://github.com/just-containers/s6-overlay)
 - `2.x.x-y`: versioned lemonldap-ng\* packages from Debian backports with patches version "y"
 - `2.x.x-y-no-s6`: the same without [S6-overlay](https://github.com/just-containers/s6-overlay)

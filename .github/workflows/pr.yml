@@ -2,7 +2,7 @@ name: Build and test Docker Images
 
 on:
   push:
-    branches-ignore: [master,stable,experimental]
+    branches-ignore: [master,experimental,lts-2.21]
     # The full ./build-all (every image, one runner) is heavy. Skip it for
     # changes that don't affect the images — Helm chart, CI workflows, docs —
     # so CI-only branches don't spend ~an hour building nothing relevant.
