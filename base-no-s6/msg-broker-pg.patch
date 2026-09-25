@@ -1,0 +1,254 @@
+--- a/usr/share/perl5/Lemonldap/NG/Common/Conf.pm
++++ b/usr/share/perl5/Lemonldap/NG/Common/Conf.pm
+@@ -527,7 +527,7 @@ sub lastCfg {
+         $msg .= "Warn: $@\n" if $@;
+         if ( ref($cached) and $cached->{cfgNum} ) {
+             $msg .=
+-                "lastCfg failed, falling back to cached configuration "
++                "Warn: lastCfg failed, falling back to cached configuration "
+               . "(cfgNum=$cached->{cfgNum}).\n";
+             return $cached->{cfgNum};
+         }
+--- a/usr/share/perl5/Lemonldap/NG/Common/MessageBroker/Pg.pm
++++ b/usr/share/perl5/Lemonldap/NG/Common/MessageBroker/Pg.pm
+@@ -15,10 +15,15 @@ sub new {
+         and $args->{dbiChain}
+         and $args->{dbiUser} )
+     {
+-        $logger->error('MISSING OPTIONS FOR PG PUB/SUB');
++        $logger->error('MISSING OPTIONS FOR PG PUB/SUB') if $logger;
+         return undef;
+     }
+-    my $self = bless { %{$args}, logger => $logger }, $class;
++    my $self = bless {
++        %{$args},
++        checkTime      => $conf->{checkTime} // 600,
++        eventQueueName => $conf->{eventQueueName},
++        logger         => $logger,
++    }, $class;
+     return $self;
+ }
+ 
+@@ -32,26 +37,45 @@ sub publish {
+ 
+ sub subscribe {
+     my ( $self, $channel ) = @_;
++
++    # Get a connection first: a new connection re-subscribes to the
++    # already known channels only
++    my $dbh = $self->_dbh;
+     $self->{messages}{$channel} = [];
+-    $self->_dbh->do("LISTEN $channel");
++    return undef unless $self->{_dbh};
++    my $res = eval { $self->_listen( $dbh, $channel ) };
++    unless ($res) {
++        $self->_log( error => "MsgBroker: unable to subscribe to $channel: "
++              . $self->_err($@) );
++
++        # Drop connection: next call will reconnect and subscribe again
++        $self->_drop;
++    }
++    return $res;
+ }
+ 
+ sub getNextMessage {
+     my ( $self, $channel, $delay ) = @_;
+     return undef
+       unless $self->{messages}{$channel};
+-    if ( my $notify = $self->_dbh->pg_notifies ) {
+-        my ( $name, $pid, $payload ) = @$notify;
+-        $payload = eval { JSON::from_json($payload) };
+-        if ($@) {
+-            $self->{logger}->error("Bad message from Pg: $@");
+-        }
+-        else {
+-            push @{ $self->{messages}{$name} }, $payload;
++    my $dbh = $self->_checkedDbh;
++    if ( $self->{_dbh} ) {
++        my $ok = eval {
++            while ( my $notify = $dbh->pg_notifies ) {
++                $self->_store(@$notify);
++            }
++            1;
++        };
++        unless ($ok) {
++            $self->_log(
++                warn => 'MsgBroker: unable to read Pg notifications: '
++                  . $self->_err($@) );
++            $self->_drop;
+         }
+     }
+     return shift( @{ $self->{messages}{$channel} } )
+       if @{ $self->{messages}{$channel} };
++    return undef;
+ }
+ 
+ sub waitForNextMessage {
+@@ -65,11 +89,73 @@ sub waitForNextMessage {
+     }
+ }
+ 
++# Store a notification into local queue
++sub _store {
++    my ( $self, $name, $pid, $payload ) = @_;
++
++    # PostgreSQL folds unquoted channel names to lower case
++    ($name) = grep { lc($_) eq $name } keys %{ $self->{messages} }
++      unless $self->{messages}{$name};
++    return unless $name;
++    $payload = eval { JSON::from_json($payload) };
++    if ($@) {
++        $self->_log( error => "Bad message from Pg: $@" );
++    }
++    else {
++        push @{ $self->{messages}{$name} }, $payload;
++    }
++}
++
++# Like _dbh() but verifies periodically that all subscribed channels are
++# still listened (a session may lose its LISTEN without being disconnected)
++sub _checkedDbh {
++    my ($self) = @_;
++    my $dbh = $self->{_dbh};
++    return $self->_dbh
++      unless $dbh
++      and time >= ( $self->{_lastSubCheck} || 0 ) + $self->{checkTime};
++
++    my $listening =
++      eval { $dbh->selectcol_arrayref('SELECT pg_listening_channels()') };
++    unless ($listening) {
++        $self->_log( warn => 'MsgBroker: Pg subscription check failed: '
++              . $self->_err($@) );
++        $self->_drop;
++        return $self->_dbh;
++    }
++    $self->{_lastSubCheck} = time;
++    my %listening = map { ( $_ => 1 ) } @$listening;
++    my @missing =
++      grep { !$listening{ lc($_) } } sort keys %{ $self->{messages} };
++    return $dbh unless @missing;
++
++    $self->_log( warn => 'MsgBroker: subscription lost for '
++          . join( ', ', @missing )
++          . ', subscribing again' );
++    unless ( eval { $self->_listen( $dbh, $_ ) foreach @missing; 1 } ) {
++        $self->_log( error => 'MsgBroker: unable to subscribe again to '
++              . join( ', ', @missing ) . ': '
++              . $self->_err($@) );
++        $self->_drop;
++        return $self->_dbh;
++    }
++
++    # Notifications may have been lost
++    $self->_pushNewConf;
++    return $dbh;
++}
++
+ sub _dbh {
+     my ($self) = @_;
+     my $dbh = check_dbh( $self->{_dbh} );
+     return $dbh if $dbh;
+     $self->{_dbh} = undef;
++    return $self->_connect || bless {}, 'Lemonldap::NG::DBI::Failed';
++}
++
++sub _connect {
++    my ($self) = @_;
++    my ( $dbh, $err );
+ 
+     # This timeout is inspired from example given by DBI(3)
+     my $mask = POSIX::SigSet->new(SIGALRM);
+@@ -80,16 +166,80 @@ sub _dbh {
+     eval {
+         eval {
+             alarm(10);
+-            $self->{_dbh} =
++            $dbh =
+               DBI->connect( $self->{dbiChain}, $self->{dbiUser},
+-                $self->{dbiPassword}, { RaiseError => 1, AutoCommit => 1, } );
+-
+-            # Re subscribe to all channels when reconnecting
+-            $self->subscribe($_) foreach ( keys %{ $self->{messages} || {} } );
++                $self->{dbiPassword},
++                { RaiseError => 1, PrintError => 0, AutoCommit => 1, } );
+         };
++        $err = $@;
+         alarm(0);
+     };
+-    return $self->{_dbh} ||= bless {}, 'Lemonldap::NG::DBI::Failed';
++    sigaction( SIGALRM, $oldaction );
++    unless ($dbh) {
++        $self->_log( error => 'MsgBroker: unable to connect to Pg: '
++              . ( $err || $DBI::errstr || 'unknown error' ) );
++        return undef;
++    }
++
++    # Subscribe again to all channels, never keep a half-subscribed handle
++    my @channels = sort keys %{ $self->{messages} || {} };
++    unless ( eval { $self->_listen( $dbh, $_ ) foreach @channels; 1 } ) {
++        $self->_log( error => 'MsgBroker: unable to subscribe to '
++              . join( ', ', @channels ) . ': '
++              . ( $@ || $dbh->errstr || 'unknown error' ) );
++        eval { $dbh->disconnect };
++        return undef;
++    }
++    $self->_log( warn => 'MsgBroker: '
++          . ( $self->{_connected} ? 'reconnected' : 'connected' )
++          . ' to Pg'
++          . ( @channels ? ', subscribed to ' . join( ', ', @channels ) : '' ) )
++      if $self->{_connected} or @channels;
++    $self->{_connected}    = 1;
++    $self->{_dbh}          = $dbh;
++    $self->{_lastSubCheck} = time;
++
++    # Notifications sent while disconnected are lost
++    $self->_pushNewConf if @channels;
++    return $dbh;
++}
++
++sub _listen {
++    my ( $self, $dbh, $channel ) = @_;
++    return $dbh->do("LISTEN $channel");
++}
++
++sub _drop {
++    my ($self) = @_;
++    eval { $self->{_dbh}->disconnect } if $self->{_dbh};
++    $self->{_dbh} = undef;
++}
++
++# Insert a "newConf" event to force handler to verify its configuration
++sub _pushNewConf {
++    my ($self) = @_;
++    my $queue = $self->{messages}{ $self->{eventQueueName} // '' };
++    return unless $queue;
++    push @$queue, { action => 'newConf' }
++      unless grep { ( $_->{action} // '' ) eq 'newConf' } @$queue;
++}
++
++sub _err {
++    my ( $self, $err ) = @_;
++    return
++         $err
++      || ( $self->{_dbh} && $self->{_dbh}->errstr )
++      || 'unknown error';
++}
++
++sub _log {
++    my ( $self, $level, $msg ) = @_;
++    if ( $self->{logger} ) {
++        $self->{logger}->$level($msg);
++    }
++    else {
++        print STDERR "$msg\n";
++    }
+ }
+ 
+ package Lemonldap::NG::DBI::Failed;
+@@ -99,4 +249,6 @@ sub AUTOLOAD {
+     return undef;
+ }
+ 
++sub DESTROY { }
++
+ 1;
