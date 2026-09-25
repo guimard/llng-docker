@@ -1,8 +1,11 @@
 # Changes
 
 ## v2.23.4-1  _(2026-09-25)_
-- Update to 2.23.4
+- Update to 2.23.4 (CVE-2026-92288, CVE-2026-92289, CVE-2026-95811)
 - Update plugins to 0.5.2
+- patches:
+  - Fix MessageBroker::Pg
+  - Fix mails format
 
 ## v2.23.3-3 _(2026-08-30)_
 - Update plugins to 0.5.1
