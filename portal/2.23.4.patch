@@ -1,0 +1,797 @@
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Portal/2F/Engines/Default.pm b/usr/share/perl5/Lemonldap/NG/Portal/2F/Engines/Default.pm
+--- a/usr/share/perl5/Lemonldap/NG/Portal/2F/Engines/Default.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Portal/2F/Engines/Default.pm	2026-09-25 08:51:40.560829245 +0200
+@@ -877,10 +877,16 @@
+         return $res;
+     }
+     else {
++        delete $req->pdata->{sfRegToken};
+         $self->logger->warn(
+             "Cannot restore session state during mandatory 2FA registration");
++        if ( $req->wantJSON ) {
++            return $self->sendError( $req, "PE" . PE_TOKENEXPIRED );
++        }
++        else {
+         return $self->p->sendRedirection( $req, $req->portal );
+     }
++    }
+ }
+ 
+ # LEGACY
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Portal/2F/Register/Base.pm b/usr/share/perl5/Lemonldap/NG/Portal/2F/Register/Base.pm
+--- a/usr/share/perl5/Lemonldap/NG/Portal/2F/Register/Base.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Portal/2F/Register/Base.pm	2026-09-25 08:51:40.560829245 +0200
+@@ -2,7 +2,8 @@
+ package Lemonldap::NG::Portal::2F::Register::Base;
+ 
+ use strict;
+-use Lemonldap::NG::Portal::Main::Constants qw/PE_OK PE_ERROR/;
++use Lemonldap::NG::Portal::Main::Constants ':all';
++use Scalar::Util 'looks_like_number';
+ use Mouse;
+ 
+ our $VERSION = '2.23.0';
+@@ -106,7 +107,7 @@
+ sub run {
+     my ( $self, $req, $action ) = @_;
+     my $user = $req->userData->{ $self->conf->{whatToTrace} };
+-    return $self->p->sendError( $req, 'PE82', 400 )
++    return $self->errorResponse( $req, pe_status => PE_TOKENEXPIRED )
+       unless $user;
+ 
+     if ( $self->can('supportedActions')
+@@ -117,7 +118,7 @@
+         }
+     }
+     $self->logger->error( $self->prefix . "2f: unknown action ($action)" );
+-    return $self->p->sendError( $req, 'unknownAction', 400 );
++    return $self->errorResponse( $req, label => 'unknownAction' );
+ }
+ 
+ sub delete {
+@@ -125,15 +126,18 @@
+     my $user = $req->userData->{ $self->conf->{whatToTrace} };
+ 
+     # Check if unregistration is allowed
+-    return $self->p->sendError( $req, 'notAuthorized', 400 )
++    return $self->errorResponse( $req, label => 'notAuthorized' )
+       unless $self->userCanRemove;
+ 
+     $self->checkCsrf($req)
+-      or return $self->p->sendError( $req, 'csrfError', 400 );
++      or return $self->errorResponse( $req, label => 'csrfError' );
+ 
+-    my $epoch = $req->param('epoch')
+-      or return $self->p->sendError( $req,
+-        $self->prefix . '2f: "epoch" parameter is missing', 400 );
++    my $epoch = $req->param('epoch');
++    if ( !$epoch ) {
++        $self->logger->error(
++            $self->prefix . '2f: "epoch" parameter is missing' );
++        return $self->errorResponse($req);
++    }
+ 
+     my $registration_state = { module => $self };
+ 
+@@ -148,7 +152,7 @@
+         $self->logger->error( $self->prefix
+               . "2f: error in sfDeleteDevice hook: "
+               . $errorLabel );
+-        return $self->p->sendError( $req, $errorLabel, 400 );
++        return $self->errorResponse( $req, label => $errorLabel );
+     }
+ 
+     if ( $self->del2fDevice( $req, $req->userData, $self->type, $epoch ) ) {
+@@ -157,7 +161,7 @@
+     else {
+         $self->logger->error(
+             $self->prefix . "2f: unable to delete device: 2FDeviceNotFound" );
+-        return $self->p->sendError( $req, '2FDeviceNotFound', 400 );
++        return $self->errorResponse( $req, label => '2FDeviceNotFound' );
+     }
+ }
+ 
+@@ -166,14 +170,20 @@
+     my $user = $req->userData->{ $self->conf->{whatToTrace} };
+ 
+     $self->checkCsrf($req)
+-      or return $self->p->sendError( $req, 'csrfError', 400 );
++      or return $self->errorResponse( $req, label => 'csrfError' );
+ 
+-    my $epoch = $req->param('epoch')
+-      or return $self->p->sendError( $req,
+-        $self->prefix . '2f: "epoch" parameter is missing', 400 );
+-    my $label = $req->param('label')
+-      or return $self->p->sendError( $req,
++    my $epoch = $req->param('epoch');
++    if ( !$epoch ) {
++        $self->logger->error(
++            $self->prefix . '2f: "epoch" parameter is missing' );
++        return $self->errorResponse($req);
++    }
++    my $label = $req->param('label');
++    if ( !$label ) {
++        $self->logger->error(
+         $self->prefix . '2f: "label" parameter is missing', 400 );
++        return $self->errorResponse($req);
++    }
+     $self->logger->debug( "Modifying 2FA device with the label " . $label );
+     if (
+         $self->update2fDevice(
+@@ -185,28 +195,37 @@
+         return $self->p->sendJSONresponse( $req, { result => 1 } );
+     }
+     $self->logger->error( $self->prefix . "2f: device not found" );
+-    return $self->p->sendError( $req, '2FDeviceNotFound', 400 );
++    return $self->errorResponse( $req, label => '2FDeviceNotFound' );
+ }
+ 
+ sub failHtmlResponse {
+     my ( $self, $req, $error ) = @_;
+     my $uid = $req->userData->{ $self->conf->{whatToTrace} };
+ 
++    my $pe;
++    my $loglabel = $error;
++    my $label    = $error;
++    if ( looks_like_number($error) ) {
++        $pe       = portalConsts->{$error};
++        $loglabel = $pe;
++        $label    = "PE" . $error;
++    }
++
+     $self->auditLog(
+         $req,
+         message => (
+-            $self->type . " 2F device registration failed for $uid : $error"
++            $self->type . " 2F device registration failed for $uid : $loglabel"
+         ),
+         code         => "2FA_DEVICE_REGISTRATION_FAILED",
+         type         => $self->prefix,
+-        portal_error => $error,
++        ( $pe ? ( portal_error => $pe ) : ( error => $error ) ),
+         user         => $uid,
+     );
+ 
+     return $self->p->sendHtml(
+         $req, 'error',
+         params => {
+-            RAW_ERROR       => $error,
++            RAW_ERROR       => $label,
+             AUTH_ERROR_TYPE => 'error',
+         }
+     );
+@@ -216,18 +235,28 @@
+     my ( $self, $req, $error, $code ) = @_;
+     my $uid = $req->userData->{ $self->conf->{whatToTrace} };
+ 
++    my $pe;
++    my $loglabel = $error;
++    my $label    = $error;
++    if ( looks_like_number($error) ) {
++        $pe       = portalConsts->{$error};
++        $loglabel = $pe;
++        $label    = "PE" . $error;
++    }
++
+     $self->auditLog(
+         $req,
+         message => (
+-            $self->type . " 2F device registration failed for $uid : $error"
++            $self->type . " 2F device registration failed for $uid : $loglabel"
+         ),
+         code         => "2FA_DEVICE_REGISTRATION_FAILED",
+         type         => $self->prefix,
+-        portal_error => $error,
++        ( $pe ? ( portal_error => $pe ) : ( error => $error ) ),
+         user         => $uid,
+     );
+ 
+-    return $self->p->sendError( $req, $error, $code );
++    $code ||= 500;
++    return $self->sendJSONresponse( $req, { error => $label }, code => $code );
+ }
+ 
+ sub successResponse {
+@@ -235,6 +264,18 @@
+     return $self->p->sendJSONresponse( $req, $info );
+ }
+ 
++sub errorResponse {
++    my ( $self, $req, %args ) = @_;
++
++    my $code   = $args{code} || 400;
++    my $status = $args{pe_status} // PE_ERROR;
++    my $err    = "PE" . $status;
++    if ( $args{label} ) {
++        $err = $args{label};
++    }
++    return $self->sendJSONresponse( $req, { error => $err }, code => $code );
++}
++
+ sub registerDevice {
+     my ( $self, $req, $info, $device ) = @_;
+ 
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Portal/2F/Register/Generic.pm b/usr/share/perl5/Lemonldap/NG/Portal/2F/Register/Generic.pm
+--- a/usr/share/perl5/Lemonldap/NG/Portal/2F/Register/Generic.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Portal/2F/Register/Generic.pm	2026-09-25 08:51:40.560829245 +0200
+@@ -6,7 +6,7 @@
+ use Mouse;
+ use JSON qw(from_json to_json);
+ use Lemonldap::NG::Common::Crypto;
+-use Lemonldap::NG::Portal::Main::Constants 'PE_OK';
++use Lemonldap::NG::Portal::Main::Constants ':all';
+ 
+ our $VERSION = '2.23.0';
+ 
+@@ -54,7 +54,7 @@
+     my $generic = $req->param('generic');
+ 
+     unless ($generic) {
+-        return $self->failResponse( $req, 'PE79', 200 );
++        return $self->failResponse( $req, PE_REGISTERFORMEMPTY, 200 );
+     }
+ 
+     return $self->failResponse( $req, 'csrfError', 400 )
+@@ -104,7 +104,7 @@
+     my $token = $self->ott->getToken( $tokenid, 1 );
+     my $res   = $self->verificationModule->verify_supplied_code( $req, $token,
+         $genericcode );
+-    return $self->failResponse( $req, "PE$res", 400 )
++    return $self->failResponse( $req, $res, 400 )
+       unless ( $res == PE_OK );
+ 
+     # Now generic is verified, let's store it in persistent data
+@@ -140,7 +140,7 @@
+     }
+     else {
+         $self->logger->error( $self->prefix . "2f: unable to add device" );
+-        return $self->failResponse( $req, "PE$res" );
++        return $self->failResponse( $req, $res );
+     }
+ }
+ 
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Portal/2F/Register/Password.pm b/usr/share/perl5/Lemonldap/NG/Portal/2F/Register/Password.pm
+--- a/usr/share/perl5/Lemonldap/NG/Portal/2F/Register/Password.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Portal/2F/Register/Password.pm	2026-09-25 08:51:40.560829245 +0200
+@@ -2,7 +2,7 @@
+ package Lemonldap::NG::Portal::2F::Register::Password;
+ 
+ use strict;
+-use Lemonldap::NG::Portal::Main::Constants 'PE_OK';
++use Lemonldap::NG::Portal::Main::Constants ':all';
+ use Mouse;
+ use JSON qw(from_json to_json);
+ use Lemonldap::NG::Common::Crypto;
+@@ -73,7 +73,7 @@
+     # Invalid try is returned with a 200 code. Javascript will read error
+     # and propose to retry
+     if ( $password ne $passwordverify ) {
+-        return $self->failResponse( $req, 'PE34', 200 );
++        return $self->failResponse( $req, PE_PASSWORD_MISMATCH, 200 );
+     }
+     $self->logger->debug( $self->prefix . '2f: code verified' );
+ 
+@@ -113,7 +113,7 @@
+     }
+     else {
+         $self->logger->error( $self->prefix . "2f: unable to add password" );
+-        return $self->failResponse( $req, "PE$res" );
++        return $self->failResponse( $req, $res );
+     }
+ }
+ 
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Portal/2F/Register/TOTP.pm b/usr/share/perl5/Lemonldap/NG/Portal/2F/Register/TOTP.pm
+--- a/usr/share/perl5/Lemonldap/NG/Portal/2F/Register/TOTP.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Portal/2F/Register/TOTP.pm	2026-09-25 08:51:40.560829245 +0200
+@@ -2,7 +2,7 @@
+ package Lemonldap::NG::Portal::2F::Register::TOTP;
+ 
+ use strict;
+-use Lemonldap::NG::Portal::Main::Constants 'PE_OK';
++use Lemonldap::NG::Portal::Main::Constants ':all';
+ use Mouse;
+ use JSON qw(from_json to_json);
+ 
+@@ -56,7 +56,7 @@
+     # Verify that token exists in DB (note that "keep" flag is set to
+     # permit more than 1 try during token life
+     unless ( $token = $self->ott->getToken( $token, 1 ) ) {
+-        return $self->failResponse( $req, 'PE82', 400 );
++        return $self->failResponse( $req, PE_TOKENEXPIRED, 400 );
+     }
+ 
+     # Now check TOTP code to verify that user has a valid TOTP app
+@@ -119,7 +119,7 @@
+     }
+     else {
+         $self->logger->error( $self->prefix . "2f: unable to add device" );
+-        return $self->failResponse( $req, "PE$res" );
++        return $self->failResponse( $req, $res );
+     }
+ }
+ 
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Portal/2F/Register/WebAuthn.pm b/usr/share/perl5/Lemonldap/NG/Portal/2F/Register/WebAuthn.pm
+--- a/usr/share/perl5/Lemonldap/NG/Portal/2F/Register/WebAuthn.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Portal/2F/Register/WebAuthn.pm	2026-09-25 08:51:40.560829245 +0200
+@@ -3,7 +3,7 @@
+ 
+ use strict;
+ use Mouse;
+-use Lemonldap::NG::Portal::Main::Constants 'PE_OK';
++use Lemonldap::NG::Portal::Main::Constants ':all';
+ use JSON         qw(from_json to_json);
+ use MIME::Base64 qw(encode_base64url decode_base64url);
+ use Crypt::URandom;
+@@ -184,7 +184,7 @@
+     unless ( $state_data = $self->ott->getToken($state_id) ) {
+         $self->logger->error( $self->prefix
+               . "2f: expired or invalid state ID in response: $state_id" );
+-        return $self->failResponse( $req, 'PE82', 400 );
++        return $self->failResponse( $req, PE_TOKENEXPIRED, 400 );
+     }
+     my $registration_options = ( $state_data->{registration_options} );
+     unless ($registration_options) {
+@@ -270,7 +270,7 @@
+     }
+     else {
+         $self->logger->error( $self->prefix . '2f: unable to add device' );
+-        return $self->failResponse( $req, "PE$res" );
++        return $self->failResponse( $req, $res );
+     }
+ }
+ 
+@@ -329,7 +329,7 @@
+     unless ( $state_data = $self->ott->getToken($state_id) ) {
+         $self->logger->error( $self->prefix
+               . "2f: expired or invalid state ID in response ($state_id)" );
+-        return $self->failResponse( $req, 'PE82', 400 );
++        return $self->failResponse( $req, PE_TOKENEXPIRED, 400 );
+     }
+ 
+     my $signature_options = ( $state_data->{authentication_options} );
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Portal/2F/Register/Yubikey.pm b/usr/share/perl5/Lemonldap/NG/Portal/2F/Register/Yubikey.pm
+--- a/usr/share/perl5/Lemonldap/NG/Portal/2F/Register/Yubikey.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Portal/2F/Register/Yubikey.pm	2026-09-25 08:51:40.560829245 +0200
+@@ -76,7 +76,7 @@
+         }
+         else {
+             $self->logger->debug( $self->prefix . "2f: unable to add device" );
+-            return $self->failResponse( $req, "PE$res" );
++            return $self->failResponse( $req, $res );
+         }
+     }
+     else {
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm b/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm	2026-09-23 21:10:53.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm	2026-09-25 08:51:40.568827366 +0200
+@@ -24,7 +24,7 @@
+   PE_SLO_ERROR
+ );
+ 
+-our $VERSION = '2.23.1';
++our $VERSION = '2.23.4';
+ 
+ extends qw(
+   Lemonldap::NG::Portal::Main::Issuer
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Portal/Lib/OIDCTokenExchange.pm b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OIDCTokenExchange.pm
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/OIDCTokenExchange.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OIDCTokenExchange.pm	2026-09-25 08:51:40.568827366 +0200
+@@ -9,7 +9,7 @@
+ 
+ extends 'Lemonldap::NG::Portal::Lib::OIDCPlugin';
+ 
+-our $VERSION = '2.23.0';
++our $VERSION = '2.23.4';
+ 
+ # INTERFACE
+ use constant hook => { oidcGotTokenExchange => 'tokenExchange' };
+@@ -61,7 +61,7 @@
+ 
+     # 2. Check for audience and authorization
+     my $targetClientId = $req->param('audience');
+-    my $target         = { audience => $req->param('audience') // undef, };
++    my $target = { audience => scalar $req->param('audience') // undef, };
+     if ( $target->{audience} ) {
+         if ( $target->{audience} eq $clientId ) {
+             $target->{rp} = $rp;
+@@ -114,11 +114,11 @@
+         $rp,
+         {
+             %{ $req->sessionInfo },
+-            scope     => $req->param('scope') || 'openid',
++            scope     => scalar $req->param('scope') || 'openid',
+             client_id => $target->{audience}
+               || $self->oidc->rpOptions->{$rp}->{oidcRPMetaDataOptionsClientID},
+             _session_uid => $uid,
+-            grant_type   => $req->param('grant_type'),
++            grant_type   => scalar $req->param('grant_type'),
+         },
+     );
+     unless ($refreshToken) {
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm	2026-09-23 21:10:53.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm	2026-09-25 08:51:40.574419201 +0200
+@@ -15,6 +15,7 @@
+ use JSON;
+ use Lemonldap::NG::Common::FormEncode;
+ use Lemonldap::NG::Common::OpenIDConnect::Constants;
++use Lemonldap::NG::Common::Session 'id2storage';
+ use Lemonldap::NG::Common::UserAgent;
+ use Lemonldap::NG::Common::JWT
+   qw(getAccessTokenSessionId getJWTPayload getJWTHeader getJWTSignature getJWTSignedData);
+@@ -28,7 +29,7 @@
+ use Lemonldap::NG::Portal::Main::Constants
+   qw(PE_OK PE_REDIRECT PE_ERROR portalConsts);
+ 
+-our $VERSION = '2.23.1';
++our $VERSION = '2.23.4';
+ 
+ use constant oidcErrorLevel => {
+     server_error     => 'error',
+@@ -682,12 +683,32 @@
+     return $self->_redirectToUrl( $req, $response_uri );
+ }
+ 
++# Add parameters to the query string of an URI object
++#
++# URI::QueryParam::query_param() silently drops the existing query string
++# when it does not contain any "=" (URI treats it as an "isindex" query).
++# Keep such parameters, they are part of the registered redirect URI (#3707)
++# @param uri URI object, modified in place
++# @param response_params Hashref of parameters to add
++sub _addQueryParams {
++    my ( $self, $uri, $response_params ) = @_;
++
++    my $query = $uri->query;
++    if ( defined $query and length $query and $query !~ /=/ ) {
++        $uri->query( $query . '&' . build_urlencoded(%$response_params) );
++    }
++    else {
++        $uri->query_param( $_, $response_params->{$_} )
++          for ( keys %$response_params );
++    }
++
++    return $uri;
++}
++
+ sub getQueryResponse {
+     my ( $self, $redirect_uri, $response_params ) = @_;
+     my $uri = URI->new($redirect_uri);
+-    for ( keys %$response_params ) {
+-        $uri->query_param( $_, $response_params->{$_} );
+-    }
++    $self->_addQueryParams( $uri, $response_params );
+     return $uri;
+ }
+ 
+@@ -698,9 +719,7 @@
+    # Use a temporary URL so we can use QueryParam features to build the fragment
+     my $tmp = URI->new;
+     $tmp->query( $uri->fragment );
+-    for ( keys %$response_params ) {
+-        $tmp->query_param( $_, $response_params->{$_} );
+-    }
++    $self->_addQueryParams( $tmp, $response_params );
+ 
+     $uri->fragment( $tmp->query );
+ 
+@@ -1742,7 +1761,7 @@
+                 "Cannot verify $alg signature: no JWKS data found");
+             return;
+         }
+-        unless ($jwks->{keys}
++        unless ( $jwks->{keys}
+             and ref( $jwks->{keys} ) eq 'ARRAY'
+             and @{ $jwks->{keys} } )
+         {
+@@ -2020,8 +2039,33 @@
+ 
+     # Check client_secret
+     if ( $self->rpOptions->{$rp}->{oidcRPMetaDataOptionsPublic} ) {
++
++        # A public client is only authenticated by the client secret
++        # registered for it: else endpoints must not consider it as such. A
++        # wrong secret is rejected, but a secret given to a public client
++        # without registered secret is ignored, as before. JWS methods
++        # (client_secret_jwt, private_key_jwt) are kept: their signature was
++        # already verified by getEndPointAuthenticationCredentials
++        if ( $method =~ /^client_secret_(?:basic|post)$/ ) {
++            my $secret =
++              $self->rpOptions->{$rp}->{oidcRPMetaDataOptionsClientSecret}
++              // '';
++            if ( !length $secret ) {
++                $self->logger->debug( "Relying Party $rp is public without"
++                      . " client secret, given secret is ignored" )
++                  if length( $client_secret // '' );
++                $method = 'none';
++            }
++            elsif ( !length( $client_secret // '' ) ) {
+         $self->logger->debug(
+-            "Relying Party $rp is public, do not check client secret");
++                    "Relying Party $rp is public, no client secret given");
++                $method = 'none';
++            }
++            elsif ( $client_secret ne $secret ) {
++                $self->logger->error("Wrong credentials for $rp");
++                return undef;
++            }
++        }
+     }
+     else {
+         if ( $method eq "none" ) {
+@@ -2040,7 +2084,6 @@
+             unless ( $client_secret eq
+                 $self->rpOptions->{$rp}->{oidcRPMetaDataOptionsClientSecret} )
+             {
+-                $self->logger->debug("OIDC SECRETS MISMATCH: '$client_secret' != '$self->{rpOptions}->{$rp}->{oidcRPMetaDataOptionsClientSecret}'\n");
+                 $self->logger->error("Wrong credentials for $rp");
+                 return undef;
+             }
+@@ -3014,9 +3057,17 @@
+ 
+ sub getSidFromSession {
+     my ( $self, $rp, $sessionInfo ) = @_;
+-    return $sessionInfo->{_oidc_sid}
+-      || Digest::SHA::hmac_sha256_base64(
+-        $sessionInfo->{_session_id} . ':' . $rp );
++    return $sessionInfo->{_oidc_sid} if $sessionInfo->{_oidc_sid};
++
++    # sid is computed from the storage ID: it is the only one available when
++    # the session is read by its storage ID (GlobalLogout, SingleSession)
++    my $storageId = $sessionInfo->{_session_storage_id};
++    unless ( defined $storageId ) {
++        $storageId = $sessionInfo->{_session_id};
++        $storageId = id2storage($storageId)
++          if $self->conf->{hashedSessionStore};
++    }
++    return Digest::SHA::hmac_sha256_base64( $storageId . ':' . $rp );
+ }
+ 
+ sub decryptJwt {
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Portal/Lib/RESTProxy.pm b/usr/share/perl5/Lemonldap/NG/Portal/Lib/RESTProxy.pm
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/RESTProxy.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/RESTProxy.pm	2026-09-25 08:51:40.574419201 +0200
+@@ -12,7 +12,7 @@
+ );
+ use Lemonldap::NG::Common::FormEncode;
+ 
+-our $VERSION = '2.19.0';
++our $VERSION = '2.23.4';
+ 
+ has ua             => ( is => 'rw' );
+ has cookieName     => ( is => 'rw' );
+@@ -69,7 +69,7 @@
+             (
+                 $self->conf->{proxyAuthServiceImpersonation}
+                   && $req->param('spoofId')
+-                ? ( spoofId => $req->param('spoofId') )
++                ? ( spoofId => scalar $req->param('spoofId') )
+                 : ()
+             )
+         }
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Portal/Main/Display.pm b/usr/share/perl5/Lemonldap/NG/Portal/Main/Display.pm
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Display.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Display.pm	2026-09-25 08:51:40.574419201 +0200
+@@ -2,7 +2,7 @@
+ # Display functions for LemonLDAP::NG Portal
+ package Lemonldap::NG::Portal::Main::Display;
+ 
+-our $VERSION = '2.23.0';
++our $VERSION = '2.23.4';
+ 
+ package Lemonldap::NG::Portal::Main;
+ use strict;
+@@ -166,9 +166,9 @@
+             CHOICE_VALUE => $req->data->{_authChoice},
+             CHECK_LOGINS => $self->conf->{portalCheckLogins}
+               && $req->data->{login},
+-            ASK_LOGINS => $req->param('checkLogins')
++            ASK_LOGINS => scalar $req->param('checkLogins')
+               || 0,
+-            ASK_STAYCONNECTED => $req->param('stayconnected')
++            ASK_STAYCONNECTED => scalar $req->param('stayconnected')
+               || 0,
+             CONFIRMKEY => $self->stamp(),
+             (
+@@ -195,8 +195,8 @@
+             CHOICE_VALUE  => $req->data->{_authChoice},
+             CHECK_LOGINS  => $self->conf->{portalCheckLogins}
+               && $req->data->{login},
+-            ASK_LOGINS        => $req->param('checkLogins')   || 0,
+-            ASK_STAYCONNECTED => $req->param('stayconnected') || 0,
++            ASK_LOGINS        => scalar $req->param('checkLogins')   || 0,
++            ASK_STAYCONNECTED => scalar $req->param('stayconnected') || 0,
+             CONFIRMKEY        => $self->stamp(),
+             LIST              => $req->data->{list} || [],
+             LOGIN_HINT        => $req->data->{suggestedLogin},
+@@ -427,8 +427,8 @@
+             ACTIVE_FORM           => 1,
+             DONT_STORE_PASSWORD   => $self->conf->{browsersDontStorePassword},
+             CHECK_LOGINS          => $self->conf->{portalCheckLogins},
+-            ASK_LOGINS            => $req->param('checkLogins')   || 0,
+-            ASK_STAYCONNECTED     => $req->param('stayconnected') || 0,
++            ASK_LOGINS            => scalar $req->param('checkLogins')   || 0,
++            ASK_STAYCONNECTED     => scalar $req->param('stayconnected') || 0,
+             DISPLAY_RESETPASSWORD => $self->conf->{portalDisplayResetPassword},
+             DISPLAY_REGISTER      => $self->conf->{portalDisplayRegister},
+             DISPLAY_UPDATECERTIF  =>
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Portal/Main/Menu.pm b/usr/share/perl5/Lemonldap/NG/Portal/Main/Menu.pm
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Menu.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Menu.pm	2026-09-25 08:51:40.576825487 +0200
+@@ -385,7 +385,7 @@
+             $apphash->{$key}->{options}->{uri} =~ URIRE;
+             my ( $vhost, $appuri ) = ( $3, $5 );
+             $vhost = $self->p->HANDLER->resolveAlias($vhost);
+-            $appuri ||= '/';
++            $appuri = $self->p->HANDLER->canonicalUri($appuri);
+ 
+             # Remove if display is "no" or "off"
+             delete $apphash->{$key} and next if ( $appdisplay =~ /^(no|off)$/ );
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Portal/Main/Process.pm b/usr/share/perl5/Lemonldap/NG/Portal/Main/Process.pm
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Process.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Process.pm	2026-09-25 08:51:40.576825487 +0200
+@@ -1,6 +1,6 @@
+ package Lemonldap::NG::Portal::Main::Process;
+ 
+-our $VERSION = '2.23.0';
++our $VERSION = '2.23.4';
+ 
+ package Lemonldap::NG::Portal::Main;
+ 
+@@ -213,7 +213,7 @@
+             if ( $u->scheme =~ /^https?$/ ) {
+                 $proto  = $u->scheme;
+                 $vhost  = $u->host if $u->can("host");
+-                $appuri = $u->path_query;
++                $appuri = $self->HANDLER->canonicalUri( $u->path_query );
+             }
+         }
+ 
+@@ -361,10 +361,15 @@
+     return $res;
+ }
+ 
++# Delete the current SSO session
++#
++# Callers holding a storage identifier instead of a session one may ask for it
++# using [ 'deleteSession', rawSessionId => 1 ] as step
+ sub deleteSession {
+-    my ( $self, $req ) = @_;
++    my ( $self, $req, %args ) = @_;
+     if ( my $id = $req->id || $req->userData->{_session_id} ) {
+-        my $apacheSession = $self->getApacheSession($id);
++        my $apacheSession = $self->getApacheSession( $id,
++            ( $args{rawSessionId} ? ( hashStore => 0 ) : () ) );
+         unless ($apacheSession) {
+             $self->logger->debug("Session $id already deleted");
+             return PE_OK;
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm b/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm	2026-09-23 21:10:53.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm	2026-09-25 08:51:40.576825487 +0200
+@@ -9,7 +9,7 @@
+ #
+ package Lemonldap::NG::Portal::Main::Run;
+ 
+-our $VERSION = '2.23.3';
++our $VERSION = '2.23.4';
+ 
+ package Lemonldap::NG::Portal::Main;
+ 
+@@ -1604,6 +1604,11 @@
+ 
+     return PE_OK unless $sessionData && ref($sessionData) eq 'HASH';
+ 
++    # Sessions given here are read by their storage ID, then _session_id is
++    # already a storage ID (used to compute OIDC sid)
++    $sessionData =
++      { %$sessionData, _session_storage_id => $sessionData->{_session_id} };
++
+     $self->logger->debug(
+         "Triggering back-channel logout for session $sessionData->{_session_id}"
+     );
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/AdminLogout.pm b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/AdminLogout.pm
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/AdminLogout.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/AdminLogout.pm	2026-09-25 08:51:40.576825487 +0200
+@@ -5,7 +5,7 @@
+ 
+ extends 'Lemonldap::NG::Portal::Lib::OIDCPlugin';
+ 
+-our $VERSION = '2.23.0';
++our $VERSION = '2.23.4';
+ 
+ sub init {
+     my ($self) = @_;
+@@ -52,10 +52,27 @@
+     my ( $self, $req ) = @_;
+     my $id = $req->param('token')
+       or return $self->sendError( $req, 'Missing token', 400 );
+-    my $sessionData = $self->p->HANDLER->retrieveSession( $req, $id );
+-    $req->userData( $req->sessionInfo($sessionData) );
+-    return $self->p->do( $req,
+-        [ @{ $self->p->beforeLogout }, 'authLogout', 'deleteSession' ] );
++
++    # Like for tokens, the caller may give a storage identifier instead of a
++    # session one. This is what the Manager does, since it collects sessions
++    # using searchOn()
++    my $raw = $req->param('raw');
++
++    my $session =
++      $self->p->getApacheSession( $id, ( $raw ? ( hashStore => 0 ) : () ) );
++    unless ($session) {
++        return $self->sendError( $req, "Session $id not found", 400 );
++    }
++
++    $req->userData( $req->sessionInfo( $session->data ) );
++    return $self->p->do(
++        $req,
++        [
++            @{ $self->p->beforeLogout },
++            'authLogout',
++            ( $raw ? [ 'deleteSession', rawSessionId => 1 ] : 'deleteSession' ),
++        ]
++    );
+ }
+ 
+ 1;
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CheckUser.pm b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CheckUser.pm
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CheckUser.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CheckUser.pm	2026-09-25 08:51:40.576825487 +0200
+@@ -456,6 +456,8 @@
+     my ( $vhost, $appuri ) = $uri =~ m@^https?://([^/#]*)(.*)@;
+     my $exist = 0;
+ 
++    $appuri = $self->p->HANDLER->canonicalUri($appuri);
++
+     $vhost =~ s/:\d+$//;
+     foreach my $vh ( keys %{ $self->conf->{locationRules} } ) {
+         if ( $vh eq $vhost ) {
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CrowdSecAgent.pm b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CrowdSecAgent.pm
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CrowdSecAgent.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/CrowdSecAgent.pm	2026-09-25 08:51:40.576825487 +0200
+@@ -124,7 +124,8 @@
+     return $ret unless %{ $self->filters };
+ 
+     # Use matchScenario to find matching scenario (with whitelist check)
+-    my $uri = $req->env->{REQUEST_URI};
++    # Use the routed URI: an encoded URL would avoid the scenarios below
++    my $uri = $req->access_control_uri;
+     my ( $scenario, $cat, $maxFailures, $banDuration, $timeWindow ) =
+       $self->matchScenario($uri);
+ 
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/RESTServer.pm b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/RESTServer.pm
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/RESTServer.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/RESTServer.pm	2026-09-25 08:51:40.580824547 +0200
+@@ -458,7 +458,7 @@
+         my ( $host, $uri );
+         if ( $req->urldc =~ URIRE ) {
+             ( $host, $uri ) = ( $3 . ( $4 ? ":$4" : '' ), $5 );
+-            $uri ||= '/';
++            $uri = $self->p->HANDLER->canonicalUri($uri);
+             return $self->p->sendError( $req, "Bad URL $req->{urldc}", 400 )
+               unless ($host);
+         }
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/SOAPServer.pm b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/SOAPServer.pm
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/SOAPServer.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/SOAPServer.pm	2026-09-25 08:51:40.580824547 +0200
+@@ -460,7 +460,8 @@
+     die 'uri is required' unless ($url);
+     my ( $host, $uri );
+     if ( $url =~ URIRE ) {
+-        ( $host, $uri ) = ( $1, $2 );
++        ( $host, $uri ) = ( $3 . ( $4 ? ":$4" : '' ), $5 );
++        $uri = $self->p->HANDLER->canonicalUri($uri);
+     }
+     else {
+         die 'Bad uri';
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Portal.pm b/usr/share/perl5/Lemonldap/NG/Portal.pm
+--- a/usr/share/perl5/Lemonldap/NG/Portal.pm	2026-09-23 21:10:53.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Portal.pm	2026-09-24 14:43:26.577820456 +0200
+@@ -1,7 +1,7 @@
+ # Alias for Lemonldap::NG::Portal::Main
+ package Lemonldap::NG::Portal;
+ 
+-our $VERSION = '2.23.3';
++our $VERSION = '2.23.4';
+ use Lemonldap::NG::Portal::Main;
+ use base 'Lemonldap::NG::Portal::Main';
+ 

@@ -1,0 +1,338 @@
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Common/PSGI/Request.pm b/usr/share/perl5/Lemonldap/NG/Common/PSGI/Request.pm
+--- a/usr/share/perl5/Lemonldap/NG/Common/PSGI/Request.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Common/PSGI/Request.pm	2026-09-25 08:51:40.520838639 +0200
+@@ -40,6 +40,21 @@
+ 
+ sub uri { return $_[0]->{uri} }
+ 
++# URI tested by locationRules. It must be the path the request is really
++# served at, else rules can be bypassed with an encoded URL:
++#  - handlers protecting another application (Nginx, Traefik, mod_perl) set it
++#    in ACCESS_CONTROL_URI, see Handler::Server::Main::setAccessControlUri()
++#    and Handler::ApacheMP2::Request
++#  - otherwise (portal, manager, api), it is PATH_INFO, the path the LLNG
++#    router uses, followed by the query string as received
++sub access_control_uri {
++    my ($self) = @_;
++    my $env = $self->env;
++    return $env->{ACCESS_CONTROL_URI} if defined $env->{ACCESS_CONTROL_URI};
++    my $qs = $env->{QUERY_STRING};
++    return $env->{PATH_INFO} . ( defined $qs && length $qs ? "?$qs" : '' );
++}
++
+ sub request_id { return $_[0]->{request_id} }
+ 
+ sub userData {
+@@ -210,6 +225,14 @@
+ 
+ REQUEST_URI environment variable decoded.
+ 
++=head2 access_control_uri
++
++URI tested by L<locationRules>: the path the request is really served at.
++Handlers protecting another application set it in the C<ACCESS_CONTROL_URI>
++environment variable (see L<Lemonldap::NG::Handler::Server::Main> and
++L<Lemonldap::NG::Handler::ApacheMP2::Request>); otherwise it is PATH_INFO,
++the path used by the LLNG router, followed by the query string as received.
++
+ =head2 user
+ 
+ REMOTE_USER environment variable. It contains username when a server
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Common/TOTP.pm b/usr/share/perl5/Lemonldap/NG/Common/TOTP.pm
+--- a/usr/share/perl5/Lemonldap/NG/Common/TOTP.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Common/TOTP.pm	2026-09-25 08:51:40.520838639 +0200
+@@ -16,7 +16,7 @@
+     "sha512" => \&Digest::SHA::hmac_sha512_hex,
+ };
+ 
+-our $VERSION = '2.23.0';
++our $VERSION = '2.23.3';
+ 
+ has key => (
+     is      => 'ro',
+@@ -137,6 +137,16 @@
+             error  => "Bad characters in TOTP secret",
+         };
+     }
++
++    # A plain string comparison is deliberate here. This has been reported as a
++    # CWE-208 timing oracle; it is not one. A TOTP code is valid for a single
++    # $interval, so an attacker has no stable secret to average timing
++    # measurements against -- the precondition every comparison-timing attack
++    # needs. Independently: Perl's eq defers to memcmp(), which compares short
++    # strings by word rather than byte (measured: no difference across the six
++    # digit positions), and any residual signal sits far below the HMAC, secret
++    # decryption and session-backend costs of the surrounding request. Failed
++    # attempts are counted by BruteForceProtection.
+     for ( -$range .. $range ) {
+         if ( $code eq $self->_code( $s, $_, $interval, $digits, $hash ) ) {
+             return {
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Common.pm b/usr/share/perl5/Lemonldap/NG/Common.pm
+--- a/usr/share/perl5/Lemonldap/NG/Common.pm	2026-07-24 17:20:11.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Common.pm	2026-09-24 14:43:26.529955318 +0200
+@@ -1,6 +1,6 @@
+ package Lemonldap::NG::Common;
+ 
+-our $VERSION = '2.23.2';
++our $VERSION = '2.23.4';
+ 
+ 1;
+ __END__
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Handler/ApacheMP2/Request.pm b/usr/share/perl5/Lemonldap/NG/Handler/ApacheMP2/Request.pm
+--- a/usr/share/perl5/Lemonldap/NG/Handler/ApacheMP2/Request.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Handler/ApacheMP2/Request.pm	2026-09-24 14:43:26.536486433 +0200
+@@ -57,6 +57,11 @@
+     my $uri = URI->new( "http://" . $r->hostname . $r->unparsed_uri );
+     $env->{PATH_INFO} = uri_unescape( $uri->path );
+ 
++    # Access control is decided on the URI httpd routed on ($r->uri, decoded
++    # and normalized), not on PATH_INFO, which is rebuilt here from the raw
++    # unparsed URI and where dot segments survive
++    $env->{ACCESS_CONTROL_URI} = $uri_full;
++
+     my $self = Lemonldap::NG::Common::PSGI::Request->new($env);
+     bless $self, $class;
+     return $self;
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Handler/Lib/CDA.pm b/usr/share/perl5/Lemonldap/NG/Handler/Lib/CDA.pm
+--- a/usr/share/perl5/Lemonldap/NG/Handler/Lib/CDA.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Handler/Lib/CDA.pm	2026-09-24 14:43:26.536486433 +0200
+@@ -8,7 +8,9 @@
+ 
+ sub run {
+     my ( $class, $req, $rule, $protection ) = @_;
+-    my $uri = $req->{env}->{REQUEST_URI};
++
++    # Use the routed URI: an encoded '?' would hide the CDA parameter here
++    my $uri = $req->access_control_uri;
+     my $cn  = $class->tsv->{cookieName};
+     my ( $id, $session );
+     if ( $uri =~ m/[\?&;]${cn}cda=(\w+)/i ) {
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Handler/Lib/SecureToken.pm b/usr/share/perl5/Lemonldap/NG/Handler/Lib/SecureToken.pm
+--- a/usr/share/perl5/Lemonldap/NG/Handler/Lib/SecureToken.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Handler/Lib/SecureToken.pm	2026-09-24 14:43:26.536486433 +0200
+@@ -37,7 +37,7 @@
+     return $ret unless ( $ret == $class->OK );
+ 
+     # Get current URI
+-    my $uri = $r->{env}->{REQUEST_URI};
++    my $uri = $r->access_control_uri;
+ 
+     # Catch Secure Token parameters
+     my $localConfig = $class->localConfig;
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Handler/Lib/StatusConstants.pm b/usr/share/perl5/Lemonldap/NG/Handler/Lib/StatusConstants.pm
+--- a/usr/share/perl5/Lemonldap/NG/Handler/Lib/StatusConstants.pm	2026-09-23 21:12:21.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Handler/Lib/StatusConstants.pm	2026-09-25 08:51:40.531454479 +0200
+@@ -124,7 +124,7 @@
+ }
+ 
+ # EXPORTER PARAMETERS
+-our @EXPORT_OK = ( 'portalConsts' );
++our @EXPORT_OK   = ('portalConsts');
+ our %EXPORT_TAGS = ( 'all' => [ @EXPORT_OK, 'import' ], );
+ 
+ 1;
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Handler/Lib/ZimbraPreAuth.pm b/usr/share/perl5/Lemonldap/NG/Handler/Lib/ZimbraPreAuth.pm
+--- a/usr/share/perl5/Lemonldap/NG/Handler/Lib/ZimbraPreAuth.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Handler/Lib/ZimbraPreAuth.pm	2026-09-24 14:43:26.536486433 +0200
+@@ -23,7 +23,7 @@
+     return $ret unless ( $ret == $class->OK );
+ 
+     # Get current URI
+-    my $uri = $req->{env}->{REQUEST_URI};
++    my $uri = $req->access_control_uri;
+ 
+     # Get Zimbra parameters
+     my $localConfig      = $class->localConfig;
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Handler/Main/Reload.pm b/usr/share/perl5/Lemonldap/NG/Handler/Main/Reload.pm
+--- a/usr/share/perl5/Lemonldap/NG/Handler/Main/Reload.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Handler/Main/Reload.pm	2026-09-24 14:43:26.536486433 +0200
+@@ -355,6 +355,20 @@
+                 next;
+             }
+ 
++            # The path of the URL is tested against its canonical form
++            # (decoded and normalized), so percent-encoded characters can't
++            # match any more there. The query string is left untouched, so
++            # only look at the part before the '?' of the rule, which is
++            # escaped since rules are regular expressions (see canonicalUri())
++            my $rulePath = $url;
++            $rulePath =~ s/\\\?.*$//s;
++            if ( $rulePath =~ /%[0-9A-Fa-f]{2}/ ) {
++                $class->logger->warn(
++                        "Rule '$url' of virtual host $vhost contains "
++                      . "percent-encoded characters in its path: it can't "
++                      . "match, rules are tested against the decoded URL" );
++            }
++
+             if ( $url eq 'default' ) {
+                 $class->tsv->{defaultCondition}->{$vhost}  = $cond;
+                 $class->tsv->{defaultProtection}->{$vhost} = $prot;
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Handler/Main/Run.pm b/usr/share/perl5/Lemonldap/NG/Handler/Main/Run.pm
+--- a/usr/share/perl5/Lemonldap/NG/Handler/Main/Run.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Handler/Main/Run.pm	2026-09-25 10:47:37.087898138 +0200
+@@ -141,7 +141,7 @@
+     }
+ 
+     # Authentication process
+-    my $uri = $req->{env}->{REQUEST_URI};
++    my $uri = $req->access_control_uri;
+     my ($cond);
+ 
+     ( $cond, $protection ) = $class->conditionSub($rule) if ($rule);
+@@ -330,10 +330,64 @@
+     return 0;
+ }
+ 
++## @rmethod string canonicalUri(string uri)
++# Return the canonical form of an URI: as web servers do before routing
++# requests to applications, the path is percent-decoded and normalized
++# (dot segments and duplicate slashes removed). The query string is left
++# untouched since some rules contain GET parameters.
++#
++# This is only a guess of the path the web server will route on: each server
++# has its own rules (encoded slashes, duplicate slashes, dot segments,...).
++# Don't use it when the server gives this path (X_ORIGINAL_URI with Nginx,
++# $r->uri with mod_perl, PATH_INFO for LLNG's own applications, see
++# access_control_uri()): only when LL::NG receives the URI as sent by the
++# client (forward-auth) or a URL given by the caller (menu, authorizationfor,
++# CheckUser, urldc,...).
++#
++# @param $uri URI to canonicalize
++# @return canonical URI
++sub canonicalUri {
++    my ( $class, $uri ) = @_;
++    return '/' unless defined $uri;
++
++    # Absolute-URI form (RFC 7230 5.3.2): applications only see the path
++    $uri =~ s#^[a-zA-Z][a-zA-Z0-9+.\-]*://[^/?]*/?#/#;
++
++    # An empty path is "/" (RFC 3986 6.2.3)
++    $uri = "/$uri" if $uri =~ /^(?:\?|\z)/;
++
++    my ( $path, $query ) = ( $uri, undef );
++    if ( $uri =~ /^([^?]*)\?(.*)$/s ) {
++        ( $path, $query ) = ( $1, $2 );
++    }
++
++    # Only absolute paths are normalized, others (OPTIONS *, ...) are kept as is
++    if ( $path =~ m{^/} ) {
++        $path = uri_unescape($path);
++
++        # A path ending with "/", "/." or "/.." keeps its trailing slash
++        my $trailingSlash = ( $path =~ m{(?:/|/\.\.?)$} );
++        my @segments;
++        foreach my $segment ( split m{/+}, $path ) {
++            next if ( $segment eq '' or $segment eq '.' );
++            if ( $segment eq '..' ) {
++                pop @segments;
++            }
++            else {
++                push @segments, $segment;
++            }
++        }
++        $path = '/' . join( '/', @segments );
++        $path .= '/' if ( $trailingSlash and $path ne '/' );
++    }
++
++    return defined $query ? "$path?$query" : $path;
++}
++
+ ## @rmethod int getLevel(string uri, string $vhost)
+ # Return required authentication level for this URI
+ # default to vhost authentication level
+-# @param $uri URI
++# @param $uri URI, must be canonical (see canonicalUri())
+ # @param $vhost vhost name, default to current request
+ sub getLevel {
+     my ( $class, $req, $uri, $vhost ) = @_;
+@@ -364,7 +418,7 @@
+ 
+ ## @rmethod boolean grant(string uri, string cond)
+ # Grant or refuse client using compiled regexp and functions
+-# @param $uri URI
++# @param $uri URI, must be canonical (see canonicalUri())
+ # @param $cond optional Function granting access
+ # @return True if the user is granted access to the current URL
+ sub grant {
+@@ -373,7 +427,7 @@
+     return $cond->( $req, $session ) if $cond;
+ 
+     $vhost ||= $class->resolveAlias($req);
+-    my $level = $class->getLevel( $req, $uri );
++    my $level = $class->getLevel( $req, $uri, $vhost );
+ 
+     # Using VH authentification level if exists
+     if ($level) {
+@@ -742,7 +796,7 @@
+ }
+ 
+ ## @rmethod protected int isUnprotected()
+-# @param $uri URI
++# @param $uri URI, as the request is routed on (see access_control_uri())
+ # @return 0 if URI is protected,
+ # $class->UNPROTECT if it is unprotected by "unprotect",
+ # SKIP if unprotected by "skip"
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Handler/Server/Main.pm b/usr/share/perl5/Lemonldap/NG/Handler/Server/Main.pm
+--- a/usr/share/perl5/Lemonldap/NG/Handler/Server/Main.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Handler/Server/Main.pm	2026-09-25 08:51:40.531454479 +0200
+@@ -16,6 +16,21 @@
+ # In server mode, headers are not passed to a PSGI application but returned
+ # to the server
+ 
++## @method void setAccessControlUri(hashRef env)
++# Set in the environment the URI on which access control must be decided.
++# Nginx gives in X_ORIGINAL_URI the URI it routed on ($original_uri, already
++# decoded and normalized): it is used as is, decoding it again would give a
++# path the application doesn't serve. Without it (Traefik and Caddy, where
++# REQUEST_URI is set from X-Forwarded-Uri), REQUEST_URI is the URI as sent by
++# the client and is canonicalized (see Handler::Main::canonicalUri()).
++# @param $env PSGI environment
++sub setAccessControlUri {
++    my ( $class, $env ) = @_;
++    $env->{ACCESS_CONTROL_URI} = $env->{X_ORIGINAL_URI}
++      || $class->canonicalUri( $env->{REQUEST_URI} );
++    return;
++}
++
+ ## @method void set_header_in(hash headers)
+ # sets or modifies request headers
+ # @param headers hash containing header names => header value
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Handler/Server/Nginx.pm b/usr/share/perl5/Lemonldap/NG/Handler/Server/Nginx.pm
+--- a/usr/share/perl5/Lemonldap/NG/Handler/Server/Nginx.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Handler/Server/Nginx.pm	2026-09-25 08:51:40.531454479 +0200
+@@ -31,6 +31,9 @@
+     return $self->psgiAdapter(
+         sub {
+             my $req = $_[0];
++
++            # Nginx gives the request URI it routed on in X_ORIGINAL_URI
++            $self->api->setAccessControlUri( $req->{env} );
+             my $res = $self->_authAndTrace($req);
+ 
+             # Transform 302 responses in 401 since Nginx refuse it
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Handler/Server/Traefik.pm b/usr/share/perl5/Lemonldap/NG/Handler/Server/Traefik.pm
+--- a/usr/share/perl5/Lemonldap/NG/Handler/Server/Traefik.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Handler/Server/Traefik.pm	2026-09-25 08:51:40.531454479 +0200
+@@ -30,6 +30,10 @@
+         my $env = $_[0];
+         $env->{HTTP_HOST}   = $env->{HTTP_X_FORWARDED_HOST};
+         $env->{REQUEST_URI} = $env->{HTTP_X_FORWARDED_URI};
++
++        # Traefik/Caddy don't expose the routed URI: X-Forwarded-Uri is all
++        # we have, so it is the source of the access control URI
++        $self->api->setAccessControlUri($env);
+         return $app->($env);
+     }
+ }
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Handler.pm b/usr/share/perl5/Lemonldap/NG/Handler.pm
+--- a/usr/share/perl5/Lemonldap/NG/Handler.pm	2026-07-24 17:20:11.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Handler.pm	2026-09-24 14:43:26.536486433 +0200
+@@ -3,7 +3,7 @@
+ # Use the appropriate handler
+ # For Apache, use Lemonldap::NG::Handler::ApacheMP2
+ 
+-our $VERSION = '2.23.2';
++our $VERSION = '2.23.4';
+ 
+ 1;
+ 

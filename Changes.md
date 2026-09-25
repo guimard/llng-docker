@@ -1,6 +1,7 @@
 # Changes
 
-## v2.23.3-4 _(UNRELEASED)_
+## v2.23.4-1  _(2026-09-25)_
+- Update to 2.23.4
 - Update plugins to 0.5.2
 
 ## v2.23.3-3 _(2026-08-30)_

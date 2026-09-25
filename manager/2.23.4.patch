@@ -1,0 +1,26 @@
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Manager/Viewer.pm b/usr/share/perl5/Lemonldap/NG/Manager/Viewer.pm
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Viewer.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Viewer.pm	2026-09-25 08:51:40.540833942 +0200
+@@ -169,7 +169,9 @@
+         $self->SUPER::getKey( $req, @args );
+     }
+     else {
+-        if ( $req->{env}->{REQUEST_URI} =~ m%/view/(?:latest|\d+/\w+)$% ) {
++        # Compare the routed path (and not REQUEST_URI, which also contains
++        # the query string: it could satisfy the whitelist from there)
++        if ( $req->path =~ m%^/view/(?:latest|\d+/\w+)$% ) {
+             $self->logger->debug(" $req->{env}->{REQUEST_URI} -> URI allowed");
+             $self->SUPER::getKey( $req, @args );
+         }
+diff -aburN a/usr/share/perl5/Lemonldap/NG/Manager.pm b/usr/share/perl5/Lemonldap/NG/Manager.pm
+--- a/usr/share/perl5/Lemonldap/NG/Manager.pm	2026-07-24 17:20:11.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Manager.pm	2026-09-25 08:51:40.532835821 +0200
+@@ -17,7 +17,7 @@
+ use Lemonldap::NG::Common::Conf::Constants;
+ use Lemonldap::NG::Common::PSGI::Constants;
+ 
+-our $VERSION = '2.23.2';
++our $VERSION = '2.23.4';
+ 
+ extends qw(
+   Lemonldap::NG::Handler::PSGI::Router
