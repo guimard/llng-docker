@@ -1,0 +1,149 @@
+--- a/usr/share/perl5/Lemonldap/NG/Common/EmailTransport.pm
++++ b/usr/share/perl5/Lemonldap/NG/Common/EmailTransport.pm
+@@ -5,6 +5,8 @@ use Email::Sender::Transport::SMTP qw();
+ use MIME::Entity;
+ use Email::Sender::Simple qw(sendmail);
+ use Email::Date::Format   qw(email_date);
++use Sys::Hostname;
++use Lemonldap::NG::Common::Crypto;
+ 
+ our $VERSION = '2.23.3';
+ 
+@@ -130,17 +132,29 @@ sub configTest {
+     return ( $res, $message );
+ }
+ 
++# Build a Message-ID header value using mailFrom domain (some providers
++# penalize messages without Message-ID)
++sub messageId {
++    my ($conf) = @_;
++    my $domain = ( $conf->{mailFrom} // '' ) =~ /\@([\w.-]+)/ ? $1 : hostname;
++    my $id =
++      Lemonldap::NG::Common::Crypto::srandom()->randregex('[0-9a-f]{32}');
++    return "<$id\@$domain>";
++}
++
+ sub sendTestMail {
+     my ( $conf, $dest ) = @_;
+     my $transport = Lemonldap::NG::Common::EmailTransport->new($conf);
+     my $message   = MIME::Entity->build(
+-        From    => $conf->{mailFrom},
+-        To      => $dest,
+-        Subject => 'LemonLDAP::NG test email',
+-        Type    => 'TEXT',
+-        Data    => 'This test message was sent from the LemonLDAP::NG Manager',
+-        Type    => 'text/plain',
+-        Date    => email_date,
++        From     => $conf->{mailFrom},
++        To       => $dest,
++        Subject  => 'LemonLDAP::NG test email',
++        Type     => 'TEXT',
++        Data     => 'This test message was sent from the LemonLDAP::NG Manager',
++        Type     => 'text/plain',
++        Encoding => '7bit',
++        Date     => email_date,
++        'Message-ID' => messageId($conf),
+     );
+ 
+     # Send the mail
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/SMTP.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/SMTP.pm
+@@ -154,6 +154,9 @@ sub send_mail {
+     # Replace cid in body
+     $body =~ s/"cid:([^:]+):([^"]+)"/"cid:$1"/g;
+ 
++    my $messageId =
++      Lemonldap::NG::Common::EmailTransport::messageId( $self->conf );
++
+     eval {
+ 
+         # Create message
+@@ -169,34 +172,47 @@ sub send_mail {
+                     ? ( "Reply-To" => $self->conf->{mailReplyTo} )
+                     : ()
+                 ),
+-                Subject => $subject,
+-                Type    => 'multipart/mixed',
+-                Date    => email_date,
++                Subject      => $subject,
++                Type         => 'multipart/mixed',
++                Encoding     => '7bit',
++                Date         => email_date,
++                'Message-ID' => $messageId,
+             );
+ 
+-            my $alternative =
+-              $message->attach( Type => 'multipart/alternative' );
++            my $alternative = $message->attach(
++                Type     => 'multipart/alternative',
++                Encoding => '7bit',
++            );
+ 
+-            # Text message
++            # Text message (HTML::FormatText expects characters, not bytes)
+             $alternative->attach(
+-                Type => 'text/plain; charset=' . $self->charset,
+-                Data => $self->htmlParser->parse($body),
++                Type     => 'text/plain; charset=' . $self->charset,
++                Encoding => 'quoted-printable',
++                Data     => encode(
++                    $self->charset,
++                    $self->htmlParser->parse( decode( $self->charset, $body ) )
++                ),
+             );
+ 
+-            my $related = $alternative->attach( Type => 'multipart/related' );
++            my $related = $alternative->attach(
++                Type     => 'multipart/related',
++                Encoding => '7bit',
++            );
+ 
+             # Attach HTML message
+             $related->attach(
+-                Type => 'text/html; charset=' . $self->charset,
+-                Data => $body,
++                Type     => 'text/html; charset=' . $self->charset,
++                Encoding => 'quoted-printable',
++                Data     => $body,
+             );
+ 
+             # Attach included images
+             foreach ( keys %cid ) {
+                 $related->attach(
+-                    Type => "image/" . ( $cid{$_} =~ m/\.(\w+)/ )[0],
+-                    Id   => $_,
+-                    Path => $self->_search_attachment( $cid{$_} ),
++                    Type     => "image/" . ( $cid{$_} =~ m/\.(\w+)/ )[0],
++                    Id       => $_,
++                    Encoding => 'base64',
++                    Path     => $self->_search_attachment( $cid{$_} ),
+                 );
+             }
+         }
+@@ -204,15 +220,17 @@ sub send_mail {
+         # Plain text case
+         else {
+             $message = MIME::Entity->build(
+-                From       => $self->conf->{mailFrom},
+-                To         => $mail,
+-                "Reply-To" => $self->conf->{mailReplyTo},
+-                Subject    => $subject,
+-                Type       => 'TEXT',
+-                Data       => $body,
+-                Type       => 'text/plain',
+-                Charset    => $self->charset,
+-                Date       => email_date,
++                From         => $self->conf->{mailFrom},
++                To           => $mail,
++                "Reply-To"   => $self->conf->{mailReplyTo},
++                Subject      => $subject,
++                Type         => 'TEXT',
++                Data         => $body,
++                Type         => 'text/plain',
++                Charset      => $self->charset,
++                Encoding     => 'quoted-printable',
++                Date         => email_date,
++                'Message-ID' => $messageId,
+             );
+         }
+ 

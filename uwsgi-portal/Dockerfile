@@ -74,6 +74,7 @@ RUN set -e && for p in \
     2.23.3.patch \
     2.23.4.patch \
     bootstrap5.patch \
+    fix-mail-mime.patch \
     ; do echo patch $p && patch -p1 < $p || exit 1; done && \
     rm -f /usr/share/lemonldap-ng/portal/htdocs/static/common/js/carousel.min.js && \
     ln -s carousel.js /usr/share/lemonldap-ng/portal/htdocs/static/common/js/carousel.min.js && \
