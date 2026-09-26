@@ -21,7 +21,8 @@ RUN apt-get update && \
     echo "# cont-init runs as www-data: it must be able to rewrite" \
          "lemonldap-ng.ini (DBI/LDAP conf), else purgeCentralCache reads the" \
          "default File conf and purges nothing" && \
-    chown -R www-data /etc/lemonldap-ng && \
+    chgrp www-data /etc/lemonldap-ng && \
+    chmod g+w /etc/lemonldap-ng && \
     for i in `find /usr/share/lemonldap-ng/bin -type f -perm -g=x`; do \
         NAME=`basename $i`; \
         test -e /usr/bin/$NAME || ln -s $i /usr/bin/$NAME; \
