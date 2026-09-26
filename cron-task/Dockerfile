@@ -17,7 +17,15 @@ RUN apt-get update && \
     rm -rf portal && \
     apt-get autoremove -y && apt-get clean && \
     rm -rf /var/lib/apt/lists/* /usr/share/perl5/Lemonldap/NG/Handler \
-    /etc/services.d /tmp/liblemonldap-ng-portal-*
+    /etc/services.d /tmp/liblemonldap-ng-portal-* && \
+    echo "# cont-init runs as www-data: it must be able to rewrite" \
+         "lemonldap-ng.ini (DBI/LDAP conf), else purgeCentralCache reads the" \
+         "default File conf and purges nothing" && \
+    chown -R www-data /etc/lemonldap-ng && \
+    for i in `find /usr/share/lemonldap-ng/bin -type f -perm -g=x`; do \
+        NAME=`basename $i`; \
+        test -e /usr/bin/$NAME || ln -s $i /usr/bin/$NAME; \
+    done
 
 USER www-data
 
