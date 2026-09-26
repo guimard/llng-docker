@@ -1,6 +1,53 @@
 --- a/usr/share/perl5/Lemonldap/NG/Common/Conf.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Common/Conf.pm
-@@ -527,7 +527,7 @@ sub lastCfg {
+@@ -12,6 +12,8 @@ use utf8;
+ no strict 'refs';
+ use Lemonldap::NG::Common::Conf::Constants;    #inherits
+ 
++use Lemonldap::NG::Common::Lib::DBI qw(timeout_call);
++
+ # Import compacter
+ use Lemonldap::NG::Common::Conf::Compact;
+ *compactConf = \&Lemonldap::NG::Common::Conf::Compact::compactConf;
+@@ -472,21 +474,26 @@ sub getDBConf {
+ }
+ 
+ sub _launch {
+-    my $self = shift;
+-    my $sub  = shift;
+-    my @res;
+-    eval {
+-        local $SIG{ALRM} = sub { die "TIMEOUT\n" };
+-        eval {
+-            alarm( $self->{confTimeout} || 10 );
+-            @res = &{ $self->{type} . "::$sub" }( $self, @_ );
+-        };
+-        alarm 0;
+-        die $@ if $@;
++    my $self    = shift;
++    my $sub     = shift;
++    my @args    = @_;
++    my $timeout = $self->{confTimeout} || 10;
++    my @res     = eval {
++        timeout_call( $timeout,
++            sub { &{ $self->{type} . "::$sub" }( $self, @args ) },
++            "TIMEOUT\n" );
+     };
+     if ($@) {
+         $msg .= $@;
+         print STDERR "MSG $msg\n";
++
++        # An interrupted DBI handle is unusable (and would be returned again
++        # by connect_cached): drop it
++        if ( $@ eq "TIMEOUT\n" and my $dbh = delete $self->{_dbh} ) {
++            eval {
++                timeout_call( $timeout, sub { $dbh->disconnect } );
++            };
++        }
+         return undef;
+     }
+     return wantarray ? (@res) : $res[0];
+@@ -527,7 +534,7 @@ sub lastCfg {
          $msg .= "Warn: $@\n" if $@;
          if ( ref($cached) and $cached->{cfgNum} ) {
              $msg .=
@@ -9,9 +56,80 @@
                . "(cfgNum=$cached->{cfgNum}).\n";
              return $cached->{cfgNum};
          }
+--- a/usr/share/perl5/Lemonldap/NG/Common/Lib/DBI.pm
++++ b/usr/share/perl5/Lemonldap/NG/Common/Lib/DBI.pm
+@@ -2,9 +2,10 @@ package Lemonldap::NG::Common::Lib::DBI;
+ 
+ use strict;
+ use Exporter 'import';
++use POSIX qw(:signal_h);
+ 
+ our $VERSION   = '2.22.2';
+-our @EXPORT_OK = qw(check_dbh);
++our @EXPORT_OK = qw(check_dbh timeout_call);
+ 
+ # Check if a DBI handle is still valid
+ # Returns the handle if valid, undef otherwise
+@@ -19,4 +20,46 @@ sub check_dbh {
+     return;
+ }
+ 
++# Run $code and die with $msg if it lasts more than $timeout seconds.
++#
++# POSIX::sigaction() is required: a %SIG handler is delayed by Perl until the
++# current C call returns, and libpq restarts poll() on EINTR, so a query sent
++# to an unreachable server would stay blocked until the kernel gives up (about
++# 15 minutes). See "Signal Handling and Canceling Operations" in DBI(3).
++#
++# Once expired, the alarm is re-armed every second: $code may catch the first
++# die (DBI calls are often wrapped into eval) and block again.
++#
++# Note that an interrupted DBI handle is in an unknown state and must be
++# dropped by the caller.
++sub timeout_call {
++    my ( $timeout, $code, $msg ) = @_;
++    $msg ||= "timeout\n";
++    my $expired;
++    my $action = POSIX::SigAction->new(
++        sub {
++            $expired = 1;
++            alarm(1);
++            die $msg;
++        },
++        POSIX::SigSet->new(SIGALRM)
++    );
++    my $oldaction = POSIX::SigAction->new();
++    sigaction( SIGALRM, $action, $oldaction );
++    my ( @res, $err );
++    eval {
++        eval {
++            alarm($timeout);
++            @res = $code->();
++        };
++        $err = $@;
++        alarm(0);
++    };
++    alarm(0);
++    sigaction( SIGALRM, $oldaction );
++    $err ||= $msg if $expired;
++    die $err      if $err;
++    return wantarray ? @res : $res[0];
++}
++
+ 1;
 --- a/usr/share/perl5/Lemonldap/NG/Common/MessageBroker/Pg.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Common/MessageBroker/Pg.pm
-@@ -15,10 +15,15 @@ sub new {
+@@ -2,8 +2,7 @@ package Lemonldap::NG::Common::MessageBroker::Pg;
+ 
+ use strict;
+ use JSON;
+-use POSIX                           qw(:signal_h);
+-use Lemonldap::NG::Common::Lib::DBI qw(check_dbh);
++use Lemonldap::NG::Common::Lib::DBI qw(timeout_call);
+ 
+ our $VERSION = '2.23.0';
+ 
+@@ -15,10 +14,16 @@ sub new {
          and $args->{dbiChain}
          and $args->{dbiUser} )
      {
@@ -23,13 +141,28 @@
 +    my $self = bless {
 +        %{$args},
 +        checkTime      => $conf->{checkTime} // 600,
++        timeout        => $args->{timeout} || 10,
 +        eventQueueName => $conf->{eventQueueName},
 +        logger         => $logger,
 +    }, $class;
      return $self;
  }
  
-@@ -32,26 +37,45 @@ sub publish {
+@@ -27,31 +32,58 @@ sub publish {
+     die 'Not a hash msg' unless ref $msg eq 'HASH';
+     my $j = eval { JSON::to_json($msg) };
+     die "MessageBroker publish only hashes! $@" if $@;
+-    $self->_dbh->do( "NOTIFY $channel, ?", undef, $j );
++    my $dbh = $self->_dbh;
++    my $res = eval {
++        $self->_timed( sub { $dbh->do( "NOTIFY $channel, ?", undef, $j ) } );
++    };
++    if ($@) {
++        $self->_drop;
++        die $@;
++    }
++    return $res;
+ }
  
  sub subscribe {
      my ( $self, $channel ) = @_;
@@ -84,10 +217,11 @@
  }
  
  sub waitForNextMessage {
-@@ -65,11 +89,73 @@ sub waitForNextMessage {
+@@ -65,31 +97,167 @@ sub waitForNextMessage {
      }
  }
  
+-sub _dbh {
 +# Store a notification into local queue
 +sub _store {
 +    my ( $self, $name, $pid, $payload ) = @_;
@@ -108,14 +242,33 @@
 +# Like _dbh() but verifies periodically that all subscribed channels are
 +# still listened (a session may lose its LISTEN without being disconnected)
 +sub _checkedDbh {
-+    my ($self) = @_;
+     my ($self) = @_;
+-    my $dbh = check_dbh( $self->{_dbh} );
+-    return $dbh if $dbh;
+-    $self->{_dbh} = undef;
+-
+-    # This timeout is inspired from example given by DBI(3)
+-    my $mask = POSIX::SigSet->new(SIGALRM);
+-    my $action =
+-      POSIX::SigAction->new( sub { die "connect timeout\n" }, $mask );
+-    my $oldaction = POSIX::SigAction->new();
+-    sigaction( SIGALRM, $action, $oldaction );
+-    eval {
+-        eval {
+-            alarm(10);
+-            $self->{_dbh} =
+-              DBI->connect( $self->{dbiChain}, $self->{dbiUser},
+-                $self->{dbiPassword}, { RaiseError => 1, AutoCommit => 1, } );
 +    my $dbh = $self->{_dbh};
 +    return $self->_dbh
 +      unless $dbh
 +      and time >= ( $self->{_lastSubCheck} || 0 ) + $self->{checkTime};
 +
-+    my $listening =
-+      eval { $dbh->selectcol_arrayref('SELECT pg_listening_channels()') };
++    my $listening = eval {
++        $self->_timed(
++            sub { $dbh->selectcol_arrayref('SELECT pg_listening_channels()') }
++        );
++    };
 +    unless ($listening) {
 +        $self->_log( warn => 'MsgBroker: Pg subscription check failed: '
 +              . $self->_err($@) );
@@ -138,45 +291,41 @@
 +        $self->_drop;
 +        return $self->_dbh;
 +    }
-+
+ 
+-            # Re subscribe to all channels when reconnecting
+-            $self->subscribe($_) foreach ( keys %{ $self->{messages} || {} } );
 +    # Notifications may have been lost
 +    $self->_pushNewConf;
 +    return $dbh;
 +}
 +
- sub _dbh {
-     my ($self) = @_;
-     my $dbh = check_dbh( $self->{_dbh} );
-     return $dbh if $dbh;
-     $self->{_dbh} = undef;
++sub _dbh {
++    my ($self) = @_;
++    if ( my $dbh = $self->{_dbh} ) {
++        return $dbh if eval {
++            $self->_timed( sub { $dbh->ping } );
+         };
+-        alarm(0);
++        $self->_log( warn => "MsgBroker: Pg ping failed: $@" ) if $@;
++        $self->_drop;
++    }
 +    return $self->_connect || bless {}, 'Lemonldap::NG::DBI::Failed';
 +}
 +
 +sub _connect {
 +    my ($self) = @_;
-+    my ( $dbh, $err );
- 
-     # This timeout is inspired from example given by DBI(3)
-     my $mask = POSIX::SigSet->new(SIGALRM);
-@@ -80,16 +166,80 @@ sub _dbh {
-     eval {
-         eval {
-             alarm(10);
--            $self->{_dbh} =
-+            $dbh =
-               DBI->connect( $self->{dbiChain}, $self->{dbiUser},
--                $self->{dbiPassword}, { RaiseError => 1, AutoCommit => 1, } );
--
--            # Re subscribe to all channels when reconnecting
--            $self->subscribe($_) foreach ( keys %{ $self->{messages} || {} } );
-+                $self->{dbiPassword},
-+                { RaiseError => 1, PrintError => 0, AutoCommit => 1, } );
-         };
-+        $err = $@;
-         alarm(0);
++    my $dbh = eval {
++        $self->_timed(
++            sub {
++                DBI->connect( $self->{dbiChain}, $self->{dbiUser},
++                    $self->{dbiPassword},
++                    { RaiseError => 1, PrintError => 0, AutoCommit => 1, } );
++            },
++            "connect timeout\n"
++        );
      };
 -    return $self->{_dbh} ||= bless {}, 'Lemonldap::NG::DBI::Failed';
-+    sigaction( SIGALRM, $oldaction );
++    my $err = $@;
 +    unless ($dbh) {
 +        $self->_log( error => 'MsgBroker: unable to connect to Pg: '
 +              . ( $err || $DBI::errstr || 'unknown error' ) );
@@ -189,7 +338,9 @@
 +        $self->_log( error => 'MsgBroker: unable to subscribe to '
 +              . join( ', ', @channels ) . ': '
 +              . ( $@ || $dbh->errstr || 'unknown error' ) );
-+        eval { $dbh->disconnect };
++        eval {
++            $self->_timed( sub { $dbh->disconnect } );
++        };
 +        return undef;
 +    }
 +    $self->_log( warn => 'MsgBroker: '
@@ -208,13 +359,23 @@
 +
 +sub _listen {
 +    my ( $self, $dbh, $channel ) = @_;
-+    return $dbh->do("LISTEN $channel");
++    return $self->_timed( sub { $dbh->do("LISTEN $channel") } );
++}
++
++# Every Pg call must be protected: a server that becomes unreachable without
++# closing the TCP connection would block the process for several minutes
++sub _timed {
++    my ( $self, $code, $msg ) = @_;
++    return timeout_call( $self->{timeout}, $code,
++        $msg || "no answer from Pg after $self->{timeout}s\n" );
 +}
 +
 +sub _drop {
 +    my ($self) = @_;
-+    eval { $self->{_dbh}->disconnect } if $self->{_dbh};
-+    $self->{_dbh} = undef;
++    my $dbh = delete $self->{_dbh};
++    eval {
++        $self->_timed( sub { $dbh->disconnect } );
++    } if $dbh;
 +}
 +
 +# Insert a "newConf" event to force handler to verify its configuration
@@ -245,7 +406,7 @@
  }
  
  package Lemonldap::NG::DBI::Failed;
-@@ -99,4 +249,6 @@ sub AUTOLOAD {
+@@ -99,4 +267,6 @@ sub AUTOLOAD {
      return undef;
  }
  
