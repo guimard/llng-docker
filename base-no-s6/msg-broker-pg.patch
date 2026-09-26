@@ -437,5 +437,3 @@
              if ($obj) {
                  $class->logger->debug(
                      'Launching ' . ref($obj) . "->$sub(conf)" );
-new file mode 100644
---- /dev/null
