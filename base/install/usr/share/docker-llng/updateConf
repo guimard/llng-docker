@@ -25,6 +25,7 @@ elsif ( $command eq 'set' ) {
     die "Missing key and value" unless @ARGV;
     my ( $c, $key, $offset ) = follow( $conf, @ARGV );
     if ( $c->{$key} ne $val ) {
+        my $old = $c->{$key};
         my $realVal = $val;
         if ( $val =~ /^[\{\[].*[\]\}]$/s ) {
             $realVal = eval { JSON::from_json($val) };
@@ -33,7 +34,7 @@ elsif ( $command eq 'set' ) {
         $c->{$key} = $realVal;
         my $res = $confAcc->saveConf( $conf, force => 1, cfgNumFixed => 1 );
         print STDERR "Key $offset$key updated from "
-          . $c->{$key}
+          . $old
           . " to $val\n";
     }
 }

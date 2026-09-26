@@ -203,7 +203,7 @@ KEY=`/usr/share/docker-llng/updateConf get key`
 
 if test "$KEY" = "" -o "$FORCE_KEY_REGENERATION" = "yes"; then
     echo "Update configuration key"
-    /usr/share/docker-llng/updateConf set key `cat /proc/sys/kernel/random/uuid | sed 's/[-]//g'` 2>&1 | perl -pe 's/\w{32}/<hidden for security>/'
+    /usr/share/docker-llng/updateConf set key `cat /proc/sys/kernel/random/uuid | sed 's/[-]//g'` 2>&1 | perl -pe 's/\w{32}/<hidden for security>/g'
 fi
 
 KEYS=`(env | grep OVERRIDE || true) | sed -e 's/=.*$//'`
