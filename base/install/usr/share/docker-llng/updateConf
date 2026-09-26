@@ -34,8 +34,9 @@ elsif ( $command eq 'set' ) {
         $c->{$key} = $realVal;
         my $res = $confAcc->saveConf( $conf, force => 1, cfgNumFixed => 1 );
         print STDERR "Key $offset$key updated from "
-          . $old
-          . " to $val\n";
+          . hide( $key, $old )
+          . " to "
+          . hide( $key, $val ) . "\n";
     }
 }
 elsif ( $command eq 'setDomain' ) {
@@ -54,6 +55,17 @@ elsif ( $command eq 'setDomain' ) {
 }
 else {
     die "Unknown command: '$command'";
+}
+
+# Don't leak secrets in logs: hide the whole value of a secret key, and the
+# password/secret fields of a JSON value (storage/broker options)
+sub hide {
+    my ( $key, $val ) = @_;
+    return $val if ref $val or $val eq '';
+    return '<hidden for security>' if $key =~ /^key$|pass|secret/i;
+    $val =~
+s/("[^"]*(?:pass|secret)[^"]*"\s*:\s*)"(?:[^"\\]|\\.)*"/$1"<hidden for security>"/gi;
+    return $val;
 }
 
 sub follow {
