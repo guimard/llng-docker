@@ -252,3 +252,29 @@
 +sub DESTROY { }
 +
  1;
+--- a/usr/share/perl5/Lemonldap/NG/Handler/Main/Reload.pm
++++ b/usr/share/perl5/Lemonldap/NG/Handler/Main/Reload.pm
+@@ -83,14 +83,17 @@ sub checkConf {
+             return 0;
+         }
+         $class->configReload($conf);
+-        foreach (@_onReload) {
+-            unless ( ref($_) eq 'ARRAY' ) {
++
++        # Don't use $_ here: it would be an alias to the entry, and any
++        # callback that modifies $_ would corrupt @_onReload
++        foreach my $entry (@_onReload) {
++            unless ( ref($entry) eq 'ARRAY' ) {
+                 $class->logger->error(
+                     "Corrupted entry in _onReload: expected ARRAY ref, got "
+-                      . ( defined $_ ? "'$_'" : 'undef' ) );
++                      . ( defined $entry ? "'$entry'" : 'undef' ) );
+                 next;
+             }
+-            my ( $obj, $sub ) = @$_;
++            my ( $obj, $sub ) = @$entry;
+             if ($obj) {
+                 $class->logger->debug(
+                     'Launching ' . ref($obj) . "->$sub(conf)" );
+new file mode 100644
+--- /dev/null
