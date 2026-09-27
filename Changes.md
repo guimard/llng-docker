@@ -1,5 +1,8 @@
 # LTS 2.21.x Changes
 
+## v2.21.6-1 _(2026-09-27)_
+* Rebuild with 2.21.2+ds-1+deb13u4
+
 ## v2.21.5-1 _(2026-08-14)_
 * Import 2.21.5 changes
 
