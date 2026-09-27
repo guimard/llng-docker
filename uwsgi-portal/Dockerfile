@@ -48,6 +48,7 @@ RUN set -e && for p in \
     874-geoip.patch \
     875-externalMenu.patch \
     2.21.5.patch \
+    fix-mail-mime.patch \
     ; do echo patch $p && patch -p1 < $p; done && \
     cp -f /usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.js /usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.min.js && \
     rm -f /*.patch && \
