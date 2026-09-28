@@ -5,7 +5,13 @@ LABEL maintainer="Yadd yadd@debian.org>" \
       version="v1.0"
 
 ENV PROTECTION=manager \
-    AUTHBASIC=
+    AUTHBASIC= \
+    MANAGER_API=no \
+    MANAGER_API_OAUTH2_CLIENTS= \
+    MANAGER_API_OAUTH2_SCOPE=manager-api \
+    MANAGER_API_ALLOW= \
+    MANAGER_API_AUTHBASIC= \
+    MANAGER_API_READONLY=no
 
 RUN echo "# Install nginx and manager libs" && \
     apt-get -y update && \
@@ -65,6 +71,7 @@ RUN set -e && for p in \
 	2.23.3.patch \
 	2.23.4.patch \
 	autocomplete.patch \
+	manager-api-204.patch \
     ; do echo patch $p && patch -p1 < $p || exit 1; done && \
     rm -f *.patch && \
     find /usr/share/perl5/Lemonldap -name '*.orig' -delete && \
@@ -85,6 +92,7 @@ RUN echo "Regenerating manager files (in case of patches)" && \
     echo "# Install nginx configuration files" && \
     rm -f /etc/nginx/sites-enabled/* && \
     ln -s ../../lemonldap-ng/manager-nginx.conf /etc/nginx/sites-enabled/ && \
+    ln -s ../../lemonldap-ng/manager-api-nginx.conf /etc/nginx/sites-enabled/zz_manager-api-nginx.conf && \
     (echo ""; echo "daemon off;") >> /etc/nginx/nginx.conf && \
     perl -i -pe 's#access_log .*;#access_log /dev/stdout;#; s#error_log .*;#error_log /dev/stdout info;#' /etc/nginx/nginx.conf
 

@@ -16,6 +16,7 @@ spec:
         roll: {{ randAlphaNum 5 | quote }}
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        checksum/api-secret: {{ include (print $.Template.BasePath "/manager/api-secret.yaml") . | sha256sum }}
     spec:
       containers:
         - name: manager
@@ -41,6 +42,10 @@ spec:
             {{- if .Values.config.postgres.enabled }}
             - secretRef:
                 name: {{ include "lemonldap.fullname" . }}-secrets-env
+            {{- end }}
+            {{- if and .Values.config.manager.api.enabled .Values.config.manager.api.authBasic }}
+            - secretRef:
+                name: {{ include "lemonldap.fullname" . }}-manager-api
             {{- end }}
           {{- with .Values.manager.livenessProbe }}
           livenessProbe:

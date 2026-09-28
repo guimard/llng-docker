@@ -35,6 +35,8 @@ See [yadd/lemonldap-ng-base](https://github.com/guimard/llng-docker/blob/master/
     the manager by LemonLDAP-NG itself
   - `AUTHBASIC`, if you use `PROTECTION=none`, you can add a basic authentication
     using `AUTHBASIC=<login>:<password>`
+  - `MANAGER_API*`: optional Manager API, see
+    [Manager API](https://github.com/guimard/llng-docker/blob/master/manager/README.md#manager-api)
 
 ## Docker-compose example
 

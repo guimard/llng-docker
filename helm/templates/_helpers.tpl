@@ -71,3 +71,30 @@ Contruct standard format for Postgres connection URI:
   {{- $dbName := .Values.config.postgres.dbName }}
   {{- printf "DBI:Pg:database=%s;host=%s;port=%s;sslmode=%s" $dbName $host $port $sslMode }}
 {{- end -}}
+{{/*
+Manager API host (the image serves it on manager-api.$SSODOMAIN)
+*/}}
+{{- define "lemonldap.managerApi.host" -}}
+{{- printf "manager-api.%s" .Values.config.domain.root }}
+{{- end }}
+
+{{/*
+Manager API: fail early on configurations refused by the image
+*/}}
+{{- define "lemonldap.managerApi.validate" -}}
+{{- with .Values.config.manager.api }}
+{{- if .enabled }}
+{{- $oauth2 := gt (len (.oauth2Clients | default list)) 0 }}
+{{- $allow := gt (len (.allow | default list)) 0 }}
+{{- if not (or $oauth2 $allow .authBasic) }}
+{{- fail "config.manager.api: the Manager API has no protection by itself, set oauth2Clients, allow and/or authBasic" }}
+{{- end }}
+{{- if and $oauth2 .authBasic }}
+{{- fail "config.manager.api: oauth2Clients and authBasic can't be used together" }}
+{{- end }}
+{{- if and $allow (not $oauth2) (not .authBasic) (regexMatch "/0(\\s|,|$)" (toString $.Values.config.proxy.forwardedBy)) }}
+{{- fail "config.manager.api.allow can be bypassed since config.proxy.forwardedBy trusts any client: set it to the ingress controller addresses or add another protection" }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
