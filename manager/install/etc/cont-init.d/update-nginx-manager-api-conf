@@ -1,0 +1,134 @@
+#!/command/with-contenv sh
+
+# Optional LemonLDAP::NG Manager API, served on manager-api.$SSODOMAIN
+# See README.md for MANAGER_API* variables
+
+CONF=/etc/lemonldap-ng/manager-api-nginx.conf
+PSGI=/etc/lemonldap-ng/manager-api.psgi
+HTPASSWD=/etc/lemonldap-ng/manager-api.htpasswd
+TEMPLATE=/usr/share/docker-llng/manager-api-nginx.conf
+
+set -e
+
+die() {
+	rm -f $CONF.new
+	echo "Manager API: $*" >&2
+	exit 1
+}
+
+# Start from a disabled API: any error below leaves it disabled
+echo "# Manager API disabled (set MANAGER_API=yes to enable it)" >$CONF
+rm -f $PSGI $HTPASSWD
+
+if test "$MANAGER_API" != "yes"; then
+	exit 0
+fi
+
+API_PROTECTION=${MANAGER_API_PROTECTION:-manager}
+export API_PROTECTION
+
+case "$MANAGER_API_TYPE" in
+	""|Main|OAuth2|AuthBasic|ServiceToken) ;;
+	*) die "unsupported MANAGER_API_TYPE '$MANAGER_API_TYPE' (use Main, OAuth2, AuthBasic or ServiceToken)" ;;
+esac
+
+case "$MANAGER_API_READONLY" in
+	""|yes|no) ;;
+	*) die "MANAGER_API_READONLY must be 'yes' or 'no'" ;;
+esac
+
+# LemonLDAP::NG keywords are case insensitive
+case "$(echo "$API_PROTECTION" | tr 'A-Z' 'a-z' | tr -d '[:space:]')" in
+	none|manager|authenticate)
+		API_PROTECTION=$(echo "$API_PROTECTION" | tr 'A-Z' 'a-z' | tr -d '[:space:]') ;;
+	skip|unprotect)
+		die "MANAGER_API_PROTECTION=$API_PROTECTION disables authentication, use 'none' with MANAGER_API_ALLOW and/or MANAGER_API_AUTHBASIC instead" ;;
+esac
+
+if test "$API_PROTECTION" = "none"; then
+	if test "$MANAGER_API_TYPE" != ""; then
+		die "MANAGER_API_TYPE is useless with MANAGER_API_PROTECTION=none"
+	fi
+	if test "$MANAGER_API_ALLOW" = "" -a "$MANAGER_API_AUTHBASIC" = ""; then
+		die "refusing to expose an unprotected API: set MANAGER_API_ALLOW and/or MANAGER_API_AUTHBASIC, or use a LemonLDAP::NG protection"
+	fi
+elif test "$API_PROTECTION" = "authenticate"; then
+	echo "WARNING: MANAGER_API_PROTECTION=authenticate gives full API access to every authenticated user" >&2
+fi
+
+if test "$MANAGER_API_AUTHBASIC" != ""; then
+	case "$MANAGER_API_TYPE" in
+		OAuth2|AuthBasic) die "MANAGER_API_AUTHBASIC can't be used with MANAGER_API_TYPE=$MANAGER_API_TYPE (both use Authorization header)" ;;
+	esac
+	AUTHUSER=${MANAGER_API_AUTHBASIC%%:*}
+	AUTHPWD=${MANAGER_API_AUTHBASIC#*:}
+	if test "$MANAGER_API_AUTHBASIC" = "$AUTHUSER" -o "$AUTHPWD" = "" -o "$AUTHUSER" = ""; then
+		die "malformed MANAGER_API_AUTHBASIC (expected <login>:<password>)"
+	fi
+	htpasswd -bc $HTPASSWD "$AUTHUSER" "$AUTHPWD"
+fi
+
+echo "Generate $PSGI (protection: $API_PROTECTION)"
+perl -e '
+my $p = $ENV{API_PROTECTION};
+$p =~ s/([\\\x27])/\\$1/g;
+print "# Generated at startup from MANAGER_API_PROTECTION, do not edit\n",
+  "use Lemonldap::NG::Manager;\n\n",
+  "Lemonldap::NG::Manager->run(\n",
+  "    { enabledModules => \x27api\x27, protection => \x27$p\x27 } );\n";
+' >$PSGI
+
+echo "Generate $CONF"
+perl -e '
+my %r;
+use Socket qw(inet_pton AF_INET AF_INET6);
+if ( length $ENV{MANAGER_API_ALLOW} ) {
+	foreach ( grep { length } split /[,\s]+/, $ENV{MANAGER_API_ALLOW} ) {
+		my ( $ip, $mask ) = m#^([^/]+)(?:/(\d{1,3}))?$#
+		  or die "Bad MANAGER_API_ALLOW value: $_\n";
+		my $max = inet_pton( AF_INET, $ip ) ? 32 : inet_pton( AF_INET6, $ip ) ? 128
+		  : die "Bad MANAGER_API_ALLOW address: $_\n";
+		die "Bad MANAGER_API_ALLOW mask: $_\n" if defined $mask and $mask > $max;
+		die "MANAGER_API_ALLOW=$_ allows everybody, not accepted without another protection\n"
+		  if defined $mask and $mask == 0
+		  and $ENV{API_PROTECTION} eq "none"
+		  and !length $ENV{MANAGER_API_AUTHBASIC};
+		$r{ACCESS} .= "  allow $_;\n";
+	}
+	die "Empty MANAGER_API_ALLOW\n" unless $r{ACCESS};
+	$r{ACCESS} .= "  deny all;\n";
+}
+if ( length $ENV{MANAGER_API_AUTHBASIC} ) {
+	$r{ACCESS} .= "  auth_basic \"LLNG manager API\";\n"
+	  . "  auth_basic_user_file /etc/lemonldap-ng/manager-api.htpasswd;\n";
+}
+$r{READONLY} = "    limit_except GET HEAD {\n      deny all;\n    }\n"
+  if $ENV{MANAGER_API_READONLY} eq "yes";
+$r{VHOSTTYPE} = "    fastcgi_param VHOSTTYPE $ENV{MANAGER_API_TYPE};\n"
+  if $ENV{MANAGER_API_TYPE};
+while (<>) {
+	s/^\s*#__(\w+)__\s*\n/$r{$1}/;
+	print;
+}
+' $TEMPLATE >$CONF.new || die "unable to build $CONF"
+mv $CONF.new $CONF
+
+perl -i -pe 's#__FASTCGISOCKDIR__#/run/llng-fastcgi-server#g;
+s#__PORT__#80#g;
+s#__DNSDOMAIN__#$ENV{SSODOMAIN}#g;
+' $CONF
+
+if test "$NGINX_LOG_JSON" != ""; then
+	perl -i -pe 's/access_log\s+(.*)\s+llng\s*;/access_log $1 llng_json;/' $CONF
+fi
+
+if test "$TLS_CERT_FILE"; then
+	echo "Configure SSL into $CONF"
+	perl -i -pe 's/^(\s*listen.*)80/${1}443 ssl/' $CONF
+	perl -i -pe 'BEGIN{our $setCert="
+  ssl_certificate $ENV{TLS_CERT_FILE};
+  ssl_certificate_key $ENV{TLS_KEY_FILE};
+"};s/^(\s*server_name)/$setCert$1/' $CONF
+fi
+
+setXforwardedForIfNeeded $CONF

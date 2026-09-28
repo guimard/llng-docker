@@ -5,7 +5,13 @@ LABEL maintainer="Yadd yadd@debian.org>" \
       version="v1.0"
 
 ENV PROTECTION=manager \
-    AUTHBASIC=
+    AUTHBASIC= \
+    MANAGER_API=no \
+    MANAGER_API_PROTECTION=manager \
+    MANAGER_API_TYPE= \
+    MANAGER_API_ALLOW= \
+    MANAGER_API_AUTHBASIC= \
+    MANAGER_API_READONLY=no
 
 RUN echo "# Install nginx and portal and manager libs" && \
     apt-get -y update && \
@@ -46,7 +52,8 @@ RUN echo "Regenerating manager files (plugins installed in portal image)" && \
     /usr/share/lemonldap-ng/bin/lemonldap-ng-store rebuild && \
     grep oidcRPMetaDataOptionsTokenXAuthorizedMatrix /usr/share/perl5/Lemonldap/NG/Manager/Attributes.pm && \
     echo "# Install nginx configuration files" && \
-    ln -s ../../lemonldap-ng/manager-nginx.conf /etc/nginx/sites-enabled/z_manager-nginx.conf
+    ln -s ../../lemonldap-ng/manager-nginx.conf /etc/nginx/sites-enabled/z_manager-nginx.conf && \
+    ln -s ../../lemonldap-ng/manager-api-nginx.conf /etc/nginx/sites-enabled/zz_manager-api-nginx.conf
 
 EXPOSE 80
 
