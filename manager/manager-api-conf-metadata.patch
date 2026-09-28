@@ -1,0 +1,337 @@
+Manager API: set configuration metadata (author, date, log) and audit changes
+Upstream: https://gitlab.ow2.org/lemonldap-ng/lemonldap-ng/-/merge_requests/1084
+
+diff --git a/usr/share/perl5/Lemonldap/NG/Manager/Api/Common.pm b/usr/share/perl5/Lemonldap/NG/Manager/Api/Common.pm
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Api/Common.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Api/Common.pm
+@@ -172,10 +172,42 @@ sub _getSSOMod {
+     return $mod;
+ }
+ 
++# Save the modified configuration with its metadata (author, date, log), as
++# the manager web interface does, then audit and apply it
+ sub _saveApplyConf {
+-    my ( $self, $conf ) = @_;
+-    $self->_confAcc->saveConf($conf);
+-    $self->applyConf($conf);
++    my ( $self, $req, $conf, $confKey ) = @_;
++
++    # API client identity (OAuth2 client ID, user, web server basic auth)
++    my $user = $self->p->userId($req);
++    $user = $req->env->{REMOTE_USER}
++      if ( $user eq 'anonymous' and $req->env->{REMOTE_USER} );
++
++    my $log = '[API] ' . $req->method . ' ' . $req->path_info;
++    $log .= " ($confKey)"
++      if ( defined $confKey and $req->path_info !~ m#/\Q$confKey\E$# );
++
++    $conf->{cfgAuthor}   = $user;
++    $conf->{cfgAuthorIP} = $req->address;
++    $conf->{cfgDate}     = time;
++    $conf->{cfgVersion}  = $Lemonldap::NG::Manager::VERSION;
++    $conf->{cfgLog}      = $log;
++
++    my $s = $self->_confAcc->saveConf($conf);
++    if ( $s > 0 ) {
++        $self->auditLog(
++            $req,
++            message => "User $user has stored conf $s: $log",
++            code    => "CONF_STORED",
++            user    => $user,
++            cfgNum  => $s,
++        );
++        $self->applyConf($conf);
++    }
++    else {
++        $self->logger->error( "[API] Unable to store configuration ($s): "
++              . ( $Lemonldap::NG::Common::Conf::msg // '' ) );
++    }
++    return $s;
+ }
+ 
+ sub _merge_hash {
+diff --git a/usr/share/perl5/Lemonldap/NG/Manager/Api/Menu/App.pm b/usr/share/perl5/Lemonldap/NG/Manager/Api/Menu/App.pm
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Api/Menu/App.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Api/Menu/App.pm
+@@ -164,7 +164,7 @@ sub addMenuApp {
+             $add->{confKey} ) );
+ 
+     my $res =
+-      $self->_pushMenuApp( $conf, $catConfKey, $add->{confKey}, $add, 1 );
++      $self->_pushMenuApp( $req, $conf, $catConfKey, $add->{confKey}, $add, 1 );
+ 
+     return $self->sendError( $req, $res->{msg}, 400 )
+       unless ( $res->{res} eq 'ok' );
+@@ -213,7 +213,7 @@ sub updateMenuApp {
+       );
+ 
+     my $res =
+-      $self->_pushMenuApp( $conf, $catConfKey, $appConfKey, $update, 0 );
++      $self->_pushMenuApp( $req, $conf, $catConfKey, $appConfKey, $update, 0 );
+ 
+     return $self->sendError( $req, $res->{msg}, 400 )
+       unless ( $res->{res} eq 'ok' );
+@@ -275,7 +275,7 @@ sub replaceMenuApp {
+       );
+ 
+     my $res =
+-      $self->_pushMenuApp( $conf, $catConfKey, $appConfKey, $replace, 1 );
++      $self->_pushMenuApp( $req, $conf, $catConfKey, $appConfKey, $replace, 1 );
+     return $self->sendError( $req, $res->{msg}, 400 )
+       unless ( $res->{res} eq 'ok' );
+ 
+@@ -313,7 +313,7 @@ sub deleteMenuApp {
+     delete $conf->{applicationList}->{$catConfKey}->{$appConfKey};
+ 
+     # Save configuration
+-    $self->_saveApplyConf($conf);
++    $self->_saveApplyConf( $req, $conf );
+ 
+     return $self->sendJSONresponse( $req, undef, code => 204 );
+ }
+@@ -358,7 +358,7 @@ sub _getMenuAppByConfKey {
+ }
+ 
+ sub _pushMenuApp {
+-    my ( $self, $conf, $catConfKey, $appConfKey, $push, $replace ) = @_;
++    my ( $self, $req, $conf, $catConfKey, $appConfKey, $push, $replace ) = @_;
+ 
+     if ($replace) {
+         $conf->{applicationList}->{$catConfKey}->{$appConfKey} = {};
+@@ -399,7 +399,7 @@ sub _pushMenuApp {
+     }
+ 
+     # Save configuration
+-    $self->_saveApplyConf($conf);
++    $self->_saveApplyConf( $req, $conf, $appConfKey );
+ 
+     return { res => 'ok' };
+ }
+diff --git a/usr/share/perl5/Lemonldap/NG/Manager/Api/Menu/Cat.pm b/usr/share/perl5/Lemonldap/NG/Manager/Api/Menu/Cat.pm
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Api/Menu/Cat.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Api/Menu/Cat.pm
+@@ -99,7 +99,7 @@ sub addMenuCat {
+         409
+     ) if ( defined $self->_getMenuCatByConfKey( $conf, $add->{confKey} ) );
+ 
+-    my $res = $self->_pushMenuCat( $conf, $add->{confKey}, $add, 1 );
++    my $res = $self->_pushMenuCat( $req, $conf, $add->{confKey}, $add, 1 );
+ 
+     return $self->sendError( $req, $res->{msg}, 400 )
+       unless ( $res->{res} eq 'ok' );
+@@ -134,7 +134,7 @@ sub updateMenuCat {
+     return $self->sendError( $req, "Menu category '$confKey' not found", 404 )
+       unless ( defined $current );
+ 
+-    my $res = $self->_pushMenuCat( $conf, $confKey, $update, 0 );
++    my $res = $self->_pushMenuCat( $req, $conf, $confKey, $update, 0 );
+ 
+     return $self->sendError( $req, $res->{msg}, 400 )
+       unless ( $res->{res} eq 'ok' );
+@@ -181,7 +181,7 @@ sub replaceMenuCat {
+     return $self->sendError( $req, "Menu category '$confKey' not found", 404 )
+       unless ( defined $self->_getMenuCatByConfKey( $conf, $confKey ) );
+ 
+-    my $res = $self->_pushMenuCat( $conf, $confKey, $replace, 1 );
++    my $res = $self->_pushMenuCat( $req, $conf, $confKey, $replace, 1 );
+     return $self->sendError( $req, $res->{msg}, 400 )
+       unless ( $res->{res} eq 'ok' );
+ 
+@@ -209,7 +209,7 @@ sub deleteMenuCat {
+     delete $conf->{applicationList}->{$confKey};
+ 
+     # Save configuration
+-    $self->_saveApplyConf($conf);
++    $self->_saveApplyConf( $req, $conf );
+ 
+     return $self->sendJSONresponse( $req, undef, code => 204 );
+ }
+@@ -232,7 +232,7 @@ sub _getMenuCatByConfKey {
+ }
+ 
+ sub _pushMenuCat {
+-    my ( $self, $conf, $confKey, $push, $replace ) = @_;
++    my ( $self, $req, $conf, $confKey, $push, $replace ) = @_;
+ 
+     if ($replace) {
+         $conf->{applicationList}->{$confKey} = {};
+@@ -262,7 +262,7 @@ sub _pushMenuCat {
+     }
+ 
+     # Save configuration
+-    $self->_saveApplyConf($conf);
++    $self->_saveApplyConf( $req, $conf, $confKey );
+ 
+     return { res => 'ok' };
+ }
+diff --git a/usr/share/perl5/Lemonldap/NG/Manager/Api/Providers/CasApp.pm b/usr/share/perl5/Lemonldap/NG/Manager/Api/Providers/CasApp.pm
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Api/Providers/CasApp.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Api/Providers/CasApp.pm
+@@ -136,7 +136,7 @@ sub addCasApp {
+         }
+     }
+ 
+-    my $res = $self->_pushCasApp( $conf, $add->{confKey}, $add, 1 );
++    my $res = $self->_pushCasApp( $req, $conf, $add->{confKey}, $add, 1 );
+ 
+     return $self->sendError( $req, $res->{msg}, 400 )
+       unless ( $res->{res} eq 'ok' );
+@@ -177,7 +177,7 @@ sub updateCasApp {
+     return $self->sendError( $req, $res->{msg}, 409 )
+       unless ( $res->{res} eq 'ok' );
+ 
+-    $res = $self->_pushCasApp( $conf, $confKey, $update, 0 );
++    $res = $self->_pushCasApp( $req, $conf, $confKey, $update, 0 );
+ 
+     return $self->sendError( $req, $res->{msg}, 400 )
+       unless ( $res->{res} eq 'ok' );
+@@ -211,7 +211,7 @@ sub replaceCasApp {
+     return $self->sendError( $req, $res->{msg}, 409 )
+       unless ( $res->{res} eq 'ok' );
+ 
+-    $res = $self->_pushCasApp( $conf, $confKey, $replace, 1 );
++    $res = $self->_pushCasApp( $req, $conf, $confKey, $replace, 1 );
+     return $self->sendError( $req, $res->{msg}, 400 )
+       unless ( $res->{res} eq 'ok' );
+ 
+@@ -241,7 +241,7 @@ sub deleteCasApp {
+     delete $conf->{casAppMetaDataMacros}->{$confKey};
+ 
+     # Save configuration
+-    $self->_saveApplyConf($conf);
++    $self->_saveApplyConf( $req, $conf );
+ 
+     return $self->sendJSONresponse( $req, undef, code => 204 );
+ }
+@@ -337,7 +337,7 @@ sub _isNewCasAppServiceUrlUnique {
+ }
+ 
+ sub _pushCasApp {
+-    my ( $self, $conf, $confKey, $push, $replace ) = @_;
++    my ( $self, $req, $conf, $confKey, $push, $replace ) = @_;
+ 
+     my $translatedOptions = {};
+     if ($replace) {
+@@ -413,7 +413,7 @@ sub _pushCasApp {
+     }
+ 
+     # Save configuration
+-    $self->_saveApplyConf($conf);
++    $self->_saveApplyConf( $req, $conf, $confKey );
+ 
+     return { res => 'ok' };
+ }
+diff --git a/usr/share/perl5/Lemonldap/NG/Manager/Api/Providers/OidcRp.pm b/usr/share/perl5/Lemonldap/NG/Manager/Api/Providers/OidcRp.pm
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Api/Providers/OidcRp.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Api/Providers/OidcRp.pm
+@@ -144,7 +144,7 @@ sub addOidcRp {
+     $add->{options}->{clientId}     = $add->{clientId};
+     $add->{options}->{redirectUris} = $add->{redirectUris};
+ 
+-    my $res = $self->_pushOidcRp( $conf, $add->{confKey}, $add, 1 );
++    my $res = $self->_pushOidcRp( $req, $conf, $add->{confKey}, $add, 1 );
+ 
+     return $self->sendError( $req, $res->{msg}, 400 )
+       unless ( $res->{res} eq 'ok' );
+@@ -196,7 +196,7 @@ sub updateOidcRp {
+     return $self->sendError( $req, $res->{msg}, 409 )
+       unless ( $res->{res} eq 'ok' );
+ 
+-    $res = $self->_pushOidcRp( $conf, $confKey, $update, 0 );
++    $res = $self->_pushOidcRp( $req, $conf, $confKey, $update, 0 );
+ 
+     return $self->sendError( $req, $res->{msg}, 400 )
+       unless ( $res->{res} eq 'ok' );
+@@ -250,7 +250,7 @@ sub replaceOidcRp {
+     $replace->{options}->{clientId} = $replace->{clientId};
+     $replace->{options}->{redirectUris} = $replace->{redirectUris};
+ 
+-    $res = $self->_pushOidcRp( $conf, $confKey, $replace, 1 );
++    $res = $self->_pushOidcRp( $req, $conf, $confKey, $replace, 1 );
+     return $self->sendError( $req, $res->{msg}, 400 )
+       unless ( $res->{res} eq 'ok' );
+ 
+@@ -280,7 +280,7 @@ sub deleteOidcRp {
+     delete $conf->{oidcRPMetaDataScopeRules}->{$confKey};
+ 
+     # Save configuration
+-    $self->_saveApplyConf($conf);
++    $self->_saveApplyConf( $req, $conf );
+ 
+     return $self->sendJSONresponse( $req, undef, code => 204 );
+ }
+@@ -369,7 +369,7 @@ sub _isNewOidcRpClientIdUnique {
+ }
+ 
+ sub _pushOidcRp {
+-    my ( $self, $conf, $confKey, $push, $replace ) = @_;
++    my ( $self, $req, $conf, $confKey, $push, $replace ) = @_;
+ 
+     my $translatedOptions = {};
+     if ($replace) {
+@@ -489,7 +489,7 @@ sub _pushOidcRp {
+     }
+ 
+     # Save configuration
+-    $self->_saveApplyConf($conf);
++    $self->_saveApplyConf( $req, $conf, $confKey );
+ 
+     return { res => 'ok' };
+ }
+diff --git a/usr/share/perl5/Lemonldap/NG/Manager/Api/Providers/SamlSp.pm b/usr/share/perl5/Lemonldap/NG/Manager/Api/Providers/SamlSp.pm
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Api/Providers/SamlSp.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Api/Providers/SamlSp.pm
+@@ -125,7 +125,7 @@ sub addSamlSp {
+         "Invalid input: A SAML SP with entityID $entityId already exists", 409 )
+       if ( defined $self->_getSamlSpByEntityId( $conf, $entityId ) );
+ 
+-    my $res = $self->_pushSamlSp( $conf, $add->{confKey}, $add, 1 );
++    my $res = $self->_pushSamlSp( $req, $conf, $add->{confKey}, $add, 1 );
+ 
+     return $self->sendError( $req, $res->{msg}, 400 )
+       unless ( $res->{res} eq 'ok' );
+@@ -169,7 +169,7 @@ sub replaceSamlSp {
+     return $self->sendError( $req, $res->{msg}, 409 )
+       unless ( $res->{res} eq 'ok' );
+ 
+-    $res = $self->_pushSamlSp( $conf, $confKey, $replace, 1 );
++    $res = $self->_pushSamlSp( $req, $conf, $confKey, $replace, 1 );
+ 
+     return $self->sendError( $req, $res->{msg}, 400 )
+       unless ( $res->{res} eq 'ok' );
+@@ -210,7 +210,7 @@ sub updateSamlSp {
+ 
+     }
+ 
+-    $res = $self->_pushSamlSp( $conf, $confKey, $update, 0 );
++    $res = $self->_pushSamlSp( $req, $conf, $confKey, $update, 0 );
+     return $self->sendError( $req, $res->{msg}, 400 )
+       unless ( $res->{res} eq 'ok' );
+ 
+@@ -240,7 +240,7 @@ sub deleteSamlSp {
+     delete $conf->{samlSPMetaDataMacros}->{$confKey};
+ 
+     # Save configuration
+-    $self->_saveApplyConf($conf);
++    $self->_saveApplyConf( $req, $conf );
+ 
+     return $self->sendJSONresponse( $req, undef, code => 204 );
+ }
+@@ -379,7 +379,7 @@ sub _readSamlSpExportedAttributes {
+ }
+ 
+ sub _pushSamlSp {
+-    my ( $self, $conf, $confKey, $push, $replace ) = @_;
++    my ( $self, $req, $conf, $confKey, $push, $replace ) = @_;
+ 
+     my $translatedOptions = {};
+     if ($replace) {
+@@ -453,7 +453,7 @@ sub _pushSamlSp {
+     }
+ 
+     # Save configuration
+-    $self->_saveApplyConf($conf);
++    $self->_saveApplyConf( $req, $conf, $confKey );
+ 
+     return { res => 'ok' };
+ }
