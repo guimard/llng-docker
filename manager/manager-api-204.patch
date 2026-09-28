@@ -1,0 +1,11 @@
+--- a/usr/share/perl5/Lemonldap/NG/Common/PSGI.pm
++++ b/usr/share/perl5/Lemonldap/NG/Common/PSGI.pm
+@@ -230,6 +230,8 @@
+         };
+         return $self->sendError( $req, $@ ) if ($@);
+     }
++    # Empty body (204 responses): avoid an undefined Content-Length
++    $j //= "";
+     utf8::downgrade($j);
+     return $self->_buildPsgiResponse(
+         $args{code},
