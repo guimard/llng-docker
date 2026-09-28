@@ -82,8 +82,11 @@ authentication which both use the `Authorization` header)_:
   ```
 - **IP filtering**: `MANAGER_API_ALLOW="10.1.2.0/24 192.168.0.12"`. Don't
   forget `FORWARDED_BY` if you're behind a reverse proxy, else the proxy
-  address is checked. `0.0.0.0/0` and `::/0` are refused if no other
-  protection is set
+  address is checked. But `FORWARDED_BY` must contain only your proxy
+  addresses: if it trusts any client _(`0.0.0.0/0` or `::/0`)_, the client
+  address can be spoofed, so the allow list is refused if no other protection
+  is set. `0.0.0.0/0` and `::/0` are also refused in `MANAGER_API_ALLOW` if
+  no other protection is set
 - **Nginx basic authentication**: `MANAGER_API_AUTHBASIC=<login>:<password>`
 - **Read-only mode**: `MANAGER_API_READONLY=yes` rejects all modification
   requests _(useful for monitoring or inventory)_. Note that read requests

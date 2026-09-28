@@ -99,6 +99,18 @@ if ( length $ENV{MANAGER_API_ALLOW} ) {
 	}
 	die "Empty MANAGER_API_ALLOW\n" unless $r{ACCESS};
 	$r{ACCESS} .= "  deny all;\n";
+
+	# Client address is read from FORWARDED_HEADER when the request comes
+	# from FORWARDED_BY: trusting everybody makes the allow list spoofable
+	if ( grep { m#/0$# } split /[,\s]+/, $ENV{FORWARDED_BY} ) {
+		my $msg = "MANAGER_API_ALLOW can be bypassed since FORWARDED_BY "
+		  . "trusts any client ($ENV{FORWARDED_BY}), set it to your reverse "
+		  . "proxy addresses";
+		die "$msg\n"
+		  if !length $ENV{MANAGER_API_AUTHBASIC}
+		  and $ENV{MANAGER_API_OAUTH2_CLIENTS} !~ /\S/;
+		print STDERR "WARNING: $msg\n";
+	}
 }
 if ( length $ENV{MANAGER_API_AUTHBASIC} ) {
 	$r{ACCESS} .= "  auth_basic \"LLNG manager API\";\n"
