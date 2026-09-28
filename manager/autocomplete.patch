@@ -1,0 +1,22 @@
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/forms/password.html
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/forms/password.html
+@@ -7,7 +7,7 @@
+       <th><span trspan="value"></span></th>
+       <td>
+         <div class="input-group">
+-          <input type="{{formtype||'password'}}" id="pwdinput" class="form-control" ng-model="currentNode.data"/>
++          <input type="{{formtype||'password'}}" id="pwdinput" class="form-control" autocomplete="new-password" ng-model="currentNode.data"/>
+           <span id="showp" class="input-group-addon link" ng-click="formtype=(formtype==='text'?'password':'text')">{{translate(formtype==='text'?'hide':'show')}}</span>
+         </div>
+       </td>
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/forms/simpleInputContainer.html
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/forms/simpleInputContainer.html
+@@ -12,7 +12,7 @@
+         </td>
+         <!-- PASSWORD -->
+         <td ng-if="n.type=='password'">
+-          <input type="password" class="form-control" ng-model="n.data" />
++          <input type="password" class="form-control" autocomplete="new-password" ng-model="n.data" />
+         </td>
+         <!-- LONG TEXT -->
+         <td ng-if="n.type=='longtext'">
