@@ -10,4 +10,10 @@ spec:
     - name: manager
       port: 80
       protocol: TCP
+    {{- with include "lemonldap.managerApi.port" . }}
+    - name: api
+      port: {{ . }}
+      targetPort: api
+      protocol: TCP
+    {{- end }}
 {{- end }}

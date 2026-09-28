@@ -190,7 +190,8 @@ config:
     protection: manager
 
     # Optional Manager API (https://lemonldap-ng.org/manager-api/), served
-    # on manager-api.<config.domain.root>. It has no protection by itself:
+    # on manager-api.<config.domain.root> or, with api.port, on
+    # <config.domain.manager>/api/. It has no protection by itself:
     # at least one of oauth2Clients, allow or authBasic is required
     api:
       # -- Enable the Manager API
@@ -209,6 +210,10 @@ config:
       authBasic: ""
       # -- Allow only GET and HEAD requests
       readOnly: false
+      # -- Serve the API on this dedicated port (Service port `api`) instead
+      # of the manager-api.<config.domain.root> host. The API ingress then
+      # routes <config.domain.manager>/api/ to it
+      port: ""
 
   log:
     # -- Possible values: debug, info, notice, warn, error
@@ -276,8 +281,9 @@ ingress:
     annotations: {}
       # nginx.ingress.kubernetes.io/whitelist-source-range: "54.36.52.8/32"
 
-  # -- Manager API ingress config (host: manager-api.<config.domain.root>),
-  # requires config.manager.api.enabled
+  # -- Manager API ingress config (host: manager-api.<config.domain.root>, or
+  # <config.domain.manager>/api/ with config.manager.api.port), requires
+  # config.manager.api.enabled
   managerApi:
     enabled: false
     # -- Annotations for Manager API Ingress resource

@@ -29,6 +29,28 @@ case "$MANAGER_API_READONLY" in
 	*) die "MANAGER_API_READONLY must be 'yes' or 'no'" ;;
 esac
 
+# Listening port: by default, the manager-api.$SSODOMAIN virtual host on the
+# main port. With MANAGER_API_PORT, the API is alone on its own port, so it
+# answers whatever the Host header (to be reached through a reverse proxy
+# that routes /api/ to this port for example)
+LISTEN=80
+if test "$MANAGER_API_PORT" != ""; then
+	case "$MANAGER_API_PORT" in
+		*[!0-9]*) die "MANAGER_API_PORT must be a port number" ;;
+	esac
+	if test "$MANAGER_API_PORT" -lt 1 -o "$MANAGER_API_PORT" -gt 65535 \
+		-o "$MANAGER_API_PORT" -eq 80 -o "$MANAGER_API_PORT" -eq 443; then
+		die "MANAGER_API_PORT must be a free port number (not 80 or 443)"
+	fi
+	LISTEN=$MANAGER_API_PORT
+elif test "$TLS_CERT_FILE"; then
+	LISTEN=443
+fi
+if test "$TLS_CERT_FILE"; then
+	LISTEN="$LISTEN ssl"
+fi
+export LISTEN
+
 # Normalize lists (blank values are considered as empty)
 for v in MANAGER_API_ALLOW MANAGER_API_OAUTH2_CLIENTS; do
 	eval "$v=\$(perl -e 'print join \" \", grep { length } split /[,\\s]+/, \$ENV{$v}')"
@@ -128,7 +150,7 @@ while (<>) {
 mv $CONF.new $CONF
 
 perl -i -pe 's#__FASTCGISOCKDIR__#/run/llng-fastcgi-server#g;
-s#__PORT__#80#g;
+s#__PORT__#$ENV{LISTEN}#g;
 s#__DNSDOMAIN__#$ENV{SSODOMAIN}#g;
 ' $CONF
 
@@ -138,7 +160,6 @@ fi
 
 if test "$TLS_CERT_FILE"; then
 	echo "Configure SSL into $CONF"
-	perl -i -pe 's/^(\s*listen.*)80/${1}443 ssl/' $CONF
 	perl -i -pe 'BEGIN{our $setCert="
   ssl_certificate $ENV{TLS_CERT_FILE};
   ssl_certificate_key $ENV{TLS_KEY_FILE};

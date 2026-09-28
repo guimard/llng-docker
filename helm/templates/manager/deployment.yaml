@@ -29,6 +29,10 @@ spec:
           ports:
             - containerPort: 80
               name: manager
+            {{- with include "lemonldap.managerApi.port" . }}
+            - containerPort: {{ . }}
+              name: api
+            {{- end }}
           env:
           {{- if .Values.extraEnv }}
             {{- include "common.tplvalues.render" (dict "value" .Values.extraEnv "context" $) | nindent 12 }}

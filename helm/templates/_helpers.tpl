@@ -79,6 +79,15 @@ Manager API host (the image serves it on manager-api.$SSODOMAIN)
 {{- end }}
 
 {{/*
+Manager API dedicated port (empty: manager-api.<root> virtual host on port 80)
+*/}}
+{{- define "lemonldap.managerApi.port" -}}
+{{- with .Values.config.manager.api }}
+{{- if and .enabled .port }}{{ toString .port }}{{ end }}
+{{- end }}
+{{- end }}
+
+{{/*
 Manager API: fail early on configurations refused by the image
 */}}
 {{- define "lemonldap.managerApi.validate" -}}
@@ -94,6 +103,14 @@ Manager API: fail early on configurations refused by the image
 {{- end }}
 {{- if and $allow (not $oauth2) (not .authBasic) (regexMatch "/0(\\s|,|$)" (toString $.Values.config.proxy.forwardedBy)) }}
 {{- fail "config.manager.api.allow can be bypassed since config.proxy.forwardedBy trusts any client: set it to the ingress controller addresses or add another protection" }}
+{{- end }}
+{{- if .port }}
+{{- if not (regexMatch "^[0-9]+$" (toString .port)) }}
+{{- fail "config.manager.api.port must be a port number" }}
+{{- end }}
+{{- if or (lt (atoi (toString .port)) 1) (gt (atoi (toString .port)) 65535) (has (atoi (toString .port)) (list 80 443 8080)) }}
+{{- fail "config.manager.api.port must be a free port number (not 80, 443 or 8080)" }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}
