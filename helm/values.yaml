@@ -189,6 +189,27 @@ config:
     # * none         : no protection
     protection: manager
 
+    # Optional Manager API (https://lemonldap-ng.org/manager-api/), served
+    # on manager-api.<config.domain.root>. It has no protection by itself:
+    # at least one of oauth2Clients, allow or authBasic is required
+    api:
+      # -- Enable the Manager API
+      enabled: false
+      # -- OIDC client IDs allowed to use the API with an access token
+      # obtained by client credentials grant (recommended protection)
+      oauth2Clients: []
+      # -- Scope required in these access tokens (empty: no scope check)
+      oauth2Scope: manager-api
+      # -- IP addresses or networks allowed to access the API. Requires
+      # config.proxy.forwardedBy to be restricted to the ingress controller
+      # addresses, else the client address can be spoofed
+      allow: []
+      # -- Nginx basic authentication `<login>:<password>` (stored in a
+      # Secret, can't be combined with oauth2Clients)
+      authBasic: ""
+      # -- Allow only GET and HEAD requests
+      readOnly: false
+
   log:
     # -- Possible values: debug, info, notice, warn, error
     level: info
@@ -254,6 +275,14 @@ ingress:
     # -- Annotations for Manager Ingress resource. Extra security layer to manager endpoint
     annotations: {}
       # nginx.ingress.kubernetes.io/whitelist-source-range: "54.36.52.8/32"
+
+  # -- Manager API ingress config (host: manager-api.<config.domain.root>),
+  # requires config.manager.api.enabled
+  managerApi:
+    enabled: false
+    # -- Annotations for Manager API Ingress resource
+    annotations: {}
+      # nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8"
 
   # -- IMAP Auto Discovery sconfig
   imapAutoDiscovery:

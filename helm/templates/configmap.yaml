@@ -1,3 +1,4 @@
+{{- include "lemonldap.managerApi.validate" . }}
 {{- $postgresUrl := include "postgres.url" . }}
 apiVersion: v1
 kind: ConfigMap
@@ -9,6 +10,13 @@ data:
   SSODOMAIN: {{ .Values.config.domain.root | quote }}
   PORTAL: {{ .Values.config.domain.portal | quote }}
   PROTECTION: {{ .Values.config.manager.protection | quote }}
+  {{- with .Values.config.manager.api }}
+  MANAGER_API: {{ ternary "yes" "no" (and (eq (toString .enabled) "true") (eq (toString $.Values.manager.enabled) "true")) | quote }}
+  MANAGER_API_OAUTH2_CLIENTS: {{ join " " (.oauth2Clients | default list) | quote }}
+  MANAGER_API_OAUTH2_SCOPE: {{ .oauth2Scope | default "" | quote }}
+  MANAGER_API_ALLOW: {{ join " " (.allow | default list) | quote }}
+  MANAGER_API_READONLY: {{ ternary "yes" "no" (eq (toString .readOnly) "true") | quote }}
+  {{- end }}
   LOGLEVEL: {{ .Values.config.log.level | quote }}
   LOGGER: {{ .Values.config.log.logger | quote }}
   USERLOGGER: {{ .Values.config.log.userLogger | quote }}
