@@ -11,7 +11,7 @@ TEMPLATE=/usr/share/docker-llng/manager-api-nginx.conf
 set -e
 
 die() {
-	rm -f $CONF.new
+	rm -f $CONF.new $PSGI
 	echo "Manager API: $*" >&2
 	exit 1
 }
@@ -24,42 +24,25 @@ if test "$MANAGER_API" != "yes"; then
 	exit 0
 fi
 
-API_PROTECTION=${MANAGER_API_PROTECTION:-manager}
-export API_PROTECTION
-
-case "$MANAGER_API_TYPE" in
-	""|Main|OAuth2|AuthBasic|ServiceToken) ;;
-	*) die "unsupported MANAGER_API_TYPE '$MANAGER_API_TYPE' (use Main, OAuth2, AuthBasic or ServiceToken)" ;;
-esac
-
 case "$MANAGER_API_READONLY" in
 	""|yes|no) ;;
 	*) die "MANAGER_API_READONLY must be 'yes' or 'no'" ;;
 esac
 
-# LemonLDAP::NG keywords are case insensitive
-case "$(echo "$API_PROTECTION" | tr 'A-Z' 'a-z' | tr -d '[:space:]')" in
-	none|manager|authenticate)
-		API_PROTECTION=$(echo "$API_PROTECTION" | tr 'A-Z' 'a-z' | tr -d '[:space:]') ;;
-	skip|unprotect)
-		die "MANAGER_API_PROTECTION=$API_PROTECTION disables authentication, use 'none' with MANAGER_API_ALLOW and/or MANAGER_API_AUTHBASIC instead" ;;
-esac
+# Normalize lists (blank values are considered as empty)
+for v in MANAGER_API_ALLOW MANAGER_API_OAUTH2_CLIENTS; do
+	eval "$v=\$(perl -e 'print join \" \", grep { length } split /[,\\s]+/, \$ENV{$v}')"
+	export $v
+done
 
-if test "$API_PROTECTION" = "none"; then
-	if test "$MANAGER_API_TYPE" != ""; then
-		die "MANAGER_API_TYPE is useless with MANAGER_API_PROTECTION=none"
-	fi
-	if test "$MANAGER_API_ALLOW" = "" -a "$MANAGER_API_AUTHBASIC" = ""; then
-		die "refusing to expose an unprotected API: set MANAGER_API_ALLOW and/or MANAGER_API_AUTHBASIC, or use a LemonLDAP::NG protection"
-	fi
-elif test "$API_PROTECTION" = "authenticate"; then
-	echo "WARNING: MANAGER_API_PROTECTION=authenticate gives full API access to every authenticated user" >&2
+if test "$MANAGER_API_ALLOW" = "" -a "$MANAGER_API_AUTHBASIC" = "" -a "$MANAGER_API_OAUTH2_CLIENTS" = ""; then
+	die "refusing to expose an unprotected API: set MANAGER_API_OAUTH2_CLIENTS, MANAGER_API_ALLOW and/or MANAGER_API_AUTHBASIC"
 fi
 
 if test "$MANAGER_API_AUTHBASIC" != ""; then
-	case "$MANAGER_API_TYPE" in
-		OAuth2|AuthBasic) die "MANAGER_API_AUTHBASIC can't be used with MANAGER_API_TYPE=$MANAGER_API_TYPE (both use Authorization header)" ;;
-	esac
+	if test "$MANAGER_API_OAUTH2_CLIENTS" != ""; then
+		die "MANAGER_API_AUTHBASIC and MANAGER_API_OAUTH2_CLIENTS can't be used together (both use Authorization header)"
+	fi
 	AUTHUSER=${MANAGER_API_AUTHBASIC%%:*}
 	AUTHPWD=${MANAGER_API_AUTHBASIC#*:}
 	if test "$MANAGER_API_AUTHBASIC" = "$AUTHUSER" -o "$AUTHPWD" = "" -o "$AUTHUSER" = ""; then
@@ -68,15 +51,34 @@ if test "$MANAGER_API_AUTHBASIC" != ""; then
 	htpasswd -bc $HTPASSWD "$AUTHUSER" "$AUTHPWD"
 fi
 
-echo "Generate $PSGI (protection: $API_PROTECTION)"
+# The API has no protection by itself: when OAuth2 clients are given, the
+# LemonLDAP::NG OAuth2 handler accepts only access tokens issued to one of
+# these clients by the client credentials grant (so not tied to a user)
+echo "Generate $PSGI"
 perl -e '
-my $p = $ENV{API_PROTECTION};
-$p =~ s/([\\\x27])/\\$1/g;
-print "# Generated at startup from MANAGER_API_PROTECTION, do not edit\n",
+my $protection = "none";
+my @clients = grep { length } split /[,\s]+/, $ENV{MANAGER_API_OAUTH2_CLIENTS};
+if (@clients) {
+	foreach (@clients) {
+		die "Bad client ID in MANAGER_API_OAUTH2_CLIENTS: $_\n"
+		  unless m{^[\w.:/-]+$};
+	}
+	$protection = q{$_oidc_grant_type eq "clientcredentials" and ($_clientId eq }
+	  . join( q{ or $_clientId eq }, map { qq{"$_"} } @clients ) . ")";
+	my $scope = $ENV{MANAGER_API_OAUTH2_SCOPE};
+	if ( length $scope ) {
+		die "Bad MANAGER_API_OAUTH2_SCOPE: $scope\n"
+		  unless $scope =~ /^[\w.:\/-]+$/;
+		$protection .= q{ and $_scope =~ /(?<!\S)} . quotemeta($scope) . q{(?!\S)/};
+	}
+	print STDERR "API access rule: $protection\n";
+}
+$protection =~ s/([\\\x27])/\\$1/g;
+print "# Generated at startup from MANAGER_API* variables, do not edit\n",
   "use Lemonldap::NG::Manager;\n\n",
   "Lemonldap::NG::Manager->run(\n",
-  "    { enabledModules => \x27api\x27, protection => \x27$p\x27 } );\n";
-' >$PSGI
+  "    { enabledModules => \x27api\x27, protection => \x27$protection\x27 } );\n";
+' >$PSGI || die "unable to build $PSGI"
 
 echo "Generate $CONF"
 perl -e '
@@ -91,8 +93,8 @@ if ( length $ENV{MANAGER_API_ALLOW} ) {
 		die "Bad MANAGER_API_ALLOW mask: $_\n" if defined $mask and $mask > $max;
 		die "MANAGER_API_ALLOW=$_ allows everybody, not accepted without another protection\n"
 		  if defined $mask and $mask == 0
-		  and $ENV{API_PROTECTION} eq "none"
-		  and !length $ENV{MANAGER_API_AUTHBASIC};
+		  and !length $ENV{MANAGER_API_AUTHBASIC}
+		  and $ENV{MANAGER_API_OAUTH2_CLIENTS} !~ /\S/;
 		$r{ACCESS} .= "  allow $_;\n";
 	}
 	die "Empty MANAGER_API_ALLOW\n" unless $r{ACCESS};
@@ -104,8 +106,8 @@ if ( length $ENV{MANAGER_API_AUTHBASIC} ) {
 }
 $r{READONLY} = "    limit_except GET HEAD {\n      deny all;\n    }\n"
   if $ENV{MANAGER_API_READONLY} eq "yes";
-$r{VHOSTTYPE} = "    fastcgi_param VHOSTTYPE $ENV{MANAGER_API_TYPE};\n"
-  if $ENV{MANAGER_API_TYPE};
+$r{VHOSTTYPE} = "    fastcgi_param VHOSTTYPE OAuth2;\n"
+  if $ENV{MANAGER_API_OAUTH2_CLIENTS} =~ /\S/;
 while (<>) {
 	s/^\s*#__(\w+)__\s*\n/$r{$1}/;
 	print;

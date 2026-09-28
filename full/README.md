@@ -38,13 +38,11 @@ See [yadd/lemonldap-ng-base](https://github.com/guimard/llng-docker/blob/master/
   - `MANAGER_API` = `no`, set it to `yes` to enable the
     [Manager API](https://lemonldap-ng.org/manager-api/) on
     `manager-api.$SSODOMAIN` _(see [Manager API](#manager-api) below)_
-  - `MANAGER_API_PROTECTION` = `manager`, API protection by LemonLDAP::NG:
-    `manager` _(rules of `manager-api.$SSODOMAIN` virtual host)_,
-    `<rule>`, `authenticate` _(not recommended)_ or `none` _(web server
-    protection only)_
-  - `MANAGER_API_TYPE` = _(empty: type set in virtual host configuration)_,
-    LemonLDAP::NG handler type used to protect the API: `Main`, `OAuth2`,
-    `AuthBasic` or `ServiceToken`
+  - `MANAGER_API_OAUTH2_CLIENTS` = _(space or comma separated list of OIDC
+    client IDs allowed to use the API with an access token obtained by client
+    credentials grant)_
+  - `MANAGER_API_OAUTH2_SCOPE` = `manager-api`, scope required in these access
+    tokens _(empty value: no scope check)_
   - `MANAGER_API_ALLOW` = _(space or comma separated list of IP addresses or
     networks allowed to access the API, all others are rejected)_
   - `MANAGER_API_AUTHBASIC` = _(`<login>:<password>` to add an Nginx basic
@@ -57,51 +55,50 @@ See [yadd/lemonldap-ng-base](https://github.com/guimard/llng-docker/blob/master/
 The Manager API allows to modify LemonLDAP::NG configuration _(OIDC RPs,
 SAML SPs, CAS applications, menu)_ and users second factors. **It performs no
 authentication by itself**, so it's disabled by default. When enabled with
-`MANAGER_API=yes`, it's served on `manager-api.$SSODOMAIN`. If the given
-variables would leave the API unprotected _(or are invalid)_, an error is
-logged and the API stays disabled.
+`MANAGER_API=yes`, it's served on `manager-api.$SSODOMAIN` and at least one of
+`MANAGER_API_OAUTH2_CLIENTS`, `MANAGER_API_ALLOW` or `MANAGER_API_AUTHBASIC`
+is required. If the given variables would leave the API unprotected _(or are
+invalid)_, an error is logged and the API stays disabled.
 
-Available protections _(they can be combined)_:
+Available protections _(they can be combined, except OAuth2 and basic
+authentication which both use the `Authorization` header)_:
 
-- **LemonLDAP::NG protection** _(default: `MANAGER_API_PROTECTION=manager`)_:
-  requests are checked by the LemonLDAP::NG handler against the rules of the
-  `manager-api.$SSODOMAIN` virtual host. This virtual host doesn't exist in
-  default configuration, so no access is granted until you declare it.
-  For an API, prefer a non-interactive handler type
-  _(the default `Main` type redirects to the portal)_:
-  - `MANAGER_API_TYPE=OAuth2` _(recommended)_: clients send an OIDC access
-    token _(`Authorization: Bearer ...`)_. Create a dedicated OIDC Relying Party
-    allowed to use the _client credentials_ grant, then set the virtual host
-    rule to something like
-    `$_clientId eq "manager-api-client" and $_scope =~ /(?<!\S)manager-api(?!\S)/`
-  - `MANAGER_API_TYPE=ServiceToken`: for applications already protected by
-    LemonLDAP::NG that call the API using a `token()` header
-  - `MANAGER_API_TYPE=AuthBasic`: login/password checked by the portal
-    _(requires the portal REST server)_, then use a rule like `$uid eq "admin"`
+- **OAuth2 client credentials** _(recommended)_: API clients are
+  applications, not users. Declare each of them as an OIDC Relying Party
+  allowed to use the _client credentials_ grant, then list their client IDs
+  in `MANAGER_API_OAUTH2_CLIENTS`. The API then requires an access token
+  _(`Authorization: Bearer ...`)_ that:
+  - was issued by the client credentials grant _(tokens tied to a user
+    session are rejected)_
+  - was issued to one of the listed clients _(any other client is rejected)_
+  - contains the `MANAGER_API_OAUTH2_SCOPE` scope _(default: `manager-api`)_
+
+  Tokens are short-lived, each client has its own secret and the client ID
+  appears in LemonLDAP::NG logs. Example:
+  ```shell
+  TOKEN=$(curl -s -u myclient:mysecret -d grant_type=client_credentials \
+    -d scope=manager-api https://auth.example.com/oauth2/token | jq -r .access_token)
+  curl -H "Authorization: Bearer $TOKEN" https://manager-api.example.com/api/v1/status
+  ```
 - **IP filtering**: `MANAGER_API_ALLOW="10.1.2.0/24 192.168.0.12"`. Don't
   forget `FORWARDED_BY` if you're behind a reverse proxy, else the proxy
-  address is checked
+  address is checked. `0.0.0.0/0` and `::/0` are refused if no other
+  protection is set
 - **Nginx basic authentication**: `MANAGER_API_AUTHBASIC=<login>:<password>`
-  _(can't be combined with `OAuth2` or `AuthBasic` handler types that use
-  the same `Authorization` header)_
 - **Read-only mode**: `MANAGER_API_READONLY=yes` rejects all modification
   requests _(useful for monitoring or inventory)_. Note that read requests
   return secrets _(OIDC client secrets for example)_, so this doesn't replace
   a strong protection
 
-`MANAGER_API_PROTECTION=none` is accepted only with `MANAGER_API_ALLOW` _(not
-`0.0.0.0/0` or `::/0`)_ and/or `MANAGER_API_AUTHBASIC`. LemonLDAP::NG rules
-`skip` and `unprotect` are refused.
-
-Example: API usable only from the internal network with an OAuth2 access
-token:
+Example: API usable only from the internal network by the `ci-deploy` OIDC
+client:
 
 ```yaml
   llng:
     image: yadd/lemonldap-ng-full
     environment:
       - MANAGER_API=yes
-      - MANAGER_API_TYPE=OAuth2
+      - MANAGER_API_OAUTH2_CLIENTS=ci-deploy
       - MANAGER_API_ALLOW=10.0.0.0/8
 ```
 
