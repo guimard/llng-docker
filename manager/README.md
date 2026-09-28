@@ -49,6 +49,8 @@ See [yadd/lemonldap-ng-base](https://github.com/guimard/llng-docker/blob/master/
     authentication on the API)_
   - `MANAGER_API_READONLY` = `no`, set it to `yes` to allow only `GET` and
     `HEAD` requests
+  - `MANAGER_API_PORT` = _(serve the API on this dedicated port, whatever the
+    `Host` header, instead of the `manager-api.$SSODOMAIN` virtual host)_
 
 ## Manager API
 
@@ -92,6 +94,13 @@ authentication which both use the `Authorization` header)_:
   requests _(useful for monitoring or inventory)_. Note that read requests
   return secrets _(OIDC client secrets for example)_, so this doesn't replace
   a strong protection
+
+By default, the API is a virtual host on the main port. With
+`MANAGER_API_PORT=8081` for example, it's served instead on port 8081 whatever
+the `Host` header, so a reverse proxy can route `/api/` of the manager site to
+this port _(`https://manager.example.com/api/v1/...`)_ or it can be kept
+unexposed outside of your internal network. With `TLS_CERT_FILE`, this port
+uses TLS too.
 
 Example: API usable only from the internal network by the `ci-deploy` OIDC
 client:

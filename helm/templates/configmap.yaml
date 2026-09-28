@@ -16,6 +16,7 @@ data:
   MANAGER_API_OAUTH2_SCOPE: {{ .oauth2Scope | default "" | quote }}
   MANAGER_API_ALLOW: {{ join " " (.allow | default list) | quote }}
   MANAGER_API_READONLY: {{ ternary "yes" "no" (eq (toString .readOnly) "true") | quote }}
+  MANAGER_API_PORT: {{ include "lemonldap.managerApi.port" $ | quote }}
   {{- end }}
   LOGLEVEL: {{ .Values.config.log.level | quote }}
   LOGGER: {{ .Values.config.log.logger | quote }}

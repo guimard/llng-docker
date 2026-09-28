@@ -11,7 +11,8 @@ ENV PROTECTION=manager \
     MANAGER_API_OAUTH2_SCOPE=manager-api \
     MANAGER_API_ALLOW= \
     MANAGER_API_AUTHBASIC= \
-    MANAGER_API_READONLY=no
+    MANAGER_API_READONLY=no \
+    MANAGER_API_PORT=
 
 RUN echo "# Install nginx and portal and manager libs" && \
     apt-get -y update && \

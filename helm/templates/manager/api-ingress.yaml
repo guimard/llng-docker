@@ -1,5 +1,7 @@
 {{- if and .Values.ingress.enabled .Values.manager.enabled .Values.config.manager.api.enabled .Values.ingress.managerApi.enabled }}
-{{- $host := include "lemonldap.managerApi.host" . }}
+{{- $port := include "lemonldap.managerApi.port" . }}
+{{- /* Dedicated port: /api/ of the manager site, else manager-api.<root> */}}
+{{- $host := ternary .Values.config.domain.manager (include "lemonldap.managerApi.host" .) (ne $port "") }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -14,7 +16,8 @@ spec:
   {{- if .Values.ingress.ingressClassName }}
   ingressClassName: {{ .Values.ingress.ingressClassName }}
   {{- end }}
-  {{- if .Values.ingress.tls.enabled }}
+  {{- /* On the manager site, TLS is declared by the manager ingress when enabled */}}
+  {{- if and .Values.ingress.tls.enabled (not (and $port .Values.ingress.manager.enabled)) }}
   tls:
     - hosts:
         - {{ $host }}
@@ -24,11 +27,15 @@ spec:
     - host: {{ $host | quote }}
       http:
         paths:
-          - path: /
+          - path: {{ ternary "/api/" "/" (ne $port "") }}
             pathType: Prefix
             backend:
               service:
                 name: {{ include "lemonldap.fullname" . }}-manager
                 port:
+                  {{- if $port }}
+                  name: api
+                  {{- else }}
                   number: 80
+                  {{- end }}
 {{- end }}
