@@ -1,0 +1,192 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use Net::LDAP;
+use Net::LDAP::LDIF;
+use Getopt::Long qw(:config no_ignore_case);
+use Pod::Usage;
+
+# Options
+my $host = 'localhost';
+my $port = 389;
+my $binddn;
+my $password;
+my $file;
+my $url;
+my $continue = 0;
+my $dryrun   = 0;
+my $help     = 0;
+my $x;
+
+GetOptions(
+    'x'            => \$x,
+    'h|host=s'     => \$host,
+    'H|url=s'      => \$url,
+    'p|port=i'     => \$port,
+    'D|binddn=s'   => \$binddn,
+    'w|password=s' => \$password,
+    'f|file=s'     => \$file,
+    'c|continue'   => \$continue,
+    'n|dry-run'    => \$dryrun,
+    'help|?'       => \$help,
+) or pod2usage(2);
+
+pod2usage(1) if $help;
+
+$file ||= shift if @ARGV;
+$file ||= '-';
+
+my $ldif = Net::LDAP::LDIF->new( $file, 'r', onerror => undef )
+  or die "Unable to read $file: $!";
+
+my $ldap;
+
+if ($dryrun) {
+    print STDERR "# Dry run: nothing will be modified\n";
+}
+else {
+    $ldap = Net::LDAP->new( $url ? ($url) : ( $host, port => $port ) )
+      or die "Unable to connect to " . ( $url ? $url : "$host:$port" ) . ": $@";
+
+    if ( $binddn && $password ) {
+        my $mesg = $ldap->bind( $binddn, password => $password );
+        die "Bind error: ", $mesg->error if $mesg->code;
+    }
+}
+
+my %actions = (
+    add    => 'adding new entry',
+    modify => 'modifying entry',
+    delete => 'deleting entry',
+    modrdn => 'renaming entry',
+    moddn  => 'renaming entry',
+);
+
+my $errors = 0;
+$| = 1;
+
+while ( !$ldif->eof ) {
+    my $entry = $ldif->read_entry;
+    if ( $ldif->error ) {
+        print STDERR "LDIF error: ", $ldif->error, "\n", $ldif->error_lines;
+        $errors++;
+        $continue ? next : last;
+    }
+    next unless $entry;
+
+    my $type = $entry->changetype;
+    printf "%s \"%s\"\n", ( $actions{$type} || $type ), $entry->dn;
+    next if $dryrun;
+
+    my $mesg = $entry->update($ldap);
+    if ( $mesg->code ) {
+        print STDERR "Error: ", $mesg->error, "\n";
+        $errors++;
+        last unless $continue;
+    }
+}
+
+$ldif->done;
+$ldap->unbind if $ldap;
+
+exit( $errors ? 1 : 0 );
+
+__END__
+
+=head1 NAME
+
+ldapadd - Openldap ldapadd/ldapmodify like
+
+=head1 SYNOPSIS
+
+  $ ldapadd -H ldaps://localhost -D <account> -w <pasword> -f file.ldif
+  $ ldapmodify -H ldaps://localhost -D <account> -w <pasword> < file.ldif
+
+=head1 DESCRIPTION
+
+This program mimics OpenLDAP's ldapadd/ldapmodify but does not require its
+dependencies.
+
+LDIF records without C<changetype> are added. Records with a C<changetype>
+(add, modify, delete, modrdn, moddn) are applied as described, whatever the
+command name.
+
+=head1 Options
+
+=over
+
+=item B<--help>
+
+Display this
+
+=item B<--host>, B<-h>
+
+LDAP hostname. Default: localhost.
+
+=item B<--url>, B<-H>
+
+LDAP URI.
+
+=item B<--port>, B<-p>
+
+Override default port with this value.
+
+=item B<--binddn>, B<-D>
+
+Use the given Distinguished Name to bind to the LDAP directory.
+
+=item B<--password>, B<-w>
+
+Use the given value as the password for simple authentication.
+
+=item B<--file>, B<-f> or B<first non-option argument>
+
+LDIF file to read. Default: standard input.
+
+=item B<--continue>, B<-c>
+
+Continue on errors. Default: stop at the first error.
+
+=item B<--dry-run>, B<-n>
+
+Show what would be done but don't modify the directory.
+
+=back
+
+=head1 AUTHORS
+
+=over
+
+=item LemonLDAP::NG team L<http://lemonldap-ng.org/team>
+
+=back
+
+=head1 BUG REPORT
+
+Use OW2 system to report bug or ask for features:
+L<https://gitlab.ow2.org/lemonldap-ng/lemonldap-ng/issues>
+
+=head1 DOWNLOAD
+
+Lemonldap::NG is available at
+L<https://lemonldap-ng.org/download>
+
+=head1 COPYRIGHT AND LICENSE
+
+See COPYING file for details.
+
+This library is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2, or (at your option)
+any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see L<http://www.gnu.org/licenses/>.
+
+=cut

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add `_ldapadd` command (`ldapadd`/`ldapmodify`)
 - Fix `-h` option of `_ldapsearch`
 
 ## v2.23.4-2 _(2026-09-29)_
