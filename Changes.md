@@ -1,5 +1,19 @@
 # Changes
 
+## v2.23.4-2 _(2026-09-29)_
+
+- Add optional Manager API in manager and full images (and helm chart)
+  - protected by OAuth2 client credentials
+  - optional dedicated port (`MANAGER_API_PORT`)
+  - set configuration metadata and audit changes
+- Hide secrets during startup
+- Fix cron-task (conf not rewritable by www-data)
+- patches:
+  - Fix MessageBroker::Pg
+  - Fix CrowdSec filter on reload
+  - Fix manager autocomplete
+  - Fix empty Content-Length in Manager API 204 responses
+
 ## v2.23.4-1 _(2026-09-25)_
 
 - Update to 2.23.4 (CVE-2026-92288, CVE-2026-92289, CVE-2026-95811)
