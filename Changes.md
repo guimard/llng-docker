@@ -1,5 +1,9 @@
 # Changes
 
+## Unreleased
+
+- Fix `-h` option of `_ldapsearch`
+
 ## v2.23.4-2 _(2026-09-29)_
 
 - Add optional Manager API in manager and full images (and helm chart)

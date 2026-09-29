@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 use Net::LDAP;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Pod::Usage;
 
 # Options
