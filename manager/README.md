@@ -77,11 +77,13 @@ authentication which both use the `Authorization` header)_:
 
   Tokens are short-lived, each client has its own secret and the client ID
   appears in LemonLDAP::NG logs. Example:
+
   ```shell
   TOKEN=$(curl -s -u myclient:mysecret -d grant_type=client_credentials \
     -d scope=manager-api https://auth.example.com/oauth2/token | jq -r .access_token)
   curl -H "Authorization: Bearer $TOKEN" https://manager-api.example.com/api/v1/status
   ```
+
 - **IP filtering**: `MANAGER_API_ALLOW="10.1.2.0/24 192.168.0.12"`. Don't
   forget `FORWARDED_BY` if you're behind a reverse proxy, else the proxy
   address is checked. But `FORWARDED_BY` must contain only your proxy
@@ -106,12 +108,12 @@ Example: API usable only from the internal network by the `ci-deploy` OIDC
 client:
 
 ```yaml
-  manager:
-    image: yadd/lemonldap-ng-manager
-    environment:
-      - MANAGER_API=yes
-      - MANAGER_API_OAUTH2_CLIENTS=ci-deploy
-      - MANAGER_API_ALLOW=10.0.0.0/8
+manager:
+  image: yadd/lemonldap-ng-manager
+  environment:
+    - MANAGER_API=yes
+    - MANAGER_API_OAUTH2_CLIENTS=ci-deploy
+    - MANAGER_API_ALLOW=10.0.0.0/8
 ```
 
 ## Docker-compose example

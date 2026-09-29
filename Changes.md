@@ -1,6 +1,7 @@
 # Changes
 
-## v2.23.4-1  _(2026-09-25)_
+## v2.23.4-1 _(2026-09-25)_
+
 - Update to 2.23.4 (CVE-2026-92288, CVE-2026-92289, CVE-2026-95811)
 - Update plugins to 0.5.2
 - patches:
@@ -8,22 +9,26 @@
   - Fix mails format
 
 ## v2.23.3-3 _(2026-08-30)_
+
 - Update plugins to 0.5.1
 
 ## v2.23.3-2 _(2026-08-21)_
+
 - Update plugins to 0.4.1
 
 ## v2.23.3-1 _(2026-08-14)_
+
 - Import 2.23.3 changes
 
 ## v2.23.2-1 _(2026-07-28)_
+
 - Add perlHtPasswd utility
 - Accept "false" as value for CRON variables
 - Update to 2.23.2
 - Updates from store:
-  * crowdsec-filters: add CVE-2026-63030 detection
-  * add linagora-lemonldap-ng-plugin-custom-functions
-  * pam-access, twake, json-file: fix for future 3.0.0
+  - crowdsec-filters: add CVE-2026-63030 detection
+  - add linagora-lemonldap-ng-plugin-custom-functions
+  - pam-access, twake, json-file: fix for future 3.0.0
 
 ## v2.23.0-2 _(2026-07-01)_
 
