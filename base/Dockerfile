@@ -1,18 +1,35 @@
 ARG DEBIANVERSION=trixie
 
+# Experimental branch: build the Linagora plugin packages from the HEAD of
+# https://github.com/linagora/lemonldap-ng-plugins (or PLUGINS_REF: branch,
+# tag or commit) instead of using the released "stable" APT repository.
+# ADD of a remote URL is re-checked on every build, so a new commit on the
+# plugins branch invalidates the cache.
+FROM debian:${DEBIANVERSION}-slim AS llng-plugins-head
+
+ARG PLUGINS_REF=main
+ARG PLUGINS_VERSION=0.0~exp
+
+ADD https://github.com/linagora/lemonldap-ng-plugins/archive/${PLUGINS_REF}.tar.gz /tmp/plugins.tar.gz
+RUN apt-get -y update && \
+    apt-get -y --no-install-recommends install dpkg-dev jq libjson-perl && \
+    mkdir /src && tar -C /src --strip-components=1 -xzf /tmp/plugins.tar.gz && \
+    TAG="${PLUGINS_VERSION}" /src/debian/build-debs.sh /repo && \
+    cd /repo && dpkg-scanpackages --arch all . > Packages
+
 FROM debian:${DEBIANVERSION}-slim AS debian-backports-updated
 
 ENV DEBIAN_VERSION=trixie
 
 COPY install/etc/apt/keyrings/ngx-http-host-normalize.gpg /etc/apt/keyrings/
+COPY --from=llng-plugins-head /repo /opt/llng-plugins
 
 RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
     apt-get -y update && \
     apt-get -y install xz-utils curl gpg && \
     apt-get -y upgrade && \
     echo "deb http://deb.debian.org/debian" ${DEBIAN_VERSION}"-backports main" > /etc/apt/sources.list.d/backports.list && \
-    echo "deb [signed-by=/etc/apt/keyrings/ngx-http-host-normalize.gpg] \
-    https://linagora.github.io/lemonldap-ng-plugins/debian stable main" \
+    echo "deb [trusted=yes] file:/opt/llng-plugins ./" \
     | tee /etc/apt/sources.list.d/linagora-llng-plugins.list && \
     apt-get -y update
 

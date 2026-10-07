@@ -33,10 +33,6 @@ inputs:
 runs:
   using: "composite"
   steps:
-      - name: Get current date
-        id: date
-        shell: bash
-        run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
       - name: Set up Docker Buildx
@@ -46,72 +42,22 @@ runs:
         with:
           username: ${{ inputs.DOCKER_USERNAME }}
           password: ${{ inputs.DOCKER_PASSWORD }}
-      - name: Set main version
-        id: setversion
-        shell: bash
-        run: |
-          VERSION="${{ inputs.VERSION }}"
-          if [ "$VERSION" == "no" -o "$VERSION" == "" ]; then
-            VERSION="${{ env.VERSION }}-${{ env.DOCKERREVISION }}"
-          fi
-          echo "✅ Using VERSION: $VERSION"
-          if [[ "$VERSION" == "no" ]]; then exit 1; fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-      - name: Define platforms
-        id: platforms
-        shell: bash
-        run: |
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            echo "platforms=linux/amd64,linux/arm64,linux/arm/v7,linux/s390x" >> $GITHUB_OUTPUT
-          else
-            echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
-          fi
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ${{ inputs.DOCKER_IMAGE }}
+      # Experimental branch: amd64 only, a single "exp" tag per image
+      # (no version, no date, never "latest").
       - name: Generate tags
         id: gentags
         shell: bash
         run: |
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            TAGS="${{ inputs.DOCKER_IMAGE }}:latest${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}"
-            TAGS+=$'\n'"${{ inputs.DOCKER_IMAGE }}:${{ steps.setversion.outputs.version }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}"
-            TAGS+=$'\n'"${{ inputs.DOCKER_IMAGE }}:${{ steps.setversion.outputs.version }}-${{ env.DEBIANRELEASE }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}"
-          else
-            TAGS="${{ inputs.DOCKER_IMAGE }}:latest${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}"
-            TAGS+=$'\n'"${{ inputs.DOCKER_IMAGE }}:${{ steps.date.outputs.date }}${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}"
-          fi
-
-          echo "tags<<EOF" >> $GITHUB_OUTPUT
-          echo "$TAGS" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-      - name: Generate non-root tags
-        id: gentagsnonroot
-        if: inputs.NON_ROOT == 'yes'
-        shell: bash
-        run: |
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            TAGS="${{ inputs.DOCKER_IMAGE }}:latest-non-root"
-            TAGS+=$'\n'"${{ inputs.DOCKER_IMAGE }}:${{ steps.setversion.outputs.version }}-non-root"
-            TAGS+=$'\n'"${{ inputs.DOCKER_IMAGE }}:${{ steps.setversion.outputs.version }}-${{ env.DEBIANRELEASE }}-non-root"
-          else
-            TAGS="${{ inputs.DOCKER_IMAGE }}:latest-non-root"
-            TAGS+=$'\n'"${{ inputs.DOCKER_IMAGE }}:${{ steps.date.outputs.date }}-non-root"
-          fi
-
-          echo "tags<<EOF" >> $GITHUB_OUTPUT
-          echo "$TAGS" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-      - name: Build and push Docker latest image
+          echo "tags=${{ inputs.DOCKER_IMAGE }}:exp${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}" >> $GITHUB_OUTPUT
+          echo "nonroottags=${{ inputs.DOCKER_IMAGE }}:exp-non-root" >> $GITHUB_OUTPUT
+      - name: Build and push Docker exp image
         uses: docker/build-push-action@v7
         with:
           context: ${{ inputs.DIRNAME }}
           build-args: |
-            BASE=yadd/lemonldap-ng-base:latest${{ inputs.IMAGE_SUFFIX }}
-            PORTALBASE=yadd/lemonldap-ng-portal:latest${{ inputs.IMAGE_SUFFIX }}
-          platforms: ${{ steps.platforms.outputs.platforms }}
+            BASE=yadd/lemonldap-ng-base:exp${{ inputs.IMAGE_SUFFIX }}
+            PORTALBASE=yadd/lemonldap-ng-portal:exp${{ inputs.IMAGE_SUFFIX }}
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.gentags.outputs.tags }}
       - name: Build and publish non-root image
@@ -120,18 +66,7 @@ runs:
         with:
           context: no-root
           build-args: |
-            IMAGE=${{ inputs.DOCKER_IMAGE }}:latest${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}
-          platforms: ${{ steps.platforms.outputs.platforms }}
+            IMAGE=${{ inputs.DOCKER_IMAGE }}:exp${{ inputs.IMAGE_SUFFIX }}${{ inputs.IMAGE_SUFFIX2 }}
+          platforms: linux/amd64
           push: true
-          tags: ${{ steps.gentagsnonroot.outputs.tags }}
-      - name: push README to Dockerhub
-        if: inputs.SHORT_DESCRIPTION != 'no'
-        uses: christian-korneck/update-container-description-action@v1
-        env:
-          DOCKER_USER: ${{ inputs.DOCKER_USERNAME }}
-          DOCKER_PASS: ${{ inputs.DOCKER_PASSWORD }}
-        with:
-          destination_container_repo: ${{ inputs.DOCKER_IMAGE }}
-          provider: dockerhub
-          short_description: ${{ inputs.SHORT_DESCRIPTION }}
-          readme_file: ${{ inputs.DIRNAME }}/README.md
+          tags: ${{ steps.gentags.outputs.nonroottags }}

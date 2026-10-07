@@ -1,43 +1,21 @@
-name: Build and Publish Docker Images
+name: Build and Publish experimental Docker Images
+
+# Experimental branch: images are built with the Linagora plugins taken from
+# the HEAD of https://github.com/linagora/lemonldap-ng-plugins and published
+# with the "exp" tag only (see .github/actions/docker-common).
 
 env:
   VERSION: 2.23.4
-  PGVERSION: 17
   DEBIANRELEASE: trixie
   DOCKERREVISION: 2
 
 on:
   push:
-    branches: [master]
-    tags:
-      - 'v*'
+    branches: [exp]
+  workflow_dispatch:
 
 jobs:
-  # Gate for version tags: the images and the Helm chart are versioned from
-  # VERSION-DOCKERREVISION below, NOT from the git tag name. Refuse to run the
-  # whole pipeline if a pushed tag `vX.Y.Z-N` does not match that env, so a
-  # release tag can never disagree with what is actually built and published.
-  # The job always runs (only the check step is tag-gated), so branch builds
-  # pass it as a no-op; `test` depends on it, and every other job depends on
-  # `test`, so a mismatch blocks everything.
-  check-tag:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Tag must equal v${VERSION}-${DOCKERREVISION}
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          expected="${VERSION}-${DOCKERREVISION}"
-          got="${GITHUB_REF_NAME#v}"
-          if [ "$got" != "$expected" ]; then
-            echo "::error::Tag '${GITHUB_REF_NAME}' does not match VERSION-DOCKERREVISION." \
-                 "Expected 'v${expected}'. Update env in" \
-                 ".github/workflows/docker-publish.yml (VERSION / DOCKERREVISION) or retag."
-            exit 1
-          fi
-          echo "Tag '${GITHUB_REF_NAME}' matches VERSION-DOCKERREVISION (${expected})."
-
   test:
-    needs: check-tag
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -46,22 +24,6 @@ jobs:
         run: ./build-all
         env:
           VERSION: ${{ env.VERSION }}-${{ env.DOCKERREVISION }}
-
-  build-and-push-pg:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-      - name: Common setup
-        uses: ./.github/actions/docker-common
-        with:
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-          DOCKER_IMAGE: yadd/lemonldap-ng-pg-database
-          DIRNAME: ./pg
-          SHORT_DESCRIPTION: 'PostgreSQL database ready to use for LemonLDAP::NG'
-          VERSION: ${{ env.PGVERSION }}
 
   build-and-push-base:
     runs-on: ubuntu-latest
@@ -108,21 +70,6 @@ jobs:
           DIRNAME: ./uwsgi-portal
           IMAGE_SUFFIX2: "-hiperf"
           SHORT_DESCRIPTION: no
-
-  build-and-push-pubsub-server:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-      - name: Common setup
-        uses: ./.github/actions/docker-common
-        with:
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-          DOCKER_IMAGE: yadd/lemonldap-ng-pubsub-server
-          DIRNAME: ./webpubsub
-          SHORT_DESCRIPTION: 'LemonLDAP::NG alternative pub/sub server'
 
   build-and-push-cron:
     needs: build-and-push-base
@@ -365,114 +312,3 @@ jobs:
           IMAGE_SUFFIX: "-no-s6"
           SHORT_DESCRIPTION: no
           NON_ROOT: yes
-
-  # Package and publish the Helm chart AFTER the images the chart uses have been
-  # built and pushed (they take ~40 min), so the chart never references an image
-  # tag that does not exist yet. Runs on version tags only and publishes to
-  # https://guimard.github.io/llng-docker/helm/<CHANNEL> (gh-pages branch).
-  # For the future lts-2.21 branch, only CHANNEL needs to change to "lts-2.21".
-  publish-helm:
-    needs:
-      - build-and-push-manager-no-s6
-      - build-and-push-portal-hiperf-no-s6
-      - build-and-push-cron-task-no-s6
-    if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
-    # Serialize gh-pages publishing repo-wide (same group string on every branch,
-    # e.g. the lts-2.21 copy) so two channels tagged at once don't race.
-    concurrency:
-      group: helm-gh-pages-publish
-      cancel-in-progress: false
-    permissions:
-      contents: write
-    env:
-      CHANNEL: latest
-      PAGES_URL: https://guimard.github.io/llng-docker
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Install Helm
-        uses: azure/setup-helm@v5
-        with:
-          version: v3.14.4
-
-      - name: Compute version from workflow env
-        id: v
-        # Image tags come from docker-common as VERSION-DOCKERREVISION, NOT from
-        # the git tag name (a tag can be re-cut without bumping the revision).
-        # Derive the chart from the SAME env so it always references images that
-        # actually exist:
-        #   version      = VERSION-DOCKERREVISION  -> appVersion + image tags
-        #   chart_version = VERSION                -> clean SemVer, no --devel
-        run: |
-          echo "version=${VERSION}-${DOCKERREVISION}" >> "$GITHUB_OUTPUT"
-          echo "chart_version=${VERSION}" >> "$GITHUB_OUTPUT"
-
-      - name: Align chart image tags with the release
-        env:
-          VERSION: ${{ steps.v.outputs.version }}
-        # yq (mikefarah) is preinstalled on ubuntu-latest runners.
-        run: |
-          yq -i ".manager.image.tag = \"${VERSION}-no-s6\""        helm/values.yaml
-          yq -i ".portal.image.tag  = \"${VERSION}-no-s6-hiperf\"" helm/values.yaml
-          yq -i ".cronjob.image.tag = \"${VERSION}-no-s6\""        helm/values.yaml
-
-      - name: Package chart
-        run: |
-          helm dependency build helm
-          mkdir -p .cr-release-packages
-          helm package helm \
-            --version "${{ steps.v.outputs.chart_version }}" \
-            --app-version "${{ steps.v.outputs.version }}" \
-            --destination .cr-release-packages
-
-      - name: Publish to gh-pages
-        env:
-          VERSION: ${{ steps.v.outputs.version }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          DEST="helm/${CHANNEL}"
-          REMOTE="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-
-          rm -rf gh-pages
-          if git ls-remote --exit-code --heads "$REMOTE" gh-pages >/dev/null 2>&1; then
-            git clone --branch gh-pages --single-branch "$REMOTE" gh-pages
-          else
-            git clone "$REMOTE" gh-pages
-            ( cd gh-pages && git checkout --orphan gh-pages && git rm -rf . >/dev/null 2>&1 || true )
-          fi
-
-          mkdir -p "gh-pages/${DEST}"
-          cp .cr-release-packages/*.tgz "gh-pages/${DEST}/"
-
-          if [ -f "gh-pages/${DEST}/index.yaml" ]; then
-            helm repo index "gh-pages/${DEST}" --url "${PAGES_URL}/${DEST}" --merge "gh-pages/${DEST}/index.yaml"
-          else
-            helm repo index "gh-pages/${DEST}" --url "${PAGES_URL}/${DEST}"
-          fi
-
-          cd gh-pages
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "${DEST}"
-          if git diff --cached --quiet; then
-            echo "Nothing to publish."
-            exit 0
-          fi
-          git commit -m "helm: publish lemonldap ${VERSION} to ${CHANNEL}"
-
-          # Push with retry: a concurrent publish from another channel only
-          # advances the branch tip; our commit touches a distinct sub-dir
-          # (helm/${CHANNEL}) so rebasing onto the new tip is conflict-free.
-          for attempt in 1 2 3 4 5; do
-            if git push origin HEAD:gh-pages; then
-              echo "published"; exit 0
-            fi
-            echo "push rejected (attempt ${attempt}), syncing with origin/gh-pages"
-            git fetch origin gh-pages
-            git rebase origin/gh-pages || { git rebase --abort; exit 1; }
-          done
-          echo "could not push after retries" >&2
-          exit 1
