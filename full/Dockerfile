@@ -20,6 +20,7 @@ RUN echo "# Install nginx and portal and manager libs" && \
     apt-get -y --no-install-recommends install nginx \
       linagora-llng-build-manager-files \
       liblemonldap-ng-manager-perl${LLNGDIST} apache2-utils \
+      linagora-lemonldap-ng-plugin-new-manager \
     && \
     mv /etc/dpkg/dpkg.cfg.d /tmp/ && \
     apt-get -y --no-install-recommends install \

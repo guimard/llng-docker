@@ -57,7 +57,8 @@ RUN apt-get -y -o Dpkg::Options::="--force-confold" install \
       linagora-llng-crowdsec-filters \
       linagora-lemonldap-ng-plugin-krb-provisioning \
       open-bastion-plugins \
-      && \
+      linagora-lemonldap-ng-plugin-new-manager \
+    && \
     mv /etc/dpkg/dpkg.cfg.d /tmp/ && \
     apt-get -y --no-install-recommends install \
       lemonldap-ng-doc${LLNGDIST} && \
