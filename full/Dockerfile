@@ -20,7 +20,6 @@ RUN echo "# Install nginx and portal and manager libs" && \
     apt-get -y --no-install-recommends install nginx \
       linagora-llng-build-manager-files \
       liblemonldap-ng-manager-perl${LLNGDIST} apache2-utils \
-      linagora-lemonldap-ng-plugin-new-manager \
     && \
     mv /etc/dpkg/dpkg.cfg.d /tmp/ && \
     apt-get -y --no-install-recommends install \
@@ -44,6 +43,13 @@ RUN set -e && for p in \
     perl -i -pe 's#^(use constant DEFAULTCONFFILE).*$#$1 => "/etc/lemonldap-ng/lemonldap-ng.ini";# && print STDERR "OK\n"' \
         /usr/share/perl5/Lemonldap/NG/Common/Conf/Constants.pm && \
     perl -i -pe 's/__DNSDOMAIN__/example.com/g; s#__CACHEDIR__#/var/cache/lemonldap-ng#g; s#__SESSIONDIR__#/var/lib/lemonldap-ng/sessions#g; s#__PSESSIONDIR__#/var/lib/lemonldap-ng/psessions#g; s#__NOTIFICATIONDIR__#/var/lib/lemonldap-ng/notifications#g;' /var/lib/lemonldap-ng/conf/lmConf-1.json
+
+# Installed after the patches: installing a plugin rebuilds the manager files
+# (store trigger), which the patches expect pristine
+RUN apt-get -y update && \
+    apt-get -y --no-install-recommends install \
+      linagora-lemonldap-ng-plugin-new-manager && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY install /
 
