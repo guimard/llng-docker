@@ -4,6 +4,7 @@
 
 - Add `_ldapadd` command (`ldapadd`/`ldapmodify`)
 - Fix `-h` option of `_ldapsearch`
+- rebuild with plugins 0.5.3 to have the new manager
 
 ## v2.23.4-2 _(2026-09-29)_
 
