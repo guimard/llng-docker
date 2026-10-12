@@ -11,6 +11,9 @@ RUN echo "# Install packages from ${DEBIAN_VERSION}" && \
     echo "deb http://deb.debian.org/debian" ${DEBIAN_VERSION}"-backports main" > /etc/apt/sources.list.d/backports.list && \
     curl -fsSL https://linagora.github.io/ngx-http-host-normalize/KEY.gpg | \
     gpg --dearmor -o /etc/apt/keyrings/ngx-http-host-normalize.gpg && \
+    echo "deb [signed-by=/etc/apt/keyrings/ngx-http-host-normalize.gpg] \
+    https://linagora.github.io/lemonldap-ng-plugins/debian stable main" \
+    > /etc/apt/sources.list.d/linagora-llng-plugins.list && \
     apt-get -y update
 
 FROM debian-backports-updated AS llng-client
