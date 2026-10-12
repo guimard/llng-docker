@@ -3,6 +3,7 @@
 ## Unreleased
 * Add `MANAGER_MODULES` to set the modules of the manager (`enabledModules`)
 * helm: `config.manager.modules`
+* Fix Mongolian translations (OIDC consent, directory, compromised password, federation, SSO, session upgrade)
 
 ## v2.21.6-2 _(2026-10-12)_
 * Add Mongolian language (linagora-lemonldap-ng-plugin-lang-mn)
