@@ -229,6 +229,22 @@ if test "$LANGUAGES$PORTAL_LANGUAGES$MANAGER_LANGUAGES" != ''; then
 		}' $INI
 fi
 
+# Modules of the manager (enabledModules of the [manager] section), e.g.
+# "conf, sessions, notifications, 2ndFA, viewer". Added at the end of the
+# section when the ini has no enabledModules line
+if test "$MANAGER_MODULES" != ''; then
+	perl -i -pe '
+		my $line = "enabledModules = $ENV{MANAGER_MODULES}\n";
+		if (/^\s*\[\s*(\w+)\s*\]/) {
+			$_ = "$line$_" if $section eq "manager" && !$done++;
+			$section = $1;
+		}
+		$done = 1 if $section eq "manager"
+		  && s/^enabledModules\s*=.*\n/$line/;
+		$_ .= $line if eof && $section eq "manager" && !$done++;
+		' $INI
+fi
+
 if test "$NGINX_LOG_JSON" != ""; then
     echo "Configuring Nginx log in JSON format"
     perl -i -pe 's/access_log\s+(.*)\s+llng\s*;/access_log $1 llng_json;/' $(find /etc/nginx/sites-* /etc/lemonldap-ng/ -type f -name *.conf)

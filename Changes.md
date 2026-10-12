@@ -8,6 +8,9 @@
 - Add Mongolian language to the portal (plugins 0.5.4, `lang-mn`)
 - Add `PORTAL_LANGUAGES` and `MANAGER_LANGUAGES` to set the languages of the portal or of the manager only
 - helm: `config.languages`, `config.portal.languages` and `config.manager.languages`
+- Add `MANAGER_MODULES` to set the modules of the manager (`enabledModules`)
+- helm: `config.manager.modules`
+- Fix Mongolian translations (OIDC consent, directory, compromised password, federation, SSO, session upgrade)
 
 ## v2.23.4-2 _(2026-09-29)_
 
@@ -72,6 +75,12 @@
 - Default to bootstrap5
 - Add Crowdsec statistics patch
 - Update DBD::Patroni
+
+## v2.21.6-3 _(2026-10-12)_
+
+- Add `MANAGER_MODULES` to set the modules of the manager (`enabledModules`)
+- helm: `config.manager.modules`
+- Fix Mongolian translations (OIDC consent, directory, compromised password, federation, SSO, session upgrade)
 
 ## v2.21.6-2 _(2026-10-12)_
 

@@ -197,6 +197,9 @@ config:
     protection: manager
     # -- Languages of the manager only, takes precedence over config.languages
     languages: ""
+    # -- Modules of the manager (e.g. "conf, sessions, notifications, 2ndFA,
+    # viewer"). Empty: keep the image default
+    modules: ""
 
     # Optional Manager API (https://lemonldap-ng.org/manager-api/), served
     # on manager-api.<config.domain.root> or, with api.port, on

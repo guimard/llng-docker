@@ -34,6 +34,9 @@ data:
   {{- with .Values.config.manager.languages }}
   MANAGER_LANGUAGES: {{ . | quote }}
   {{- end }}
+  {{- with .Values.config.manager.modules }}
+  MANAGER_MODULES: {{ . | quote }}
+  {{- end }}
   {{- if .Values.config.postgres.enabled }}
   DBI_CHAIN: {{ $postgresUrl | quote }}
   {{- end }}
