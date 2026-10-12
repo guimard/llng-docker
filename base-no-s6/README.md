@@ -52,7 +52,9 @@ There are also date-based tags.
 * `LOKIURL` = `http://localhost:3100/loki/api/v1/push`
 * `LOKITENANT` =
 * `FORCE_KEY_REGENERATION` = `no`
-* `LANGUAGES` = default LLNG list _(set here the wanted languages separated by comma. Example: `fr,en`)_
+* `LANGUAGES` = default LLNG list _(set here the wanted languages separated by comma. Example: `fr,en`)_, for both the portal and the manager
+* `PORTAL_LANGUAGES` = _(languages of the portal only, takes precedence over `LANGUAGES`. Example: `fr,en,mn`)_
+* `MANAGER_LANGUAGES` = _(languages of the manager only, takes precedence over `LANGUAGES`)_
 * Configuration and persistent session storage
   * `PG_SERVER` =
   * `PG_DATABASE` = `lemonldapng`

@@ -214,8 +214,19 @@ for key in `(env | grep OVERRIDE || true) | sed -e 's/=.*$//'`; do
     /usr/share/docker-llng/updateConf set `echo $KEYNAME|perl -pe 's/_/\n/g'` "$VAL"
 done
 
-if test "$LANGUAGES" != ''; then
-	perl -i -pe "s/^(languages\s*=\s*).*\$/\$1$LANGUAGES/" /etc/lemonldap-ng/lemonldap-ng.ini
+# Languages offered by the portal and the manager. LANGUAGES sets both,
+# PORTAL_LANGUAGES / MANAGER_LANGUAGES only the "languages" line of their
+# own section and take precedence over LANGUAGES
+if test "$LANGUAGES$PORTAL_LANGUAGES$MANAGER_LANGUAGES" != ''; then
+	perl -i -pe '
+		$section = $1 if /^\s*\[\s*(\w+)\s*\]/;
+		if (/^(languages\s*=\s*)/) {
+			my $v = $section eq "portal"  ? $ENV{PORTAL_LANGUAGES}
+			      : $section eq "manager" ? $ENV{MANAGER_LANGUAGES}
+			      :                         undef;
+			$v ||= $ENV{LANGUAGES};
+			$_ = "$1$v\n" if $v;
+		}' $INI
 fi
 
 if test "$NGINX_LOG_JSON" != ""; then
