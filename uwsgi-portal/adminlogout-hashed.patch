@@ -1,0 +1,94 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
+@@ -13,6 +13,7 @@
+ use JSON;
+ use Lemonldap::NG::Common::FormEncode;
+ use Lemonldap::NG::Common::OpenIDConnect::Constants;
++use Lemonldap::NG::Common::Session 'id2storage';
+ use Lemonldap::NG::Common::UserAgent;
+ use Lemonldap::NG::Common::JWT
+   qw(getAccessTokenSessionId getJWTPayload getJWTHeader getJWTSignature getJWTSignedData);
+@@ -2858,9 +2859,17 @@
+ 
+ sub getSidFromSession {
+     my ( $self, $rp, $sessionInfo ) = @_;
+-    return $sessionInfo->{_oidc_sid}
+-      || Digest::SHA::hmac_sha256_base64(
+-        $sessionInfo->{_session_id} . ':' . $rp );
++    return $sessionInfo->{_oidc_sid} if $sessionInfo->{_oidc_sid};
++
++    # sid is computed from the storage ID: it is the only one available when
++    # the session is read by its storage ID (AdminLogout called by the Manager)
++    my $storageId = $sessionInfo->{_session_storage_id};
++    unless ( defined $storageId ) {
++        $storageId = $sessionInfo->{_session_id};
++        $storageId = id2storage($storageId)
++          if $self->conf->{hashedSessionStore};
++    }
++    return Digest::SHA::hmac_sha256_base64( $storageId . ':' . $rp );
+ }
+ 
+ sub decryptJwt {
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Process.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Process.pm
+@@ -296,10 +296,15 @@
+     return $res;
+ }
+ 
++# Delete the current SSO session
++#
++# Callers holding a storage identifier instead of a session one may ask for it
++# using rawSessionId => 1
+ sub deleteSession {
+-    my ( $self, $req ) = @_;
++    my ( $self, $req, %args ) = @_;
+     if ( my $id = $req->id || $req->userData->{_session_id} ) {
+-        my $apacheSession = $self->getApacheSession($id);
++        my $apacheSession = $self->getApacheSession( $id,
++            ( $args{rawSessionId} ? ( hashStore => 0 ) : () ) );
+         unless ($apacheSession) {
+             $self->logger->debug("Session $id already deleted");
+             return PE_OK;
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/AdminLogout.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/AdminLogout.pm
+@@ -65,10 +65,37 @@
+     my ( $self, $req ) = @_;
+     my $id = $req->param('token')
+       or return $self->sendError( $req, 'Missing token', 400 );
+-    my $sessionData = $self->p->HANDLER->retrieveSession( $req, $id );
++
++    # Like for tokens, the caller may give a storage identifier instead of a
++    # session one. This is what the Manager does, since it collects sessions
++    # using searchOn()
++    my $raw = $req->param('raw');
++
++    my $session = $self->p->getApacheSession( $id,
++        ( $raw ? ( hashStore => 0 ) : () ) );
++    unless ($session) {
++        return $self->sendError( $req, "Session $id not found", 400 );
++    }
++
++    my $sessionData = $session->data;
++
++    # Read by its storage ID, the session holds it as _session_id: tell
++    # getSidFromSession() not to hash it again
++    $sessionData = { %$sessionData, _session_storage_id => $id } if $raw;
++
+     $req->userData( $req->sessionInfo($sessionData) );
+-    return $self->p->do( $req,
+-        [ @{ $self->p->beforeLogout }, 'authLogout', 'deleteSession' ] );
++    return $self->p->do(
++        $req,
++        [
++            @{ $self->p->beforeLogout },
++            'authLogout',
++            (
++                $raw
++                ? sub { $self->p->deleteSession( $_[0], rawSessionId => 1 ) }
++                : 'deleteSession'
++            ),
++        ]
++    );
+ }
+ 
+ 1;
