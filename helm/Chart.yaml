@@ -1,5 +1,5 @@
 apiVersion: v2
-appVersion: 2.21.4-4
+appVersion: 2.21.6-2
 dependencies:
   - name: commons
     version: 1.0.0
@@ -16,4 +16,4 @@ maintainers:
     email: yadd@debian.org
     url: https://github.com/guimard
 name: lemonldap
-version: 2.21.4
+version: 2.21.6

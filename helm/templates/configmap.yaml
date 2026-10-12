@@ -16,6 +16,15 @@ data:
   PORTAL_CRON: {{ .Values.config.cron.portal.enabled | quote }}
   SERVERNAME: {{ .Values.config.portal.serverName | quote }}
   FIXED_LOGOUT_REDIRECTION: {{ .Values.config.logoutRedirection | quote }}
+  {{- with .Values.config.languages }}
+  LANGUAGES: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.config.portal.languages }}
+  PORTAL_LANGUAGES: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.config.manager.languages }}
+  MANAGER_LANGUAGES: {{ . | quote }}
+  {{- end }}
   {{- if .Values.config.postgres.enabled }}
   DBI_CHAIN: {{ $postgresUrl | quote }}
   {{- end }}

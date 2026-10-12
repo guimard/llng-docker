@@ -2,7 +2,7 @@
 
 A Helm chart for LemonLDAP::NG (manager, portal and maintenance cronjob)
 
-![Version: 2.21.4](https://img.shields.io/badge/Version-2.21.4-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 2.21.4-4](https://img.shields.io/badge/AppVersion-2.21.4--4-informational?style=flat-square)
+![Version: 2.21.6](https://img.shields.io/badge/Version-2.21.6-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 2.21.6-2](https://img.shields.io/badge/AppVersion-2.21.6--2-informational?style=flat-square)
 
 ## Source Code
 
@@ -54,7 +54,7 @@ helm delete my-release
 | manager.enabled                       | bool   | `false`                                                     |                                                                                                                            |
 | manager.image.registry                | string | `"docker.io"`                                               | Image registry                                                                                                             |
 | manager.image.repository              | string | `"yadd/lemonldap-ng-manager"`                               | Image repository                                                                                                           |
-| manager.image.tag                     | string | `"2.21.4-4-no-s6"`                                          | Image tag (immutable tags are recommended)                                                                                 |
+| manager.image.tag                     | string | `"2.21.6-2-no-s6"`                                          | Image tag (immutable tags are recommended)                                                                                 |
 | manager.image.digest                  | string | `""`                                                        | Image digest in SHA. If set, will override the tag                                                                         |
 | manager.image.pullPolicy              | string | `"IfNotPresent"`                                            | Defaults to `Always` if image tag is `latest`, else set to `IfNotPresent`                                                  |
 | manager.image.pullSecrets             | list   | `[]`                                                        | Optional - Specify an array of imagePullSecrets                                                                            |
@@ -67,7 +67,7 @@ helm delete my-release
 | manager.resources.requests            | object | `{"cpu":"50m","memory":"100Mi"}`                            | Requested resources for the container                                                                                      |
 | portal.image.registry                 | string | `"docker.io"`                                               | Image registry                                                                                                             |
 | portal.image.repository               | string | `"yadd/lemonldap-ng-portal"`                                | Image repository                                                                                                           |
-| portal.image.tag                      | string | `"2.21.4-4-no-s6-hiperf"`                                   | Image tag (immutable tags are recommended)                                                                                 |
+| portal.image.tag                      | string | `"2.21.6-2-no-s6-hiperf"`                                   | Image tag (immutable tags are recommended)                                                                                 |
 | portal.image.digest                   | string | `""`                                                        | Image digest in SHA. If set, will override the tag                                                                         |
 | portal.image.pullPolicy               | string | `"IfNotPresent"`                                            | Defaults to `Always` if image tag is `latest`, else set to `IfNotPresent`                                                  |
 | portal.image.pullSecrets              | list   | `[]`                                                        | Optional - Specify an array of imagePullSecrets                                                                            |
@@ -86,7 +86,7 @@ helm delete my-release
 | cronjob.ttl                           | int    | `21600`                                                     | Seconds after which a finished Job is deleted                                                                              |
 | cronjob.image.registry                | string | `"docker.io"`                                               | Image registry                                                                                                             |
 | cronjob.image.repository              | string | `"yadd/lemonldap-ng-cron-task"`                             | Image repository                                                                                                           |
-| cronjob.image.tag                     | string | `"2.21.4-4-no-s6"`                                          | Image tag (immutable tags are recommended)                                                                                 |
+| cronjob.image.tag                     | string | `"2.21.6-2-no-s6"`                                          | Image tag (immutable tags are recommended)                                                                                 |
 | cronjob.image.digest                  | string | `""`                                                        | Image digest in SHA. If set, will override the tag                                                                         |
 | cronjob.image.pullPolicy              | string | `"IfNotPresent"`                                            | Defaults to `Always` if image tag is `latest`, else set to `IfNotPresent`                                                  |
 | cronjob.image.pullSecrets             | list   | `[]`                                                        | Optional - Specify an array of imagePullSecrets                                                                            |
@@ -96,8 +96,11 @@ helm delete my-release
 | config.domain.root                    | string | `"example.com"`                                             | Root Domain                                                                                                                |
 | config.domain.portal                  | string | `"auth.example.com"`                                        | Portal URL - Used as Ingress if enabled                                                                                    |
 | config.domain.manager                 | string | `"manager.example.com"`                                     | Manager URL - Used as Ingress if enabled                                                                                   |
+| config.languages                      | string | `""`                                                        | Languages of the portal and of the manager, comma separated (e.g. `en, fr`). Empty: image default                          |
 | config.portal.serverName              | string | `nil`                                                       |                                                                                                                            |
+| config.portal.languages               | string | `""`                                                        | Languages of the portal only (e.g. `fr, en, mn`), takes precedence over `config.languages`                                 |
 | config.manager.protection             | string | `"manager"`                                                 | Manager protection rule. Supported values: `authenticate`, `manager`, a custom rule, or `none`                             |
+| config.manager.languages              | string | `""`                                                        | Languages of the manager only, takes precedence over `config.languages`                                                    |
 | config.log.level                      | string | `"info"`                                                    | Possible values: debug, info, notice, warn, error                                                                          |
 | config.log.logger                     | string | `"syslog"`                                                  | Possible values: stderr, syslog                                                                                            |
 | config.log.userLogger                 | string | `"syslog"`                                                  | Possible values: stderr, syslog                                                                                            |
