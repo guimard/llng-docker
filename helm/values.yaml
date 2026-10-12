@@ -197,6 +197,9 @@ config:
     protection: manager
     # -- Languages of the manager only, takes precedence over config.languages
     languages: ""
+    # -- Modules of the manager (e.g. "conf, sessions, notifications, 2ndFA,
+    # viewer"). Empty: keep the image default
+    modules: ""
 
   log:
     # -- Possible values: debug, info, notice, warn, error

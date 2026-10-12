@@ -1,5 +1,9 @@
 # LTS 2.21.x Changes
 
+## Unreleased
+* Add `MANAGER_MODULES` to set the modules of the manager (`enabledModules`)
+* helm: `config.manager.modules`
+
 ## v2.21.6-2 _(2026-10-12)_
 * Add Mongolian language (linagora-lemonldap-ng-plugin-lang-mn)
 * Add `PORTAL_LANGUAGES` and `MANAGER_LANGUAGES` to set the languages of the portal or of the manager only
