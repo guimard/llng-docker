@@ -55,6 +55,7 @@ There are also date-based tags.
 * `LANGUAGES` = default LLNG list _(set here the wanted languages separated by comma. Example: `fr,en`)_, for both the portal and the manager
 * `PORTAL_LANGUAGES` = _(languages of the portal only, takes precedence over `LANGUAGES`. Example: `fr,en,mn`)_
 * `MANAGER_LANGUAGES` = _(languages of the manager only, takes precedence over `LANGUAGES`)_
+* `MANAGER_MODULES` = _(modules of the manager, `enabledModules` of lemonldap-ng.ini. Example: `conf, sessions, notifications, 2ndFA, viewer`)_
 * Configuration and persistent session storage
   * `PG_SERVER` =
   * `PG_DATABASE` = `lemonldapng`
