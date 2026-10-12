@@ -1,11 +1,12 @@
 # LTS 2.21.x Changes
 
-## Unreleased
+## v2.21.6-2 _(2026-10-12)_
 * Add Mongolian language (linagora-lemonldap-ng-plugin-lang-mn)
 * Add `PORTAL_LANGUAGES` and `MANAGER_LANGUAGES` to set the languages of the portal or of the manager only
+* helm: `config.languages`, `config.portal.languages` and `config.manager.languages`
 
 ## v2.21.6-1 _(2026-09-27)_
-* Rebuild with 2.21.2+ds-1+deb13u4
+* Rebuild with 2.21.2+ds-1+deb13u4 (includes 2.21.6 changes)
 
 ## v2.21.5-1 _(2026-08-14)_
 * Import 2.21.5 changes
