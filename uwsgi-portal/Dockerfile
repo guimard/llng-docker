@@ -34,6 +34,7 @@ RUN apt-get -y -o Dpkg::Options::="--force-confold" install \
       linagora-lemonldap-ng-plugin-custom-functions \
       linagora-lemonldap-ng-plugin-fixed-logout-redirection \
       linagora-lemonldap-ng-plugin-json-file \
+      linagora-lemonldap-ng-plugin-lang-mn \
       linagora-lemonldap-ng-plugin-mail-autodiscover \
       linagora-lemonldap-ng-plugin-matrix-token-exchange \
       linagora-lemonldap-ng-plugin-oidc-acr-claims \

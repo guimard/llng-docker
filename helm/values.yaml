@@ -174,8 +174,15 @@ config:
     # -- Manager URL - Used as Ingress if enabled
     manager: manager.example.com
 
+  # -- Languages of the portal and of the manager, comma separated
+  # (e.g. "en, fr"). Empty: keep the image default
+  languages: ""
+
   portal:
     serverName:
+    # -- Languages of the portal only (e.g. "fr, en, mn"), takes precedence
+    # over config.languages
+    languages: ""
 
   cronjob:
 
@@ -188,6 +195,8 @@ config:
     # * <rule>       : you can set here directly the rule to apply
     # * none         : no protection
     protection: manager
+    # -- Languages of the manager only, takes precedence over config.languages
+    languages: ""
 
     # Optional Manager API (https://lemonldap-ng.org/manager-api/), served
     # on manager-api.<config.domain.root> or, with api.port, on

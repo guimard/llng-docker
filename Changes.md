@@ -5,6 +5,9 @@
 - Add `_ldapadd` command (`ldapadd`/`ldapmodify`)
 - Fix `-h` option of `_ldapsearch`
 - rebuild with plugins 0.5.3 to have the new manager
+- Add Mongolian language to the portal (plugins 0.5.4, `lang-mn`)
+- Add `PORTAL_LANGUAGES` and `MANAGER_LANGUAGES` to set the languages of the portal or of the manager only
+- helm: `config.languages`, `config.portal.languages` and `config.manager.languages`
 
 ## v2.23.4-2 _(2026-09-29)_
 
@@ -69,6 +72,24 @@
 - Default to bootstrap5
 - Add Crowdsec statistics patch
 - Update DBD::Patroni
+
+## v2.21.6-2 _(2026-10-12)_
+
+- Add Mongolian language (linagora-lemonldap-ng-plugin-lang-mn)
+- Add `PORTAL_LANGUAGES` and `MANAGER_LANGUAGES` to set the languages of the portal or of the manager only
+- helm: `config.languages`, `config.portal.languages` and `config.manager.languages`
+
+## v2.21.6-1 _(2026-09-27)_
+
+- Rebuild with 2.21.2+ds-1+deb13u4 (includes 2.21.6 changes)
+
+## v2.21.5-1 _(2026-08-14)_
+
+- Import 2.21.5 changes
+
+## v2.21.4-6 _(2026-07-30)_
+
+- Rebuild with recents Debian updates (imagemagick, Crypt::Urandom)
 
 ## v2.21.4-5 _(2026-06-30)_
 
