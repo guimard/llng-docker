@@ -11,6 +11,8 @@
 - Add `MANAGER_MODULES` to set the modules of the manager (`enabledModules`)
 - helm: `config.manager.modules`
 - Fix Mongolian translations (OIDC consent, directory, compromised password, federation, SSO, session upgrade)
+- AdminLogout with hashed session storage: the logout token sent by the SSO
+  logout the Manager requests (`raw=1`) carries the `sid` of the ID tokens
 
 ## v2.23.4-2 _(2026-09-29)_
 
