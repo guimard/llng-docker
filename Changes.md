@@ -1,6 +1,6 @@
 # LTS 2.21.x Changes
 
-## Unreleased
+## v2.21.6-3 _(2026-10-12)_
 * Add `MANAGER_MODULES` to set the modules of the manager (`enabledModules`)
 * helm: `config.manager.modules`
 * Fix Mongolian translations (OIDC consent, directory, compromised password, federation, SSO, session upgrade)

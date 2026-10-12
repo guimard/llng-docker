@@ -13,7 +13,7 @@ manager:
     # -- Image repository
     repository: yadd/lemonldap-ng-manager
     # -- Image tag (immutable tags are recommended)
-    tag: 2.21.6-2-no-s6
+    tag: 2.21.6-3-no-s6
     # -- Image digest in SHA. If set, will override the tag
     digest: ""
     # --  Defaults to `Always` if image tag is `latest`, else set to `IfNotPresent`
@@ -79,7 +79,7 @@ portal:
     # -- Image repository
     repository: yadd/lemonldap-ng-portal
     # -- Image tag (immutable tags are recommended)
-    tag: 2.21.6-2-no-s6-hiperf
+    tag: 2.21.6-3-no-s6-hiperf
     # -- Image digest in SHA. If set, will override the tag
     digest: ""
     # --  Defaults to `Always` if image tag is `latest`, else set to `IfNotPresent`
@@ -144,7 +144,7 @@ cronjob:
     # -- Image repository
     repository: yadd/lemonldap-ng-cron-task
     # -- Image tag (immutable tags are recommended)
-    tag: 2.21.6-2-no-s6
+    tag: 2.21.6-3-no-s6
     # -- Image digest in SHA. If set, will override the tag
     digest: ""
     # --  Defaults to `Always` if image tag is `latest`, else set to `IfNotPresent`
