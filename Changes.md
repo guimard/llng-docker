@@ -78,6 +78,12 @@
 - Add Crowdsec statistics patch
 - Update DBD::Patroni
 
+## v2.21.6-4 _(2026-10-12)_
+* AdminLogout with hashed session storage (backport of upstream eab4f18d14
+  and #3717): the SSO logout requested by the Manager (`raw=1`) now finds
+  and deletes the session, and the OIDC `sid` is computed from the storage
+  ID, so that back-channel logout tokens match the ID tokens
+
 ## v2.21.6-3 _(2026-10-12)_
 
 - Add `MANAGER_MODULES` to set the modules of the manager (`enabledModules`)
