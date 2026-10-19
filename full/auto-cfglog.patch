@@ -1,0 +1,216 @@
+Manager: generate a summary of changes when cfgLog is empty
+Upstream: https://gitlab.ow2.org/lemonldap-ng/lemonldap-ng/-/merge_requests/1103
+
+diff -Nru a/usr/share/perl5/Lemonldap/NG/Manager/Conf/Summary.pm b/usr/share/perl5/Lemonldap/NG/Manager/Conf/Summary.pm
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Conf/Summary.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Conf/Summary.pm
+@@ -0,0 +1,156 @@
++# Build a short summary of the differences between two configurations, used
++# as default cfgLog when the user leaves it empty.
++#
++# Only key and object names are reported, never values (they may contain
++# secrets).
++package Lemonldap::NG::Manager::Conf::Summary;
++
++use strict;
++use Exporter 'import';
++use JSON;
++use Scalar::Util qw(blessed reftype);
++use Lemonldap::NG::Manager::Attributes;
++
++our $VERSION   = '2.23.4';
++our @EXPORT_OK = qw(summary);
++
++use constant MAXNAMES  => 10;
++use constant MAXLENGTH => 500;
++use constant PREFIX    => '[auto] ';
++
++my %metaKeys = map { $_ => 1 }
++  qw(cfgNum cfgLog cfgDate cfgAuthor cfgAuthorIP cfgVersion prev next);
++
++# Per-object keys: the sub-keys of these hashes are object names
++my @families = (
++    [ 'vhost'    => qr/^(?:locationRules|exportedHeaders|post|vhostOptions)$/ ],
++    [ 'SAML SP'  => qr/^samlSPMetaData/ ],
++    [ 'SAML IdP' => qr/^samlIDPMetaData/ ],
++    [ 'OIDC RP'  => qr/^oidcRPMetaData/ ],
++    [ 'OIDC OP'  => qr/^oidcOPMetaData/ ],
++    [ 'CAS app'  => qr/^casAppMetaData/ ],
++    [ 'CAS server' => qr/^casSrvMetaData/ ],
++);
++
++my $json = JSON->new->canonical->allow_nonref;
++my $attributes;
++
++sub summary {
++    my ( $old, $new ) = @_;
++    return undef unless ref $old eq 'HASH' and ref $new eq 'HASH';
++
++    my ( @global, %familyKeys );
++    my %keys = map { $_ => 1 } keys %$old, keys %$new;
++  KEY: foreach my $key ( sort keys %keys ) {
++        next if $metaKeys{$key} or $key =~ /MetaDataNodes?$/;
++        foreach my $family (@families) {
++            if (    $key =~ $family->[1]
++                and _isHashOrUndef( $old->{$key} )
++                and _isHashOrUndef( $new->{$key} ) )
++            {
++                push @{ $familyKeys{ $family->[0] } }, $key;
++                next KEY;
++            }
++        }
++        push @global, $key
++          unless _same( $old->{$key}, $new->{$key}, _default($key) );
++    }
++
++    my @parts;
++    push @parts, 'Changed: ' . _list(@global) if @global;
++
++    foreach my $family (@families) {
++        my $name  = $family->[0];
++        my $fKeys = $familyKeys{$name} or next;
++        my ( %inOld, %inNew );
++        foreach my $key (@$fKeys) {
++            $inOld{$_} = 1 foreach keys %{ $old->{$key} || {} };
++            $inNew{$_} = 1 foreach keys %{ $new->{$key} || {} };
++        }
++        my @added   = grep { !$inOld{$_} } sort keys %inNew;
++        my @removed = grep { !$inNew{$_} } sort keys %inOld;
++        push @parts, "Added $name " . _list(@added)     if @added;
++        push @parts, "Removed $name " . _list(@removed) if @removed;
++
++        foreach my $obj ( grep { $inNew{$_} } sort keys %inOld ) {
++            my @changed;
++            foreach my $key (@$fKeys) {
++                my $o = $old->{$key} ? $old->{$key}->{$obj} : undef;
++                my $n = $new->{$key} ? $new->{$key}->{$obj} : undef;
++                if (    $key =~ /Options$/
++                    and _isHashOrUndef($o)
++                    and _isHashOrUndef($n) )
++                {
++                    my %opts = map { $_ => 1 } keys %{ $o || {} },
++                      keys %{ $n || {} };
++                    push @changed,
++                      grep { !_same( $o->{$_}, $n->{$_}, _default($_) ) }
++                      sort keys %opts;
++                }
++                elsif ( !_same( $o, $n ) ) {
++                    push @changed, $key;
++                }
++            }
++            push @parts, "Changed $name $obj: " . _list( sort @changed )
++              if @changed;
++        }
++    }
++
++    return undef unless @parts;
++    my $res = PREFIX . join( '; ', @parts );
++    $res = substr( $res, 0, MAXLENGTH - 3 ) . '...'
++      if length($res) > MAXLENGTH;
++    return $res;
++}
++
++sub _list {
++    my @names = @_;
++    return join( ', ', @names ) if @names <= MAXNAMES;
++    return join( ', ',
++        @names[ 0 .. MAXNAMES - 1 ],
++        '... (+' . ( @names - MAXNAMES ) . ')' );
++}
++
++sub _default {
++    my ($key) = @_;
++    $attributes ||= Lemonldap::NG::Manager::Attributes::attributes();
++    return $attributes->{$key} ? $attributes->{$key}->{default} : undef;
++}
++
++sub _isHashOrUndef {
++    return ( !defined $_[0] or ref $_[0] eq 'HASH' );
++}
++
++# Compare 2 values, a missing value being replaced by the default one, and
++# undef, '' and empty hash/array being considered as equivalent
++sub _same {
++    my ( $x, $y, $default ) = @_;
++    $x //= $default;
++    $y //= $default;
++    my ( $ex, $ey ) = ( _isEmpty($x), _isEmpty($y) );
++    return $ex && $ey if $ex or $ey;
++    return $json->encode( _stringify($x) ) eq $json->encode( _stringify($y) );
++}
++
++sub _isEmpty {
++    my ($v) = @_;
++    return 1 unless defined $v;
++    my $type = reftype($v) // '';
++    return $v eq '' unless ref $v;
++    return !%$v if $type eq 'HASH';
++    return !@$v if $type eq 'ARRAY';
++    return 0;
++}
++
++# Stringify leaves so that 1 and "1" (or JSON booleans) are considered equal
++sub _stringify {
++    my ($v) = @_;
++    my $type = reftype($v) // '';
++    return { map { $_ => _stringify( $v->{$_} ) } keys %$v }
++      if $type eq 'HASH';
++    return [ map { _stringify($_) } @$v ] if $type eq 'ARRAY';
++    return "$$v"                          if $type eq 'SCALAR' and !blessed($v);
++    return defined $v ? "$v" : undef;
++}
++
++1;
+diff -Nru a/usr/share/perl5/Lemonldap/NG/Manager/Conf.pm b/usr/share/perl5/Lemonldap/NG/Manager/Conf.pm
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Conf.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Conf.pm
+@@ -365,6 +365,7 @@
+         }
+     }
+     if ( $res->{result} ) {
++        $self->_autoCfgLog( $currentConf, $parser->newConf );
+         my %args;
+         $args{force} = 1 if ( $req->params('force') );
+         if ( $req->params('cfgDate') ) {
+@@ -419,6 +420,25 @@
+     return $self->sendJSONresponse( $req, $res );
+ }
+ 
++sub _emptyLog {
++    my ($conf) = @_;
++    return ( !defined $conf->{cfgLog} or $conf->{cfgLog} !~ /\S/ );
++}
++
++# Fill an empty cfgLog with a summary of changes since the stored configuration
++sub _autoCfgLog {
++    my ( $self, $old, $new ) = @_;
++    return unless ref $old eq 'HASH' and _emptyLog($new);
++    require Lemonldap::NG::Manager::Conf::Summary;
++    my $log =
++      eval { Lemonldap::NG::Manager::Conf::Summary::summary( $old, $new ) };
++    if ($@) {
++        $self->logger->warn("Unable to build configuration summary: $@");
++        return;
++    }
++    $new->{cfgLog} = $log if $log;
++}
++
+ ## @method PSGI-JSON-response newRawConf($req)
+ # Store directly raw configuration
+ #
+@@ -464,6 +484,15 @@
+         }
+     }
+     if ( $res->{result} ) {
++        if ( _emptyLog($new) ) {
++            my $last = $self->confAcc->lastCfg;
++            $self->_autoCfgLog(
++                $self->confAcc->getConf(
++                    { cfgNum => $last, raw => 1, noCache => 1 }
++                ),
++                $new
++            ) if $last;
++        }
+ 
+         # When uploading a new conf, always force it since cfgNum has a few
+         # chances to be equal to last config cfgNum

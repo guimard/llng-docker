@@ -14,6 +14,8 @@
 - AdminLogout with hashed session storage: the logout token sent by the SSO
   logout the Manager requests (`raw=1`) carries the `sid` of the ID tokens
 - Update new-manager (plugins version 0.5.5)
+- patches:
+  - Manager: generate a summary of changes when the log message is empty
 
 ## v2.23.4-2 _(2026-09-29)_
 
