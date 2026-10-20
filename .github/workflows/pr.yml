@@ -12,6 +12,9 @@ on:
       - '**.md'
       - LICENSE
       - cleanup-old-tags.sh
+  # Manual trigger, for rebuilds that change no tracked image file (e.g. picking
+  # up a new plugins release from the apt repository).
+  workflow_dispatch:
 
 # Cancel a previous run still building when a new commit is pushed to the same
 # branch, instead of letting runs pile up.
