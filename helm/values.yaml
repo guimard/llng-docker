@@ -102,6 +102,10 @@ portal:
 
   # -- Servername override
 
+  service:
+    # -- Annotations of the portal Service (e.g. Traefik sticky sessions)
+    annotations: {}
+
   # -- Affinity for pod assignment
   affinity: 
     {}

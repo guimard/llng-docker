@@ -2,6 +2,10 @@ kind: Service
 apiVersion: v1
 metadata:
   name: {{ include "lemonldap.fullname" . }}-portal
+  {{- with .Values.portal.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   selector:
     app: lemonldap-portal
