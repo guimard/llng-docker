@@ -16,6 +16,7 @@
 - Update new-manager (plugins version 0.5.5)
 - patches:
   - Manager: generate a summary of changes when the log message is empty
+- rebuild with Linagora's plugins 0.6.0
 
 ## v2.23.4-2 _(2026-09-29)_
 
