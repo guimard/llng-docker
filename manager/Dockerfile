@@ -43,6 +43,7 @@ RUN set -e && for p in \
 	autocomplete.patch \
 	manager-api-204.patch \
 	manager-api-conf-metadata.patch \
+	manager-api-oidc-op.patch \
 	auto-cfglog.patch \
     ; do echo patch $p && patch -p1 < $p || exit 1; done && \
     rm -f *.patch && \

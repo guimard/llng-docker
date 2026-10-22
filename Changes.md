@@ -1,5 +1,9 @@
 # Changes
 
+## v2.23.4-5 _UNRELEASED_
+
+- Manager API: OpenID Connect provider routes
+
 ## v2.23.4-4 _(2026-10-22)_
 
 - bootstrap5 skin: new look and feel from LLNG master

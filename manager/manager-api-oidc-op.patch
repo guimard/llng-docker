@@ -1,0 +1,795 @@
+Manager API: add OpenID Connect provider routes
+Upstream: https://gitlab.ow2.org/lemonldap-ng/lemonldap-ng/-/issues/3759
+
+diff --git a/usr/share/perl5/Lemonldap/NG/Manager/Api.pm b/usr/share/perl5/Lemonldap/NG/Manager/Api.pm
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Api.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Api.pm
+@@ -9,6 +9,7 @@ use Lemonldap::NG::Manager::Api::2F;
+ use Lemonldap::NG::Manager::Api::History;
+ use Lemonldap::NG::Manager::Api::Misc;
+ use Lemonldap::NG::Manager::Api::Providers::OidcRp;
++use Lemonldap::NG::Manager::Api::Providers::OidcOp;
+ use Lemonldap::NG::Manager::Api::Providers::SamlSp;
+ use Lemonldap::NG::Manager::Api::Providers::CasApp;
+ use Lemonldap::NG::Manager::Api::Menu::Cat;
+@@ -60,6 +61,12 @@ sub init {
+                             },
+                             ':confKey' => 'getOidcRpByConfKey'
+                         },
++                        op => {
++                            findByConfKey => {
++                                ':uPattern' => 'findOidcOpByConfKey'
++                            },
++                            ':confKey' => 'getOidcOpByConfKey'
++                        },
+                     },
+                     saml => {
+                         sp => {
+@@ -126,7 +133,8 @@ sub init {
+             v1 => {
+                 providers => {
+                     oidc => {
+-                        rp => 'addOidcRp'
++                        rp => 'addOidcRp',
++                        op => 'addOidcOp'
+                     },
+                     saml => {
+                         sp => 'addSamlSp'
+@@ -159,7 +167,8 @@ sub init {
+             v1 => {
+                 providers => {
+                     oidc => {
+-                        rp => { ':confKey' => 'replaceOidcRp' }
++                        rp => { ':confKey' => 'replaceOidcRp' },
++                        op => { ':confKey' => 'replaceOidcOp' }
+                     },
+                     saml => {
+                         sp => { ':confKey' => 'replaceSamlSp' }
+@@ -186,7 +195,8 @@ sub init {
+             v1 => {
+                 providers => {
+                     oidc => {
+-                        rp => { ':confKey' => 'updateOidcRp' }
++                        rp => { ':confKey' => 'updateOidcRp' },
++                        op => { ':confKey' => 'updateOidcOp' }
+                     },
+                     saml => {
+                         sp => { ':confKey' => 'updateSamlSp' }
+@@ -213,7 +223,8 @@ sub init {
+             v1 => {
+                 providers => {
+                     oidc => {
+-                        rp => { ':confKey' => 'deleteOidcRp' }
++                        rp => { ':confKey' => 'deleteOidcRp' },
++                        op => { ':confKey' => 'deleteOidcOp' }
+                     },
+                     saml => {
+                         sp => { ':confKey' => 'deleteSamlSp' }
+diff --git a/usr/share/perl5/Lemonldap/NG/Manager/Api/Providers/OidcOp.pm b/usr/share/perl5/Lemonldap/NG/Manager/Api/Providers/OidcOp.pm
+new file mode 100644
+--- /dev/null
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Api/Providers/OidcOp.pm
+@@ -0,0 +1,347 @@
++package Lemonldap::NG::Manager::Api::Providers::OidcOp;
++
++our $VERSION = '2.23.0';
++
++package Lemonldap::NG::Manager::Api;
++
++use strict;
++use utf8;
++use Mouse;
++use JSON;
++use Lemonldap::NG::Manager::Conf::Parser;
++
++extends 'Lemonldap::NG::Manager::Api::Common';
++
++sub getOidcOpByConfKey {
++    my ( $self, $req ) = @_;
++
++    my $confKey = $req->params('confKey')
++      or return $self->sendError( $req, 'confKey is missing', 400 );
++
++    $self->logger->debug("[API] OIDC OP $confKey configuration requested");
++
++    # Get latest configuration
++    my $conf = $self->_confAcc->getConf( { noCache => 1 } );
++
++    my $oidcOp = $self->_getOidcOpByConfKey( $conf, $confKey );
++
++    # Return 404 if not found
++    return $self->sendError( $req, "OIDC provider '$confKey' not found", 404 )
++      unless ( defined $oidcOp );
++
++    return $self->sendJSONresponse( $req, $oidcOp );
++}
++
++sub findOidcOpByConfKey {
++    my ( $self, $req ) = @_;
++
++    my $pattern = (
++        defined $req->params('uPattern')
++        ? $req->params('uPattern')
++        : ( defined $req->params('pattern') ? $req->params('pattern') : undef )
++    );
++
++    return $self->sendError( $req, 'Invalid input: pattern is missing', 400 )
++      unless ( defined $pattern );
++
++    unless ( $pattern = $self->_getRegexpFromPattern($pattern) ) {
++        return $self->sendError( $req, 'Invalid input: pattern is invalid',
++            400 );
++    }
++
++    $self->logger->debug(
++        "[API] Find OIDC OPs by confKey regexp $pattern requested");
++
++    # Get latest configuration
++    my $conf = $self->_confAcc->getConf( { noCache => 1 } );
++
++    my @oidcOps =
++      map { $_ =~ $pattern ? $self->_getOidcOpByConfKey( $conf, $_ ) : () }
++      keys %{ $conf->{oidcOPMetaDataOptions} };
++
++    return $self->sendJSONresponse( $req, [@oidcOps] );
++}
++
++sub addOidcOp {
++    my ( $self, $req ) = @_;
++    my $add = $req->jsonBodyToObj;
++
++    return $self->sendError( $req, "Invalid input: " . $req->error, 400 )
++      unless ($add);
++
++    return $self->sendError( $req, 'Invalid input: confKey is missing', 400 )
++      unless ( defined $add->{confKey} );
++
++    return $self->sendError( $req, 'Invalid input: confKey is not a string',
++        400 )
++      if ( ref $add->{confKey} );
++
++    return $self->sendError( $req, 'Invalid input: confKey is empty', 400 )
++      unless ( $add->{confKey} );
++
++    return $self->sendError( $req, 'Invalid input: metadata is missing', 400 )
++      unless ( defined $add->{metadata} );
++
++    $self->logger->debug(
++        "[API] Add OIDC OP with confKey $add->{confKey} requested");
++
++    # Get latest configuration
++    my $conf = $self->_confAcc->getConf( { noCache => 1 } );
++
++    return $self->sendError(
++        $req,
++        "Invalid input: An OIDC OP with confKey $add->{confKey} already exists",
++        409
++    ) if ( defined $self->_getOidcOpByConfKey( $conf, $add->{confKey} ) );
++
++    my $res = $self->_pushOidcOp( $req, $conf, $add->{confKey}, $add, 1, 1 );
++
++    return $self->sendError( $req, $res->{msg}, $res->{code} || 400 )
++      unless ( $res->{res} eq 'ok' );
++
++    return $self->sendJSONresponse(
++        $req,
++        { message => "Successful operation" },
++        code => 201
++    );
++}
++
++sub updateOidcOp {
++    my ( $self, $req ) = @_;
++    my $confKey = $req->params('confKey')
++      or return $self->sendError( $req, 'confKey is missing', 400 );
++
++    my $update = $req->jsonBodyToObj;
++
++    return $self->sendError( $req, "Invalid input: " . $req->error, 400 )
++      unless ($update);
++
++    $self->logger->debug(
++        "[API] OIDC OP $confKey configuration update requested");
++
++    # Get latest configuration
++    my $conf = $self->_confAcc->getConf( { noCache => 1 } );
++
++    # Return 404 if not found
++    return $self->sendError( $req, "OIDC provider '$confKey' not found", 404 )
++      unless ( defined $self->_getOidcOpByConfKey( $conf, $confKey ) );
++
++    my $res = $self->_pushOidcOp( $req, $conf, $confKey, $update, 0 );
++
++    return $self->sendError( $req, $res->{msg}, $res->{code} || 400 )
++      unless ( $res->{res} eq 'ok' );
++
++    return $self->sendJSONresponse( $req, undef, code => 204 );
++}
++
++sub replaceOidcOp {
++    my ( $self, $req ) = @_;
++    my $confKey = $req->params('confKey')
++      or return $self->sendError( $req, 'confKey is missing', 400 );
++
++    my $replace = $req->jsonBodyToObj;
++
++    return $self->sendError( $req, "Invalid input: " . $req->error, 400 )
++      unless ($replace);
++
++    return $self->sendError( $req, 'Invalid input: metadata is missing', 400 )
++      unless ( defined $replace->{metadata} );
++
++    $self->logger->debug(
++        "[API] OIDC OP $confKey configuration replace requested");
++
++    # Get latest configuration
++    my $conf = $self->_confAcc->getConf( { noCache => 1 } );
++
++    # Return 404 if not found
++    return $self->sendError( $req, "OIDC provider '$confKey' not found", 404 )
++      unless ( defined $self->_getOidcOpByConfKey( $conf, $confKey ) );
++
++    my $res = $self->_pushOidcOp( $req, $conf, $confKey, $replace, 1 );
++    return $self->sendError( $req, $res->{msg}, $res->{code} || 400 )
++      unless ( $res->{res} eq 'ok' );
++
++    return $self->sendJSONresponse( $req, undef, code => 204 );
++}
++
++sub deleteOidcOp {
++    my ( $self, $req ) = @_;
++    my $confKey = $req->params('confKey')
++      or return $self->sendError( $req, 'confKey is missing', 400 );
++
++    # Get latest configuration
++    my $conf = $self->_confAcc->getConf( { noCache => 1 } );
++
++    # Return 404 if not found
++    return $self->sendError( $req, "OIDC provider '$confKey' not found", 404 )
++      unless ( defined $self->_getOidcOpByConfKey( $conf, $confKey ) );
++
++    delete $conf->{oidcOPMetaDataOptions}->{$confKey};
++    delete $conf->{oidcOPMetaDataJSON}->{$confKey};
++    delete $conf->{oidcOPMetaDataJWKS}->{$confKey};
++    delete $conf->{oidcOPMetaDataExportedVars}->{$confKey};
++
++    # Save configuration
++    my $s = $self->_saveApplyConf( $req, $conf );
++    return $self->sendError( $req, "Unable to save configuration ($s)", 500 )
++      unless ( $s > 0 );
++
++    return $self->sendJSONresponse( $req, undef, code => 204 );
++}
++
++sub _getOidcOpByConfKey {
++    my ( $self, $conf, $confKey ) = @_;
++
++    # Check if confKey is defined
++    return undef unless ( defined $conf->{oidcOPMetaDataOptions}->{$confKey} );
++
++    # Get options
++    my $options = {};
++    for
++      my $configOption ( keys %{ $conf->{oidcOPMetaDataOptions}->{$confKey} } )
++    {
++        my $apiName  = $self->_translateOptionConfToApi($configOption);
++        my $apiValue = $self->_translateValueConfToApi( $configOption,
++            $conf->{oidcOPMetaDataOptions}->{$confKey}->{$configOption} );
++        $options->{$apiName} = $apiValue;
++    }
++
++    return {
++        confKey      => $confKey,
++        metadata     => $conf->{oidcOPMetaDataJSON}->{$confKey},
++        jwks         => $conf->{oidcOPMetaDataJWKS}->{$confKey},
++        exportedVars => $conf->{oidcOPMetaDataExportedVars}->{$confKey},
++        options      => $options
++    };
++}
++
++sub _pushOidcOp {
++    my ( $self, $req, $conf, $confKey, $push, $replace, $new ) = @_;
++
++    # The portal reads the provider's discovery document and JWKS from these
++    # JSON strings
++    foreach my $field (qw(metadata jwks)) {
++        next unless ( defined $push->{$field} );
++        return {
++            res => 'ko',
++            msg => "Invalid input: $field is not a JSON object string"
++          }
++          unless ( !ref( $push->{$field} )
++            and ref( eval { from_json( $push->{$field} ) } ) eq 'HASH' );
++    }
++
++    my $translatedOptions = {};
++    if ($replace) {
++        $conf->{oidcOPMetaDataOptions}->{$confKey} = {};
++
++        # A new provider gets the same default claims as one created in the
++        # manager; on replace, claims given in the request replace them
++        $conf->{oidcOPMetaDataExportedVars}->{$confKey} =
++            ( defined $push->{exportedVars} and !$new )
++          ? {}
++          : {
++            %{
++                Lemonldap::NG::Manager::Build::Attributes::attributes()
++                  ->{oidcOPMetaDataExportedVars}->{default}
++            }
++          };
++        delete $conf->{oidcOPMetaDataJWKS}->{$confKey};
++        $translatedOptions = $self->_getDefaultValues('oidcOPMetaDataNode');
++    }
++
++    if ( defined $push->{options} ) {
++        return {
++            res => 'ko',
++            msg => "Invalid input: options is not a hash object"
++          }
++          unless ( ref( $push->{options} ) eq 'HASH' );
++
++        foreach ( keys %{ $push->{options} } ) {
++
++            my $optionName = $self->_translateOptionApiToConf( $_, 'oidcOP' );
++            eval {
++                my $optionValue =
++                  $self->_translateValueApiToConf( $optionName,
++                    $push->{options}->{$_} );
++                $translatedOptions->{$optionName} = $optionValue;
++            };
++            if ($@) {
++                return {
++                    res => 'ko',
++                    msg => "Invalid input: $@",
++                };
++            }
++        }
++
++        my $res = $self->_hasAllowedAttributes( $translatedOptions,
++            'oidcOPMetaDataNode' );
++        return $res unless ( $res->{res} eq 'ok' );
++
++        my $extra =
++          $translatedOptions->{oidcOPMetaDataOptionsAuthEndpointExtraParams};
++        return {
++            res => 'ko',
++            msg => "Invalid input: authEndpointExtraParams is not a hash"
++              . " object with \"key\":\"value\" attributes"
++          }
++          if ( defined $extra and !$self->_isSimpleKeyValueHash($extra) );
++    }
++
++    $self->_merge_hash( $conf, 'oidcOPMetaDataOptions', $confKey,
++        $translatedOptions );
++
++    $conf->{oidcOPMetaDataJSON}->{$confKey} = $push->{metadata}
++      if ( defined $push->{metadata} );
++
++    if ( defined $push->{jwks} ) {
++        $conf->{oidcOPMetaDataJWKS}->{$confKey} = $push->{jwks};
++    }
++    elsif ( exists $push->{jwks} ) {
++        delete $conf->{oidcOPMetaDataJWKS}->{$confKey};
++    }
++
++    if ( defined $push->{exportedVars} ) {
++        if ( $self->_isSimpleKeyValueHash( $push->{exportedVars} ) ) {
++            $self->_merge_hash(
++                $conf,    'oidcOPMetaDataExportedVars',
++                $confKey, $push->{exportedVars}
++            );
++        }
++        else {
++            return {
++                res => 'ko',
++                msg =>
++"Invalid input: exportedVars is not a hash object with \"key\":\"value\" attributes"
++            };
++        }
++    }
++
++    # Test new configuration
++    my $parser = Lemonldap::NG::Manager::Conf::Parser->new( {
++            refConf => $self->_confAcc->getConf( { noCache => 1 } ),
++            newConf => $conf,
++            req     => {},
++        }
++    );
++    unless ( $parser->testNewConf( $self->p ) ) {
++        return {
++            res  => 'ko',
++            code => 400,
++            msg  => "Configuration error: "
++              . join( ". ", map { $_->{message} } @{ $parser->errors } ),
++        };
++    }
++
++    # Save configuration
++    my $s = $self->_saveApplyConf( $req, $conf, $confKey );
++    return {
++        res  => 'ko',
++        code => 500,
++        msg  => "Unable to save configuration ($s)",
++      }
++      unless ( $s > 0 );
++
++    return { res => 'ok' };
++}
++
++1;
+diff --git a/usr/share/perl5/Lemonldap/NG/Manager/Build/OpenApi.pm b/usr/share/perl5/Lemonldap/NG/Manager/Build/OpenApi.pm
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/OpenApi.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/OpenApi.pm
+@@ -17,9 +17,10 @@ my %TYPEMAP = (
+     "intOrNull" => sub { { type => "integer" } },
+     "trool"     => sub { { type => "integer", maximum => 1, minimum => -1 } },
+     "select"    => \&handleSelect,
+-    "password"  => sub { { type => "string", format => "password" } },
+-    "file"      => sub { { type => "string" } },
+-    "url"       => sub { { type => "string", format => "url" } },
++    "password"         => sub { { type => "string", format => "password" } },
++    "file"             => sub { { type => "string" } },
++    "url"              => sub { { type => "string", format => "url" } },
++    "keyTextContainer" => sub { { type => "object" } },
+ );
+ 
+ sub handleSelect {
+@@ -104,6 +105,10 @@ sub openapi {
+                 'name'        => 'oidcrp',
+                 'description' => 'OpenID Connect Relying Parties'
+             },
++            {
++                'name'        => 'oidcop',
++                'description' => 'OpenID Connect Providers'
++            },
+             {
+                 'name'        => '2fa',
+                 'description' => 'negistered Second Factors'
+@@ -705,6 +710,229 @@ EOF
+                     }
+                 }
+             },
++            '/api/v1/providers/oidc/op' => {
++                'post' => {
++                    'tags'        => ['oidcop'],
++                    'summary'     => 'Create a new OpenID Connect Provider',
++                    'operationId' => 'addoidcop',
++                    'requestBody' => {
++                        'description' => 'OpenID Connect Provider to add',
++                        'content'     => {
++                            'application/json' => {
++                                'schema' => {
++                                    '$ref' => '#/components/schemas/OidcOp'
++                                }
++                            }
++                        },
++                        'required' => JSON::true
++                    },
++                    'responses' => {
++                        '201' => {
++                            '$ref' => '#/components/responses/Created'
++                        },
++                        '400' => {
++                            '$ref' => '#/components/responses/Error'
++                        },
++                        '409' => {
++                            '$ref' => '#/components/responses/Conflict'
++                        }
++                    }
++                }
++            },
++            '/api/v1/providers/oidc/op/findByConfKey' => {
++                'get' => {
++                    'tags'    => ['oidcop'],
++                    'summary' =>
++                      'Finds OpenID Connect Providers by configuration key',
++                    'description' =>
++'Takes a search pattern to be tested against existing providers',
++                    'operationId' => 'findOidcOpByConfKey',
++                    'parameters'  => [ {
++                            'name'        => 'pattern',
++                            'in'          => 'query',
++                            'description' => 'Search pattern',
++                            'required'    => JSON::true,
++                            'schema'      => {
++                                '$ref' => '#/components/schemas/confKey'
++                            },
++                            'examples' => {
++                                'any' => {
++                                    'summary' => 'Any value',
++                                    'value'   => '*'
++                                },
++                                'prefix' => {
++                                    'summary' => 'Given prefix',
++                                    'value'   => 'zone1-*'
++                                },
++                                'anywhere' => {
++                                    'summary' => 'Substring',
++                                    'value'   => 'something'
++                                }
++                            }
++                        }
++                    ],
++                    'responses' => {
++                        '200' => {
++                            '$ref' => '#/components/responses/ManyOidcOp'
++                        },
++                        '400' => {
++                            '$ref' => '#/components/responses/Error'
++                        }
++                    }
++                }
++            },
++            '/api/v1/providers/oidc/op/{confKey}' => {
++                'get' => {
++                    'tags'    => ['oidcop'],
++                    'summary' =>
++                      'Get OpenID Connect Provider by configuration key',
++                    'description' => 'Returns a single OpenID Connect Provider',
++                    'operationId' => 'getOidcOpByConfKey',
++                    'parameters'  => [ {
++                            'name'        => 'confKey',
++                            'in'          => 'path',
++                            'description' =>
++                              'Configuration key of OpenID Connect Provider',
++                            'required' => JSON::true,
++                            'schema'   => {
++                                '$ref' => '#/components/schemas/confKey'
++                            }
++                        }
++                    ],
++                    'responses' => {
++                        '200' => {
++                            '$ref' => '#/components/responses/OneOidcOp'
++                        },
++                        '400' => {
++                            '$ref' => '#/components/responses/Error'
++                        },
++                        '404' => {
++                            '$ref' => '#/components/responses/NotFound'
++                        }
++                    }
++                },
++                'patch' => {
++                    'tags'        => ['oidcop'],
++                    'summary'     => 'Updates an OpenID Connect Provider',
++                    'description' => <<'EOF'
++This method merges the supplied JSON object with existing configuration. You
++can delete a subkey from a top-level key by setting its value to `null`.  For
++example:
++```
++{
++  "exportedVars": {
++    "addme": "newval",
++    "deleteme": null
++  }
++}
++```
++EOF
++                    ,
++                    'operationId' => 'updateOidcOp',
++                    'parameters'  => [ {
++                            'name'        => 'confKey',
++                            'in'          => 'path',
++                            'description' =>
++'Configuration key of OpenID Connect Provider that needs to be updated',
++                            'required' => JSON::true,
++                            'schema'   => {
++                                '$ref' => '#/components/schemas/confKey'
++                            }
++                        }
++                    ],
++                    'requestBody' => {
++                        'content' => {
++                            'application/json' => {
++                                'schema' => {
++                                    '$ref' =>
++                                      '#/components/schemas/OidcOpUpdate'
++                                }
++                            }
++                        }
++                    },
++                    'responses' => {
++                        '204' => {
++                            '$ref' => '#/components/responses/NoContent'
++                        },
++                        '400' => {
++                            '$ref' => '#/components/responses/Error'
++                        },
++                        '404' => {
++                            '$ref' => '#/components/responses/NotFound'
++                        }
++                    }
++                },
++                'put' => {
++                    'tags'        => ['oidcop'],
++                    'summary'     => 'Replaces an OpenID Connect Provider',
++                    'description' => <<'EOF'
++Options left out get their default value. If `exportedVars` is given, it
++replaces the existing claims, otherwise the default claims are used (on
++creation, given claims are added to the default ones).
++EOF
++                    ,
++                    'operationId' => 'replaceOidcOp',
++                    'parameters'  => [ {
++                            'name'        => 'confKey',
++                            'in'          => 'path',
++                            'description' =>
++'Configuration key of OpenID Connect Provider that needs to be replaced',
++                            'required' => JSON::true,
++                            'schema'   => {
++                                '$ref' => '#/components/schemas/confKey'
++                            }
++                        }
++                    ],
++                    'requestBody' => {
++                        'content' => {
++                            'application/json' => {
++                                'schema' => {
++                                    '$ref' =>
++                                      '#/components/schemas/OidcOpReplace'
++                                }
++                            }
++                        }
++                    },
++                    'responses' => {
++                        '204' => {
++                            '$ref' => '#/components/responses/NoContent'
++                        },
++                        '400' => {
++                            '$ref' => '#/components/responses/Error'
++                        },
++                        '404' => {
++                            '$ref' => '#/components/responses/NotFound'
++                        }
++                    }
++                },
++                'delete' => {
++                    'tags'        => ['oidcop'],
++                    'summary'     => 'Deletes an OpenID Connect Provider',
++                    'operationId' => 'deleteOidcOp',
++                    'parameters'  => [ {
++                            'name'        => 'confKey',
++                            'in'          => 'path',
++                            'description' =>
++'Configuration key of OpenID Connect Provider to delete',
++                            'required' => JSON::true,
++                            'schema'   => {
++                                '$ref' => '#/components/schemas/confKey'
++                            }
++                        }
++                    ],
++                    'responses' => {
++                        '204' => {
++                            '$ref' => '#/components/responses/NoContent'
++                        },
++                        '400' => {
++                            '$ref' => '#/components/responses/Error'
++                        },
++                        '404' => {
++                            '$ref' => '#/components/responses/NotFound'
++                        }
++                    }
++                }
++            },
+             '/api/v1/providers/cas/app' => {
+                 'post' => {
+                     'tags'        => ['casapp'],
+@@ -2045,6 +2273,86 @@ EOF
+                         }
+                     }
+                 },
++                'OidcOp' => {
++                    'required'   => [ 'confKey', 'metadata' ],
++                    'type'       => 'object',
++                    'properties' => {
++                        'confKey' => {
++                            '$ref' => '#/components/schemas/confKey'
++                        },
++                        'metadata' => {
++                            '$ref' => '#/components/schemas/OidcOpMetadata'
++                        },
++                        'jwks' => {
++                            '$ref' => '#/components/schemas/OidcOpJwks'
++                        },
++                        'exportedVars' => {
++                            '$ref' => '#/components/schemas/OidcOpExportedVars'
++                        },
++                        'options' => {
++                            '$ref' => '#/components/schemas/OidcOpOptions'
++                        }
++                    }
++                },
++                'OidcOpMetadata' => {
++                    'type'        => 'string',
++                    'description' =>
++'Discovery document of the provider (/.well-known/openid-configuration), as a JSON string',
++                    'example' =>
++'{"issuer":"https://op.example.com","authorization_endpoint":"https://op.example.com/authorize","token_endpoint":"https://op.example.com/token","jwks_uri":"https://op.example.com/jwks"}'
++                },
++                'OidcOpJwks' => {
++                    'type'        => 'string',
++                    'description' => 'JWKS of the provider, as a JSON string',
++                    'example'     => '{"keys":[]}'
++                },
++                'OidcOpExportedVars' => {
++                    'type'    => 'object',
++                    'example' => {
++                        'mail' => 'email',
++                        'uid'  => 'sub'
++                    }
++                },
++                'OidcOpOptions' => {
++                    'type'       => 'object',
++                    'properties' =>
++                      getOptions( $attributes, 'oidcOPMetaDataOptions' ),
++                },
++                'OidcOpUpdate' => {
++                    'type'       => 'object',
++                    'properties' => {
++                        'metadata' => {
++                            '$ref' => '#/components/schemas/OidcOpMetadata'
++                        },
++                        'jwks' => {
++                            '$ref' => '#/components/schemas/OidcOpJwks'
++                        },
++                        'exportedVars' => {
++                            '$ref' => '#/components/schemas/OidcOpExportedVars'
++                        },
++                        'options' => {
++                            '$ref' => '#/components/schemas/OidcOpOptions'
++                        }
++                    }
++                },
++                'OidcOpReplace' => {
++                    'type'       => 'object',
++                    'required'   => ['metadata'],
++                    'properties' => {
++                        'metadata' => {
++                            '$ref' => '#/components/schemas/OidcOpMetadata'
++                        },
++                        'jwks' => {
++                            '$ref' => '#/components/schemas/OidcOpJwks'
++                        },
++                        'exportedVars' => {
++                            '$ref' => '#/components/schemas/OidcOpExportedVars'
++                        },
++                        'options' => {
++                            '$ref' => '#/components/schemas/OidcOpOptions'
++                        }
++                    }
++                },
+                 'CasApp' => {
+                     'required'   => ['confKey'],
+                     'type'       => 'object',
+@@ -2359,6 +2667,30 @@ EOF
+                         }
+                     }
+                 },
++                'OneOidcOp' => {
++                    'description' => 'Return an OpenID Connect Provider',
++                    'content'     => {
++                        'application/json' => {
++                            'schema' => {
++                                '$ref' => '#/components/schemas/OidcOp'
++                            }
++                        }
++                    }
++                },
++                'ManyOidcOp' => {
++                    'description' =>
++                      'Return a list of OpenID Connect Providers',
++                    'content' => {
++                        'application/json' => {
++                            'schema' => {
++                                'type'  => 'array',
++                                'items' => {
++                                    '$ref' => '#/components/schemas/OidcOp'
++                                }
++                            }
++                        }
++                    }
++                },
+                 'OneSamlSp' => {
+                     'description' => 'Return a SAML Provider',
+                     'content'     => {
