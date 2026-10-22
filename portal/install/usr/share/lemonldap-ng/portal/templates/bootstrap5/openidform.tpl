@@ -7,7 +7,7 @@
   <TMPL_INCLUDE NAME="impersonation.tpl">
   <TMPL_INCLUDE NAME="checklogins.tpl">
 
-  <button type="submit" class="btn btn-success" >
+  <button type="submit" class="btn btn-primary">
     <span class="fa fa-sign-in"></span>
     <span trspan="connect">Connect</span>
   </button>

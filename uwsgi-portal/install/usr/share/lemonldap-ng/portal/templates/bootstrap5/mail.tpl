@@ -34,7 +34,7 @@
         <input id="token" type="hidden" name="token" value="<TMPL_VAR NAME="TOKEN">" />
       </TMPL_IF>
 
-      <button type="submit" class="btn btn-success">
+      <button type="submit" class="btn btn-primary">
         <span class="fa fa-envelope-open"></span>
         <span trspan="sendPwd">Send me a link</span>
       </button>
@@ -83,7 +83,7 @@
         </p>
       </div>
 
-      <button type="submit" class="btn btn-success">
+      <button type="submit" class="btn btn-primary">
         <span class="fa fa-envelope-open"></span>
         <span trspan="submit">Submit</span>
       </button>
@@ -155,7 +155,7 @@
         </div>
         </TMPL_IF>
 
-        <button type="submit" class="btn btn-success">
+        <button type="submit" class="btn btn-primary">
           <span class="fa fa-envelope-open"></span>
           <span trspan="submit">Submit</span>
         </button>
@@ -190,7 +190,7 @@
   </TMPL_IF>
 
   <div class="buttons">
-    <a href="<TMPL_VAR NAME="PORTAL_URL">?skin=<TMPL_VAR NAME="SKIN"><TMPL_IF NAME="CHOICE_VALUE">&<TMPL_VAR NAME="CHOICE_PARAM">=<TMPL_VAR NAME="CHOICE_VALUE"></TMPL_IF><TMPL_IF NAME="AUTH_URL">&url=<TMPL_VAR NAME="AUTH_URL"></TMPL_IF>" class="btn btn-primary" role="button">
+    <a href="<TMPL_VAR NAME="PORTAL_URL">?skin=<TMPL_VAR NAME="SKIN"><TMPL_IF NAME="CHOICE_VALUE">&<TMPL_VAR NAME="CHOICE_PARAM">=<TMPL_VAR NAME="CHOICE_VALUE"></TMPL_IF><TMPL_IF NAME="AUTH_URL">&url=<TMPL_VAR NAME="AUTH_URL"></TMPL_IF>" class="btn btn-secondary" role="button">
       <span class="fa fa-home"></span>
       <span trspan="back2Portal">Go back to portal</span>
     </a>

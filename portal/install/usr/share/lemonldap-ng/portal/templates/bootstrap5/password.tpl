@@ -78,7 +78,7 @@
     <TMPL_VAR NAME=CAPTCHA_HTML>
   </TMPL_IF>
     <div class="buttons">
-      <button type="submit" class="btn btn-success">
+      <button type="submit" class="btn btn-primary">
         <span class="fa fa-check-circle"></span>
         <span trspan="submit">Submit</span>
       </button>

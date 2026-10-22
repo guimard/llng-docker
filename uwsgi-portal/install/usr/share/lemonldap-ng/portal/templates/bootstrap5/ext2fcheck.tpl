@@ -15,10 +15,10 @@
     <input type="hidden" id="token" name="token" value="<TMPL_VAR NAME="TOKEN">" />
     <input type="hidden" id="checkLogins" name="checkLogins" value="<TMPL_VAR NAME="CHECKLOGINS">" />
     <input type="hidden" id="stayconnected" name="stayconnected" value="<TMPL_VAR NAME="STAYCONNECTED">" />
-      <input type="hidden" name="skin" value="<TMPL_VAR NAME="SKIN">" />
+    <input type="hidden" name="skin" value="<TMPL_VAR NAME="SKIN">" />
     <div class="input-group mb-3">
       <span class="input-group-text"><label for="extcode" class="mb-0"><i class="fa fa-lock"></i></label></span>
-      <input name="code" value="" type="text" class="form-control" id="extcode" trplaceholder="code" autocomplete="one-time-code"  required />
+      <input name="code" value="" type="text" class="form-control <TMPL_IF NAME="CODEREGEX">remove-spaces</TMPL_IF>" id="extcode" trplaceholder="code" autocomplete="one-time-code" <TMPL_IF NAME="CODEREGEX">pattern="<TMPL_VAR NAME="CODEREGEX">"</TMPL_IF>  required />
     </div>
   </div>
   <div class="buttons">

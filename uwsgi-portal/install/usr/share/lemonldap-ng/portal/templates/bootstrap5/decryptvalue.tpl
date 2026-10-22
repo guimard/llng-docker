@@ -18,14 +18,14 @@
         <input id="cipheredValuefield" name="cipheredValue" type="text" class="form-control" trplaceholder="cipheredValue" autocomplete="off" aria-required="false"/>
       </div>
 
-      <button type="submit" class="btn btn-success">
+      <button type="submit" class="btn btn-primary">
         <span class="fa fa-search"></span>
         <span trspan="search">Search</span>
       </button>
     </div>
   </form>
     <div class="buttons">
-      <a href="<TMPL_VAR NAME="PORTAL_URL">" class="btn btn-primary" role="button">
+      <a href="<TMPL_VAR NAME="PORTAL_URL">" class="btn btn-secondary" role="button">
         <span class="fa fa-home"></span>
         <span trspan="goToPortal">Go to portal</span>
       </a>

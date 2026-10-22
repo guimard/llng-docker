@@ -8,7 +8,7 @@
 
   <div id="menu">
 
-  <nav class="navbar navbar-expand-lg navbar-light bg-light">
+  <nav class="navbar navbar-expand-lg navbar-light bg-light mb-3">
     <div class="container-fluid">
     <a class="navbar-brand" href="<TMPL_VAR NAME="PORTAL_BASE">"><span trspan="home" hidden></span><i class="fa fa-home"></i></a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
@@ -23,40 +23,52 @@
         <TMPL_LOOP NAME="DISPLAY_MODULES">
 
           <TMPL_IF NAME="Appslist">
-            <li class="nav-item"><a class="nav-link" href="#appslist"><span>
-              <img src="<TMPL_VAR NAME="STATIC_PREFIX">common/icons/application_cascade.png" width="16" height="16" alt="appslist" />
-              <span trspan="yourApps">Your applications</span>
-            </span></a></li>
+            <li class="nav-item" id="menu-item-appslist">
+              <a class="nav-link" href="#appslist">
+                <i class="fa-regular fa-window-restore me-1"></i>
+                <span trspan="yourApps">Your applications</span>
+              </a>
+            </li>
           </TMPL_IF>
           <TMPL_IF NAME="ChangePassword">
-            <li class="nav-item"><a class="nav-link" href="#password"><span>
-              <img src="<TMPL_VAR NAME="STATIC_PREFIX">common/icons/vcard_edit.png" width="16" height="16" alt="password" />
-              <span trspan="password">Password</span>
-            </span></a></li>
+            <li class="nav-item" id="menu-item-password">
+              <a class="nav-link" href="#password">
+                <i class="fa-solid fa-key me-1"></i>
+                <span trspan="password">Password</span>
+              </a>
+            </li>
           </TMPL_IF>
           <TMPL_IF NAME="LoginHistory">
-            <li class="nav-item"><a class="nav-link" href="#loginHistory"><span>
-              <img src="<TMPL_VAR NAME="STATIC_PREFIX">common/icons/calendar.png" width="16" height="16" alt="login history" />
-              <span trspan="loginHistory">Login history</span>
-            </span></a></li>
+            <li class="nav-item" id="menu-item-loginhistory">
+              <a class="nav-link" href="#loginHistory">
+                <i class="fa-solid fa-clock-rotate-left me-1"></i>
+                <span trspan="loginHistory">Login history</span>
+              </a>
+            </li>
           </TMPL_IF>
           <TMPL_IF NAME="OidcConsents">
-            <li class="nav-item"><a class="nav-link" href="#oidcConsents"><span>
-              <img src="<TMPL_VAR NAME="STATIC_PREFIX">common/icons/oidc.png" width="16" height="16" alt="OIDC consents" />
-              <span trspan="oidcConsents">OIDC Consent</span>
-            </span></a></li>
+            <li class="nav-item" id="menu-item-oidcconsents">
+              <a class="nav-link" href="#oidcConsents">
+                <i class="fa-solid fa-list-check me-1"></i>
+                <span trspan="oidcConsents">OIDC Consent</span>
+              </a>
+            </li>
           </TMPL_IF>
           <TMPL_IF NAME="Logout">
-            <li class="nav-item"><a class="nav-link" href="#logout"><span>
-              <img src="<TMPL_VAR NAME="STATIC_PREFIX">common/icons/door_out.png" width="16" height="16" alt="logout" />
-              <span trspan="logout">Logout</span>
-            </span></a></li>
+            <li class="nav-item" id="menu-item-logout">
+              <a class="nav-link" href="#logout">
+                <i class="fa-solid fa-right-from-bracket me-1"></i>
+                <span trspan="logout">Logout</span>
+              </a>
+            </li>
           </TMPL_IF>
-        <TMPL_IF NAME="_PLUGIN">
-            <li class="nav-item"><a class="nav-link" href="#<TMPL_VAR NAME="_PLUGIN_ID">"><span>
-              <i class="fa fa-<TMPL_VAR NAME="_PLUGIN_LOGO">"></i>
-              <span trspan="<TMPL_VAR NAME="_PLUGIN_NAME">"><TMPL_VAR NAME="_PLUGIN_NAME"></span>
-            </span></a></li>
+          <TMPL_IF NAME="_PLUGIN">
+            <li class="nav-item" id="menu-item-<TMPL_VAR NAME="_PLUGIN_ID">">
+              <a class="nav-link" href="#<TMPL_VAR NAME="_PLUGIN_ID">">
+                <i class="fa fa-<TMPL_VAR NAME="_PLUGIN_LOGO"> me-1"></i>
+                <span trspan="<TMPL_VAR NAME="_PLUGIN_NAME">"><TMPL_VAR NAME="_PLUGIN_NAME"></span>
+              </a>
+            </li>
         </TMPL_IF>
         </TMPL_LOOP>
       </ul>
@@ -76,34 +88,48 @@
           <TMPL_IF NAME="DropdownMenu">
           <ul class="dropdown-menu" role="menu">
             <TMPL_IF NAME="sfaManager">
-              <li class="dropdown-item" role="menuitem"><a href="<TMPL_VAR NAME="PORTAL_BASE">2fregisters" class="nav-link">
-                <img src="<TMPL_VAR NAME="STATIC_PREFIX">common/icons/sfa_manager.png" width="16" height="16" alt="refresh" />
-                <span trspan="sfaManager">sfaManager</span>
-              </a></li>
+              <li class="dropdown-item" role="menuitem" id="menu-item-sfamanager">
+                <a href="<TMPL_VAR NAME="PORTAL_BASE">2fregisters" class="nav-link">
+                  <i class="fa-solid fa-shield-halved me-1"></i>
+                  <span trspan="sfaManager">sfaManager</span>
+                </a>
+              </li>
             </TMPL_IF>
             <TMPL_IF NAME="Notifications">
-              <li class="dropdown-item" role="menuitem"><a href="<TMPL_VAR NAME="PORTAL_BASE">mynotifications" class="nav-link">
-                <img src="<TMPL_VAR NAME="STATIC_PREFIX">common/icons/comments.png" width="20" height="20" alt="NotificationsExplorer" />
-                <span trspan="notificationsExplorer">notificationsExplorer</span>
-              </a></li>
+              <li class="dropdown-item" role="menuitem" id="menu-item-notificationsexplorer">
+                <a href="<TMPL_VAR NAME="PORTAL_BASE">mynotifications" class="nav-link">
+                  <i class="fa-solid fa-bell me-1"></i>
+                  <span trspan="notificationsExplorer">notificationsExplorer</span>
+                </a>
+              </li>
             </TMPL_IF>
             <TMPL_IF NAME="DecryptValue">
-              <li class="dropdown-item" role="menuitem"><a href="<TMPL_VAR NAME="PORTAL_BASE">decryptvalue" class="nav-link">
-                <img src="<TMPL_VAR NAME="STATIC_PREFIX">common/icons/decryptValue.png" width="20" height="20" alt="DecryptCipheredValue" />
-                <span trspan="decryptCipheredValue">decryptCipheredValue</span>
-              </a></li>
+              <li class="dropdown-item" role="menuitem" id="menu-item-decryptvalue">
+                <a href="<TMPL_VAR NAME="PORTAL_BASE">decryptvalue" class="nav-link">
+                  <i class="fa-solid fa-eye me-1"></i>
+                  <span trspan="decryptCipheredValue">decryptCipheredValue</span>
+                </a>
+              </li>
             </TMPL_IF>
             <TMPL_IF NAME="ContextSwitching">
-              <li class="dropdown-item" role="menuitem"><a href="<TMPL_VAR NAME="PORTAL_BASE">switchcontext" class="nav-link">
-                <img src="<TMPL_VAR NAME="STATIC_PREFIX">common/icons/switchcontext_<TMPL_VAR NAME="contextSwitching">.png" width="20" height="20" alt="ContextSwitching" />
-                <span trspan="contextSwitching_<TMPL_VAR NAME="contextSwitching">">contextSwitching_<TMPL_VAR NAME="ContextSwitching"></span>
-              </a></li>
+              <li class="dropdown-item" role="menuitem" id="menu-item-contextswitching">
+                <a href="<TMPL_VAR NAME="PORTAL_BASE">switchcontext" class="nav-link">
+                  <TMPL_IF NAME="ContextSwitchingON">
+                  <i class="fa-solid fa-person-circle-check text-success me-1"></i>
+                  <TMPL_ELSE>
+                  <i class="fa-solid fa-person-circle-xmark text-danger me-1"></i>
+                  </TMPL_IF>
+                  <span trspan="contextSwitching_<TMPL_VAR NAME="contextSwitching">">contextSwitching_<TMPL_VAR NAME="ContextSwitching"></span>
+                </a>
+              </li>
             </TMPL_IF>
             <TMPL_IF NAME="RefreshMyRights">
-            <li class="dropdown-item" role="menuitem"><a href="<TMPL_VAR NAME="PORTAL_BASE">refresh" class="nav-link">
-              <img src="<TMPL_VAR NAME="STATIC_PREFIX">common/icons/arrow_refresh.png" width="16" height="16" alt="refresh" />
-              <span trspan="refreshrights">Refresh</span>
-            </a></li>
+              <li class="dropdown-item" role="menuitem" id="menu-item-refreshrights">
+                <a href="<TMPL_VAR NAME="PORTAL_BASE">refresh" class="nav-link">
+                  <i class="fa-solid fa-arrows-rotate me-1"></i>
+                  <span trspan="refreshrights">Refresh</span>
+                </a>
+              </li>
             </TMPL_IF>
           </ul>
           </TMPL_IF>
@@ -131,9 +157,9 @@
             <TMPL_IF NAME="category">
             <!-- Category -->
 
-              <div class="category cat-level-<TMPL_VAR NAME="catlevel"> <TMPL_VAR NAME="catid"> card border-secondary" name="<TMPL_VAR NAME="catname">" id="sort_<TMPL_VAR NAME="__counter__">" >
+              <div class="category cat-level-<TMPL_VAR NAME="catlevel"> <TMPL_VAR NAME="catid"> card border-secondary my-3" name="<TMPL_VAR NAME="catname">" id="sort_<TMPL_VAR NAME="__counter__">" >
 
-                <div class="card-header text-white bg-secondary">
+                <div class="card-header bg-secondary">
                 <h4 class="catname card-title"><TMPL_VAR NAME="catname"><span><i class="fa fa-arrows-v float-end" ></i></span></h4>
                 </div>
 
@@ -145,11 +171,10 @@
                     <TMPL_LOOP NAME=applications>
 
                       <!-- Application -->
-                      <div class="col-md-4">
-                      <div class="application <TMPL_VAR NAME="appid"> card">
+                      <div class="col-md-4 py-1">
+                      <div class="application <TMPL_VAR NAME="appid"> p-3 h-100">
                         <a href="<TMPL_VAR NAME="appuri">" title="<TMPL_VAR NAME="apptip">" >
 
-                        <div class="card-body">
                         <div class="row">
                         <!-- Logo (optional) -->
                         <TMPL_IF NAME="applogo">
@@ -168,7 +193,7 @@
                         </TMPL_IF>
 
                         <!-- Name and link (mandatory) -->
-                        <h5 class="appname <TMPL_VAR NAME="appid"> card-title">
+                        <h5 class="appname <TMPL_VAR NAME="appid">">
                           <TMPL_VAR NAME="appname">
                         </h5>
 
@@ -180,7 +205,6 @@
                         </TMPL_IF>
 
                           </div>
-                        </div>
                         </div>
                         </a>
 
@@ -207,7 +231,7 @@
       <TMPL_IF NAME="ChangePassword">
         <div id="password">
             <div class="card border-secondary">
-              <div class="card-header text-white bg-secondary">
+              <div class="card-header bg-secondary">
               <h4 class="card-title" trspan="changePwd">Change your password</h4>
               </div>
               <div class="card-body">
@@ -220,8 +244,8 @@
       <TMPL_IF NAME="LoginHistory">
         <div id="loginHistory">
             <TMPL_IF NAME="SUCCESS_LOGIN">
-            <div class="card border-secondary">
-              <div class="card-header text-white bg-secondary">
+            <div class="card border-secondary mb-3">
+              <div class="card-header bg-secondary">
               <h4 class="card-title" trspan="lastLogins">Last logins</h4>
               </div>
               <div class="card-body">
@@ -231,7 +255,7 @@
             </TMPL_IF>
             <TMPL_IF NAME="FAILED_LOGIN">
             <div class="card border-secondary">
-              <div class="card-header text-white bg-secondary">
+              <div class="card-header bg-secondary">
               <h4 class="card-title" trspan="lastFailedLogins">Last failed logins</h4>
               </div>
               <div class="card-body">
@@ -245,7 +269,7 @@
       <TMPL_IF NAME="OidcConsents">
         <div id="oidcConsents">
             <div class="card border-secondary">
-              <div class="card-header text-white bg-secondary">
+              <div class="card-header bg-secondary">
               <h4 class="card-title" trspan="oidcConsentsFull">OpenID-Connect Consents</h4>
               </div>
               <div class="card-body">
@@ -258,11 +282,11 @@
       <TMPL_IF NAME="Logout">
         <div id="logout">
           <div class="card border-secondary">
-            <div class="card-header text-white bg-secondary">
+            <div class="card-header bg-secondary">
               <h4 class="card-title" trspan="areYouSure">Are you sure ?</h4>
             </div>
             <div class="card-body buttons">
-            <a href="<TMPL_VAR NAME="LOGOUT_URL">" class="btn btn-success" role="button">
+            <a href="<TMPL_VAR NAME="LOGOUT_URL">" class="btn btn-primary" role="button">
               <span class="fa fa-check-circle"></span>
               <span trspan="imSure">I'm sure</span>
             </a>

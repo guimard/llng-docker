@@ -108,7 +108,7 @@
         <img src="<TMPL_VAR NAME="STATIC_PREFIX"><TMPL_VAR NAME="SKIN">/<TMPL_VAR NAME="LOGO">" alt="<TMPL_VAR NAME="CODE">2f" title="<TMPL_VAR NAME="LABEL">" />
       </a>
       </div>
-      <div class="card-footer text-white text-uppercase bg-secondary">
+      <div class="card-footer text-uppercase bg-secondary">
       <TMPL_IF LABEL>
         <p><TMPL_VAR NAME="LABEL"></p>
       <TMPL_ELSE>
@@ -129,7 +129,7 @@
       <span trspan="upgradeSession">Upgrade session</span>
     </a>
   </TMPL_IF>
-  <a href="<TMPL_VAR NAME="PORTAL_URL">?cancel=1&skin=<TMPL_VAR NAME="SKIN">" class="btn btn-primary" role="button">
+  <a href="<TMPL_VAR NAME="PORTAL_URL">?cancel=1&skin=<TMPL_VAR NAME="SKIN">" class="btn btn-secondary" role="button">
     <span class="fa fa-home"></span>
     <span trspan="goToPortal">Go to portal</span>
   </a>

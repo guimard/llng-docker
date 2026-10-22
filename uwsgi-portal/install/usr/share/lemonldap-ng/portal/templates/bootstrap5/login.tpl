@@ -23,10 +23,9 @@
     <div id="authMenu" class="card">
 
     <!-- Authentication loop -->
-    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+    <nav class="navbar navbar-expand-lg navbar-light bg-secondary">
     <div class="container-fluid">
 
-    <a class="navbar-brand" href="<TMPL_VAR NAME="PORTAL_BASE">"><i class="fa fa-user-circle"></i></a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
@@ -104,7 +103,7 @@
                 <TMPL_INCLUDE NAME="checklogins.tpl">
 
                 <div class="buttons">
-                  <button type="submit" class="btn btn-success">
+                  <button type="submit" class="btn btn-primary">
                     <span class="fa fa-sign-in"></span>
                     <span trspan="connect">Connect</span>
                   </button>
@@ -280,7 +279,7 @@
       <TMPL_INCLUDE NAME="checklogins.tpl">
 
       <div class="buttons">
-      <button type="submit" class="btn btn-success">
+      <button type="submit" class="btn btn-primary">
         <span class="fa fa-sign-in"></span>
         <span trspan="connect">Connect</span>
       </button>
@@ -316,7 +315,7 @@
     <div id="logout">
       <div class="buttons">
       <TMPL_IF NAME="MSG"><TMPL_VAR NAME="MSG"></TMPL_IF>
-        <a href="<TMPL_VAR NAME="PORTAL_URL">?cancel=1<TMPL_IF NAME="AUTH_URL">&url=<TMPL_VAR NAME="AUTH_URL"></TMPL_IF>" class="btn btn-primary" role="button">
+        <a href="<TMPL_VAR NAME="PORTAL_URL">?cancel=1<TMPL_IF NAME="AUTH_URL">&url=<TMPL_VAR NAME="AUTH_URL"></TMPL_IF>" class="btn btn-secondary" role="button">
           <span class="fa fa-home"></span>
           <span trspan="goToPortal">Go to portal</span>
         </a>

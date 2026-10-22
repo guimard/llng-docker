@@ -32,14 +32,14 @@
       <span class="fa fa-shield"></span>
       <span trspan="sfaManager">sfaManager</span>
     </a>
-    <a id="goback" href="<TMPL_VAR NAME="PORTAL_URL">?cancel=1&skin=<TMPL_VAR NAME="SKIN"><TMPL_IF NAME="AUTH_URL">&url=<TMPL_VAR NAME="AUTH_URL"></TMPL_IF>" class="btn btn-primary" role="button">
+    <a id="goback" href="<TMPL_VAR NAME="PORTAL_URL">?cancel=1&skin=<TMPL_VAR NAME="SKIN"><TMPL_IF NAME="AUTH_URL">&url=<TMPL_VAR NAME="AUTH_URL"></TMPL_IF>" class="btn btn-secondary" role="button">
       <span class="fa fa-home"></span>
       <span trspan="goToPortal">Go to portal</span>
     </a>
   </div>
 
 <!-- //if:jsminified
-  <script type="text/javascript" src="<TMPL_VAR NAME="STATIC_PREFIX">/common/js/password2fregistration.min.js?v=<TMPL_VAR CACHE_TAG>"></script>
+  <script type="text/javascript" src="<TMPL_VAR NAME="STATIC_PREFIX">common/js/password2fregistration.min.js?v=<TMPL_VAR CACHE_TAG>"></script>
 //else -->
   <script type="text/javascript" src="<TMPL_VAR NAME="STATIC_PREFIX">common/js/password2fregistration.js?v=<TMPL_VAR CACHE_TAG>"></script>
 <!-- //endif -->

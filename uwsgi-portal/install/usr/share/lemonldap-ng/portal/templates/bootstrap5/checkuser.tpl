@@ -15,7 +15,7 @@
         <span class="input-group-text"><label for="urlfield" class="mb-0"><i class="fa fa-link"></i></label></span>
         <input id="urlfield" name="url" type="text" class="form-control" value="<TMPL_VAR NAME="URL">" trplaceholder="URL / DNS" aria-required="true" autocomplete="url" />
       </div>
-      <button type="submit" class="btn btn-success">
+      <button type="submit" class="btn btn-primary">
         <span class="fa fa-search"></span>
         <span trspan="search">Search</span>
       </button>
@@ -155,7 +155,7 @@
     </div>
 
     <div class="buttons">
-      <a href="<TMPL_VAR NAME="PORTAL_URL">" class="btn btn-primary" role="button">
+      <a href="<TMPL_VAR NAME="PORTAL_URL">" class="btn btn-secondary" role="button">
         <span class="fa fa-home"></span>
         <span trspan="goToPortal">Go to portal</span>
       </a>
