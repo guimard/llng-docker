@@ -96,6 +96,10 @@
 - Add Crowdsec statistics patch
 - Update DBD::Patroni
 
+## v2.21.6-5 _(2026-10-12)_
+
+* Rebuild (nginx updated to 1.26.3-3+deb13u10)
+
 ## v2.21.6-4 _(2026-10-12)_
 
 - AdminLogout with hashed session storage (backport of upstream eab4f18d14
