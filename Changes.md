@@ -1,13 +1,9 @@
 # Changes
 
-## Unreleased
+## v2.23.4-4 _(2026-10-22)_
 
-- bootstrap5 skin: new look and feel from LLNG master (compact centered
-  login card, fields with inline icons, cards without grey headers,
-  floating menu bar, application tiles, canvas without background image);
-  templates resynchronized with master, OpenID kept, and the pages that
-  used to fall back to the `bootstrap` templates (error, info, confirm,
-  notifications, redirect…) are now provided
+- bootstrap5 skin: new look and feel from LLNG master
+- Rebuild to get nginx 1.26.3-3+deb13u10
 
 ## v2.23.4-3 _(2026-10-20)_
 
