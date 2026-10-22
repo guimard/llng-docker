@@ -2,14 +2,14 @@ apiVersion: v1
 entries:
   lemonldap:
   - apiVersion: v2
-    appVersion: 2.23.4-3
-    created: "2026-10-20T15:46:03.706492673Z"
+    appVersion: 2.23.4-4
+    created: "2026-10-22T12:23:08.247629033Z"
     dependencies:
     - name: commons
       repository: file://charts/commons
       version: 1.0.0
     description: A Helm chart for LemonLDAP::NG (manager, portal and maintenance cronjob)
-    digest: f2de93784abba6e7e92d8b83a60ad1f4c2aea530e0fd92f7e45e780398d4dd75
+    digest: dda995b82cfc605e8f046ddf0ee6594c21e0a9d4acd97941a567103254ed2cd5
     home: https://github.com/guimard/llng-docker
     icon: https://lemonldap-ng.org/images/llng_opengraph.png
     kubeVersion: '>=1.22'
@@ -26,7 +26,7 @@ entries:
     version: 2.23.4
   - apiVersion: v2
     appVersion: 2.23.3-3
-    created: "2026-10-20T15:46:03.704925157Z"
+    created: "2026-10-22T12:23:08.246215215Z"
     dependencies:
     - name: commons
       repository: file://charts/commons
@@ -49,7 +49,7 @@ entries:
     version: 2.23.3
   - apiVersion: v2
     appVersion: 2.23.2-1
-    created: "2026-10-20T15:46:03.703741939Z"
+    created: "2026-10-22T12:23:08.244741977Z"
     dependencies:
     - name: commons
       repository: file://charts/commons
@@ -72,7 +72,7 @@ entries:
     version: 2.23.2
   - apiVersion: v2
     appVersion: 2.23.0-2
-    created: "2026-10-20T15:46:03.702782356Z"
+    created: "2026-10-22T12:23:08.241892447Z"
     dependencies:
     - name: commons
       repository: file://charts/commons
@@ -116,4 +116,4 @@ entries:
     urls:
     - https://guimard.github.io/llng-docker/helm/latest/lemonldap-2.23.0-2.tgz
     version: 2.23.0-2
-generated: "2026-10-20T15:46:03.701556113Z"
+generated: "2026-10-22T12:23:08.2389081Z"
