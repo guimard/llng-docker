@@ -53,6 +53,7 @@ RUN set -e && for p in \
     fix-mail-mime.patch \
     mn-translations.patch \
     adminlogout-hashed.patch \
+    ldap-filter-escape.patch \
     ; do echo patch $p && patch -p1 < $p; done && \
     cp -f /usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.js /usr/share/lemonldap-ng/portal/htdocs/static/common/js/kerberosChoice.min.js && \
     rm -f /*.patch && \

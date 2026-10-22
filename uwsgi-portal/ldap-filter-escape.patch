@@ -1,0 +1,27 @@
+Escape values put into LDAP filters
+Upstream: https://gitlab.ow2.org/lemonldap-ng/lemonldap-ng/-/merge_requests/1113
+
+diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Lib/LDAP.pm b/usr/share/perl5/Lemonldap/NG/Portal/Lib/LDAP.pm
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/LDAP.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/LDAP.pm
+@@ -3,6 +3,7 @@ package Lemonldap::NG::Portal::Lib::LDAP;
+ use strict;
+ use Mouse;
+ use Lemonldap::NG::Portal::Lib::Net::LDAP;
++use Net::LDAP::Util                        qw(escape_filter_value);
+ use Lemonldap::NG::Portal::Main::Constants qw(
+   PE_OK
+   PE_LDAPERROR
+@@ -97,7 +98,11 @@ sub _buildFilter {
+     my $conf = $self->{conf};
+     $self->{p}->logger->debug("LDAP Search base: $_[0]->{conf}->{ldapBase}");
+     $filter =~ s/"/\\"/g;
+-    $filter =~ s/\$(\w+)/".\$req->{sessionInfo}->{$1}."/g;
++
++    # Values may come from a federated provider and skip userControl: escape
++    # them so that they only match literally
++    $filter =~
++      s/\$(\w+)/".escape_filter_value(\$req->{sessionInfo}->{$1}\/\/'')."/g;
+     $filter =~ s/\$req->\{sessionInfo\}->\{user\}/\$req->{user}/g;
+     $filter =~
+       s/\$req->\{sessionInfo\}->\{(_?password|mail)\}/\$req->{data}->{$1}/g;
