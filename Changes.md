@@ -96,6 +96,12 @@
 - Add Crowdsec statistics patch
 - Update DBD::Patroni
 
+## v2.21.6-6 _(2026-10-28)_
+
+* Enforce LDAP filter parsing _(part of future 2.21.7)_
+* Report all Ppolicy errors _(part of future 2.21.7)_
+* Rebuild (libbrotli1, tzdata,... updated on Debian side)
+
 ## v2.21.6-5 _(2026-10-12)_
 
 * Rebuild (nginx updated to 1.26.3-3+deb13u10)

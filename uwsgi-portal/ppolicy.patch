@@ -1,0 +1,47 @@
+commit 81cae561a3375f7d325a4b9c014a7cccdd598267
+Author: Yadd <yadd@debian.org>
+Date:   Wed Oct 28 09:40:03 2026 +0100
+
+    LDAP: report a refused password modification when ppolicy gives no error
+    
+    Backport of !1117 (bf105a3c4d and 98f2a24c6c) to v2.21. The test is
+    adapted to the v2.21 layout of t/21-Auth-LDAP-Policy.t, and
+    resetLdapData() is added to t/test-ldap.pm.
+
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/Net/LDAP.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/Net/LDAP.pm
+@@ -622,7 +622,7 @@ sub userModifyPassword {
+             if ( defined $pp_error ) {
+                 $self->{portal}
+                   ->logger->error("Password policy error $pp_error");
+-                return [
++                my $code = [
+                     PE_PP_PASSWORD_EXPIRED,
+                     PE_PP_ACCOUNT_LOCKED,
+                     PE_PP_CHANGE_AFTER_RESET,
+@@ -633,14 +633,24 @@ sub userModifyPassword {
+                     PE_PP_PASSWORD_TOO_YOUNG,
+                     PE_PP_PASSWORD_IN_HISTORY,
+                 ]->[$pp_error];
++                return $code if defined $code;
+             }
+         }
+         else {
+             $self->{portal}->logger->error(
+                 "Missing PPolicy control from server response. Code: "
+                   . $mesg->code );
+-            return PE_LDAPERROR;
+         }
++
++        # The server refused the modification for a reason the password
++        # policy control does not describe (ACL, schema, constraint...).
++        # Without this, the modification error was silently reported as a
++        # success.
++        $self->{portal}
++          ->logger->error( "Password modification failed with LDAP error "
++              . $mesg->code . ": "
++              . $mesg->error );
++        return PE_LDAPERROR;
+     }
+ }
+ 
