@@ -1,0 +1,533 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
+@@ -311,6 +311,15 @@ sub run {
+ sub _checkErrorsInAuthorizeEndpoint {
+     my ( $self, $req ) = @_;
+ 
++    # RFC 6749 section 3.1: request parameters MUST NOT be included more than
++    # once. "resource" may be repeated (RFC 8707 section 2). As the client and
++    # its redirection URI are not validated yet, the user is informed with a
++    # portal error page
++    if ( $self->hasDuplicatedParameters( $req, 'resource' ) ) {
++        return $self->_failAuthorize( $req,
++            msg => "Duplicated parameters in authorization request" );
++    }
++
+     # Get and save parameters
+     my $oidc_request = {};
+     foreach my $param (
+@@ -503,27 +512,32 @@ sub _checkErrorsInAuthorizeEndpoint {
+         and not $self->conf->{oidcServiceAllowAuthorizationCodeFlow} )
+     {
+         return $self->returnRedirectError(
+-            $req,           $oidc_request->{'redirect_uri'},
+-            "server_error", "Authorization code flow not allowed",
+-            undef,          $oidc_request->{'state'}, 0
++            $req,
++            $oidc_request->{'redirect_uri'},
++            "unsupported_response_type",
++            "Authorization code flow not allowed",
++            undef,
++            $oidc_request->{'state'},
++            0
+         );
+     }
+     if ( $flow eq "implicit"
+         and not $self->conf->{oidcServiceAllowImplicitFlow} )
+     {
+         return $self->returnRedirectError(
+-            $req,           $oidc_request->{'redirect_uri'},
+-            "server_error", "Implicit flow not allowed",
+-            undef,          $oidc_request->{'state'}, 1
++            $req,                        $oidc_request->{'redirect_uri'},
++            "unsupported_response_type", "Implicit flow not allowed",
++            undef,                       $oidc_request->{'state'},
++            1
+         );
+     }
+     if ( $flow eq "hybrid"
+         and not $self->conf->{oidcServiceAllowHybridFlow} )
+     {
+         return $self->returnRedirectError(
+-            $req,           $oidc_request->{'redirect_uri'},
+-            "server_error", "Hybrid flow not allowed",
+-            undef,          $oidc_request->{'state'}, 1
++            $req,                        $oidc_request->{'redirect_uri'},
++            "unsupported_response_type", "Hybrid flow not allowed",
++            undef,                       $oidc_request->{'state'}, 1
+         );
+     }
+ 
+@@ -535,19 +549,26 @@ sub _checkErrorsInAuthorizeEndpoint {
+         $self->logger->debug('JWS authentication is required');
+         unless ($authMethod) {
+             return $self->returnRedirectError(
+-                $req,           $oidc_request->{'redirect_uri'},
+-                'server_error', 'JWS authentication required',
+-                undef,          $oidc_request->{'state'}, 1
++                $req,
++                $oidc_request->{'redirect_uri'},
++                'invalid_request',
++                'JWS authentication required',
++                undef,
++                $oidc_request->{'state'},
++                ( $flow ne "authorizationcode" )
+             );
+         }
+         my $methodAllowed =
+           $self->rpOptions->{$rp}->{oidcRPMetaDataOptionsAuthMethod};
+         if ( $methodAllowed and $authMethod ne $methodAllowed ) {
+             return $self->returnRedirectError(
+-                $req,           $oidc_request->{'redirect_uri'},
+-                'server_error', "Authentication must use $methodAllowed",
+-                undef,          $oidc_request->{'state'},
+-                1
++                $req,
++                $oidc_request->{'redirect_uri'},
++                'invalid_request_object',
++                "Authentication must use $methodAllowed",
++                undef,
++                $oidc_request->{'state'},
++                ( $flow ne "authorizationcode" )
+             );
+         }
+     }
+@@ -557,9 +578,9 @@ sub _checkErrorsInAuthorizeEndpoint {
+         and not( $oidc_request->{'state'} ) )
+     {
+         return $self->returnRedirectError(
+-            $req,           $oidc_request->{'redirect_uri'},
+-            "server_error", "State required",
+-            undef,          undef, 1
++            $req,              $oidc_request->{'redirect_uri'},
++            "invalid_request", "State required",
++            undef,             undef, ( $flow ne "authorizationcode" )
+         );
+     }
+ 
+@@ -568,9 +589,9 @@ sub _checkErrorsInAuthorizeEndpoint {
+         and not( $oidc_request->{'nonce'} ) )
+     {
+         return $self->returnRedirectError(
+-            $req,           $oidc_request->{'redirect_uri'},
+-            "server_error", "Nonce required",
+-            undef,          undef, 1
++            $req,              $oidc_request->{'redirect_uri'},
++            "invalid_request", "Nonce required",
++            undef,             undef, ( $flow ne "authorizationcode" )
+         );
+     }
+ 
+@@ -581,13 +602,22 @@ sub _checkErrorsInAuthorizeEndpoint {
+     # Scope names are restricted to printable ASCII characters,
+     # excluding double quote and backslash
+     unless ( $oidc_request->{'scope'} =~ /^[\x20\x21\x23-\x5B\x5D-\x7E]*$/ ) {
+-        return $self->_failAuthorize( $req,
+-            msg => "Submitted scope is not valid" );
++        return $self->returnRedirectError(
++            $req,            $oidc_request->{'redirect_uri'},
++            'invalid_scope', 'Submitted scope is not valid',
++            undef,           $oidc_request->{'state'},
++            ( $flow ne "authorizationcode" )
++        );
+     }
+ 
+     # Check openid scope
+     unless ( $self->_hasScope( 'openid', $oidc_request->{'scope'} ) ) {
+-        return $self->_failAuthorize( $req, msg => "No openid scope found" );
++        return $self->returnRedirectError(
++            $req,            $oidc_request->{'redirect_uri'},
++            'invalid_scope', 'No openid scope found',
++            undef,           $oidc_request->{'state'},
++            ( $flow ne "authorizationcode" )
++        );
+     }
+     $req->data->{_oidc_request} = $oidc_request;
+     $req->data->{_oidc_rp}      = $rp;
+@@ -1517,11 +1547,33 @@ sub token {
+     $req->data->{dropCsp} = 1 if $self->conf->{oidcDropCspHeaders};
+     $self->logger->debug("URL detected as an OpenID Connect TOKEN URL");
+ 
++    # RFC 6749 section 3.2: the token endpoint must be called with POST
++    unless ( $req->method =~ /^POST$/i ) {
++        $self->userLogger->error(
++            "Token endpoint called with " . $req->method . " method" );
++        return $self->sendOIDCError( $req, 'invalid_request', 400 );
++    }
++
++    # RFC 6749 section 5.2: a repeated parameter makes the request malformed.
++    # "resource" and "audience" may be repeated (RFC 8707, RFC 8693)
++    if ( $self->hasDuplicatedParameters( $req, 'resource', 'audience' ) ) {
++        $self->userLogger->error(
++            "Token endpoint called with duplicated parameters");
++        return $self->sendOIDCError( $req, 'invalid_request', 400 );
++    }
++
+     my ( $rp, $method ) = $self->checkEndPointAuthenticationCredentials($req);
+     return $self->invalidClientResponse($req) unless ($rp);
+ 
+     my $grant_type = $req->param('grant_type') || '';
+ 
++    # RFC 6749 section 5.2: "invalid_request" is returned when a required
++    # parameter is missing
++    unless ($grant_type) {
++        $self->userLogger->error("Missing grant_type parameter");
++        return $self->sendOIDCError( $req, 'invalid_request', 400 );
++    }
++
+     # Hook to allow plugins to handle custom grant_types or modify parameters
+     # (e.g., CIBA, Device Authorization RFC 8628)
+     # PE_OK => continue processing
+@@ -1542,12 +1594,12 @@ sub token {
+                 message =>
+ "An oidcGotTokenRequest plugin rejected this request with code $h",
+             );
+-            return $self->sendOIDCError( $req, 'Bad request', 400 );
++            return $self->sendOIDCError( $req, 'invalid_request', 400 );
+         }
+         else {
+             $self->logger->error(
+                 "An oidcGotTokenRequest plugin returned an usable code: $h");
+-            return $self->sendOIDCError( $req, 'Server error', 500 );
++            return $self->sendOIDCError( $req, 'server_error', 500 );
+         }
+     }
+ 
+@@ -1566,13 +1618,9 @@ sub token {
+         return $self->_handleTokenExchange( $req, $rp );
+     }
+ 
+-    # Unknown or unspecified grant type
++    # Unknown grant type
+     else {
+-        $self->userLogger->error(
+-            $grant_type
+-            ? "Unknown grant type: $grant_type"
+-            : "Missing grant_type parameter"
+-        );
++        $self->userLogger->error("Unknown grant type: $grant_type");
+         return $self->sendOIDCError( $req, 'unsupported_grant_type', 400 );
+     }
+ 
+@@ -1588,7 +1636,7 @@ sub _handleTokenExchange {
+     }
+ 
+     $self->logger->error("Unsupported OAuth 2.0 Token Exchange request");
+-    return $self->sendOIDCError( $req, 'invalid_request', 400 );
++    return $self->sendOIDCError( $req, 'unsupported_grant_type', 400 );
+ }
+ 
+ sub _handleAuthorizationCodeGrant {
+@@ -1625,10 +1673,11 @@ sub _handleAuthorizationCodeGrant {
+         }
+     }
+ 
+-    # Check PKCE requirement (mode 1: always required)
++    # Check PKCE requirement (mode 1: always required). The code was issued to
++    # a known client, so this is a grant problem, not an authentication one
+     if ( $require_pkce and $require_pkce != 2 and !$has_pkce ) {
+         $self->userLogger->error("Relying Party $rp requires PKCE");
+-        return $self->invalidClientResponse($req);
++        return $self->sendOIDCError( $req, 'invalid_grant', 400 );
+     }
+ 
+     # Validate PKCE challenge
+@@ -1851,7 +1900,10 @@ sub _handleRefreshTokenGrant {
+ 
+     unless ($refreshSession) {
+         $self->logger->warn("Unable to find OIDC session $refresh_token");
+-        return $self->sendOIDCError( $req, 'invalid_request', 400 );
++
++        # RFC 6749 section 5.2: an expired, revoked or unknown refresh token
++        # must be answered with "invalid_grant"
++        return $self->sendOIDCError( $req, 'invalid_grant', 400 );
+     }
+ 
+     $refreshSession =
+@@ -1878,7 +1930,7 @@ sub _handleRefreshTokenGrant {
+                     user => $user,
+                 );
+                 $refreshSession->remove;
+-                return $self->sendOIDCError( $req, 'invalid_grant', 401 );
++                return $self->sendOIDCError( $req, 'invalid_grant', 400 );
+             }
+         }
+         else {
+@@ -2090,6 +2142,14 @@ sub userInfo {
+     $req->data->{dropCsp} = 1 if $self->conf->{oidcDropCspHeaders};
+     $self->logger->debug("URL detected as an OpenID Connect USERINFO URL");
+ 
++    # RFC 6750 section 3.1: a repeated parameter makes the request malformed
++    if ( $self->hasDuplicatedParameters($req) ) {
++        $self->userLogger->error(
++            "UserInfo endpoint called with duplicated parameters");
++        return $self->returnBearerError( $req, 'invalid_request',
++            'Duplicated parameter in request', 400 );
++    }
++
+     my ( $access_token, $authMethod ) = $self->getEndPointAccessToken($req);
+ 
+     unless ($access_token) {
+@@ -2098,8 +2158,10 @@ sub userInfo {
+             code    => 'ISSUER_OIDC_USERINFO_FAILED',
+             message => 'Missing access_token',
+         );
+-        return $self->returnBearerError( $req, 'invalid_request',
+-            "Access token not found in request", 401 );
++
++        # RFC 6750 section 3.1: no authentication information, so no error
++        # code is sent in the challenge
++        return $self->returnBearerError($req);
+     }
+ 
+     $self->logger->debug("Received Access Token $access_token");
+@@ -2112,8 +2174,8 @@ sub userInfo {
+             code    => 'ISSUER_OIDC_USERINFO_FAILED',
+             message => 'Invalid or expired access_token',
+         );
+-        return $self->returnBearerError( $req, 'invalid_request',
+-            'Invalid request', 401 );
++        return $self->returnBearerError( $req, 'invalid_token',
++            'Invalid or expired access token' );
+     }
+ 
+     # Get access token session data
+@@ -2135,7 +2197,7 @@ sub userInfo {
+             message => 'Missing required authentication header',
+         );
+         return $self->returnBearerError( $req, 'invalid_request',
+-            'Invalid request', 400 );
++            'Access token must be sent in the Authorization header', 400 );
+     }
+ 
+     # Make sure $rp has been lazy loaded
+@@ -2151,14 +2213,14 @@ sub userInfo {
+             code    => 'ISSUER_OIDC_USERINFO_FAILED',
+             message => 'Unable to get session corresponding to access-token',
+         );
+-        return $self->returnBearerError( $req, 'invalid_request',
+-            'Invalid request', 401 );
++        return $self->returnBearerError( $req, 'invalid_token',
++            'Invalid or expired access token' );
+     }
+ 
+     my $userinfo_response =
+       $self->buildUserInfoResponse( $req, $scope, $rp, $session );
+-    return $self->returnBearerError( $req, 'invalid_request',
+-        'Invalid request', 401 )
++    return $self->returnBearerError( $req, 'server_error',
++        'Unable to build UserInfo response', 500 )
+       unless ($userinfo_response);
+ 
+     my $attr_str = join( ',', sort( keys(%$userinfo_response) ) );
+@@ -2234,6 +2296,20 @@ sub introspection {
+     $req->data->{dropCsp} = 1 if $self->conf->{oidcDropCspHeaders};
+     $self->logger->debug("URL detected as an Oauth2 INTROSPECTION URL");
+ 
++    # RFC 7662 section 2.1: the introspection endpoint must be called with POST
++    unless ( $req->method =~ /^POST$/i ) {
++        $self->userLogger->error(
++            "Introspection endpoint called with " . $req->method . " method" );
++        return $self->sendOIDCError( $req, 'invalid_request', 400 );
++    }
++
++    # RFC 6749 section 5.2: a repeated parameter makes the request malformed
++    if ( $self->hasDuplicatedParameters($req) ) {
++        $self->userLogger->error(
++            "Introspection endpoint called with duplicated parameters");
++        return $self->sendOIDCError( $req, 'invalid_request', 400 );
++    }
++
+     my ( $rp, $authMethod ) =
+       $self->checkEndPointAuthenticationCredentials($req);
+     return $self->invalidClientResponse($req) unless ($rp);
+@@ -2242,7 +2318,10 @@ sub introspection {
+         $self->logger->error(
+ "Unauthenticated clients are not allowed to access the introspection endpoint"
+         );
+-        return $self->sendOIDCError( $req, 'unauthorized_client', 401 );
++
++        # RFC 7662 section 2.3 refers to RFC 6749 section 5.2: a missing or
++        # invalid client authentication is "invalid_client"
++        return $self->invalidClientResponse($req);
+     }
+ 
+     my $token = $req->param('token');
+@@ -2392,6 +2471,13 @@ sub _revokeToken {
+     return $self->sendOIDCError( $req, 'invalid_request', 400 )
+       unless ( $req->method =~ /^POST$/i );
+ 
++    # RFC 6749 section 5.2: a repeated parameter makes the request malformed
++    if ( $self->hasDuplicatedParameters($req) ) {
++        $self->userLogger->error(
++            "Revoke endpoint called with duplicated parameters");
++        return $self->sendOIDCError( $req, 'invalid_request', 400 );
++    }
++
+     my $token = $req->param('token');
+     return $self->sendOIDCError( $req, 'invalid_request', 400 ) unless ($token);
+ 
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm
+@@ -21,7 +21,7 @@ use Lemonldap::NG::Common::JWT
+   qw(getAccessTokenSessionId getJWTPayload getJWTHeader getJWTSignature getJWTSignedData);
+ use MIME::Base64
+   qw/encode_base64 decode_base64 encode_base64url decode_base64url/;
+-use Scalar::Util qw/looks_like_number/;
++use Scalar::Util qw/looks_like_number blessed/;
+ use URI;
+ use URI::Escape qw(uri_unescape);
+ use URI::QueryParam;
+@@ -1969,24 +1969,61 @@ sub sendOIDCError {
+     );
+ }
+ 
++# RFC 6749 section 3.1: request parameters MUST NOT be included more than
++# once. Plack merges duplicated parameters (the last value wins), so the
++# underlying Hash::MultiValue has to be checked.
++# Some parameters may be repeated: "resource" (RFC 8707 section 2) and
++# "audience" (RFC 8693 section 2.1).
++# @param allowed names of parameters that may be repeated
++# @return true if a parameter is given more than once
++sub hasDuplicatedParameters {
++    my ( $self, $req, @allowed ) = @_;
++    my %allowed = map { $_ => 1 } @allowed;
++
++    # Query string and body are checked separately: the portal posts OIDC
++    # parameters as hidden fields on the same URL, so the same parameter is
++    # legitimately present in both
++    foreach my $params ( $req->query_parameters, $req->body_parameters ) {
++        next unless ( blessed($params) and $params->can('get_all') );
++        foreach my $name ( $params->keys ) {
++            next if $allowed{$name};
++
++            # get_all() returns the last value in scalar context
++            my @values = $params->get_all($name);
++            return 1 if @values > 1;
++        }
++    }
++    return 0;
++}
++
+ #sub returnJSON {
+ #my ( $self, $content ) = @_;
+ #replace this call by $self->p->sendJSONresponse($req,$content)
+ 
+-# Return Bearer error
+-# @param error_code Error code
++# Return Bearer error (RFC 6750 section 3)
++# @param error_code Error code (optional: without it, a bare challenge is sent)
+ # @param error_message Error message
++# @param status HTTP status code (default: 401)
+ # @return GI response
+ sub returnBearerError {
+-    my ( $self, $req, $error_code, $error_message ) = @_;
++    my ( $self, $req, $error_code, $error_message, $status ) = @_;
++
++    # RFC 6750 section 3: the challenge must use the Bearer scheme and
++    # error/error_description must be quoted-strings (RFC 7235)
++    my $challenge = 'Bearer';
++    if ($error_code) {
++        $error_code =~ s/[^\w.\-]/_/g;
++        $challenge .= qq{ error="$error_code"};
++        if ( defined $error_message and length $error_message ) {
++            $error_message =~ s/["\\\x00-\x1f\x7f]/ /g;
++            $challenge .= qq{, error_description="$error_message"};
++        }
++    }
+ 
+     my $res = $self->p->sendBinaryResponse(
+         $req, '',
+-        code    => 401,
+-        headers => [
+-            'WWW-Authenticate' =>
+-              "error=$error_code,error_description=$error_message"
+-        ]
++        code    => $status || 401,
++        headers => [ 'WWW-Authenticate' => $challenge ]
+     );
+ 
+     $self->p->setCorsHeaderFromConfig($res);
+@@ -1996,16 +2033,29 @@ sub returnBearerError {
+ 
+ sub invalidClientResponse {
+     my ( $self, $req ) = @_;
+-    if ( $req->authorization ) {
+-        my ($method) = $req->authorization =~ qw/^(\w+) /;
+-        if ($method) {
+-            $req->respHeaders( [ 'WWW-Authenticate' => $method ] );
+-            return $self->sendOIDCError( $req, 'invalid_client', 401 );
+-        }
++
++    # RFC 6749 section 5.2: using several client authentication methods is a
++    # malformed request, not a client authentication failure
++    if ( $req->data->{oidcMultipleClientAuthMethods} ) {
++        return $self->sendOIDCError( $req, 'invalid_request', 400,
++            'Multiple client authentication methods used' );
+     }
+-    else {
+-        return $self->sendOIDCError( $req, 'invalid_client', 400 );
++
++    # RFC 6749 section 5.2: 401 with a WWW-Authenticate challenge matching the
++    # authentication scheme is only required when the client tried to
++    # authenticate with the "Authorization" header field
++    my $authorization = $req->authorization || '';
++    if ( my ($method) = $authorization =~ /^(\w+)/ ) {
++
++        # RFC 7617 section 2: "realm" is mandatory in a Basic challenge
++        my $challenge =
++          $method =~ /^Basic$/i ? 'Basic realm="LemonLDAP::NG"' : $method;
++        $req->respHeaders( [ 'WWW-Authenticate' => $challenge ] );
++        return $self->sendOIDCError( $req, 'invalid_client', 401 );
+     }
++
++    # No Authorization header, or an unusable one
++    return $self->sendOIDCError( $req, 'invalid_client', 400 );
+ }
+ 
+ sub checkEndPointAuthenticationCredentials {
+@@ -2134,6 +2184,7 @@ sub getEndPointAuthenticationCredentials {
+           )
+         {
+             $self->logger->error("Multiple client authentication methods used");
++            $req->data->{oidcMultipleClientAuthMethods} = 1;
+             ( $client_id, $client_secret ) = ( undef, undef );
+         }
+     }
+@@ -3254,7 +3305,9 @@ Create Hash
+ 
+ =head2 returnBearerError
+ 
+-Return Bearer error
++Return a Bearer error response (RFC 6750): send a C<WWW-Authenticate: Bearer>
++challenge, with C<error> and C<error_description> parameters when an error code
++is given. The HTTP status code defaults to 401 and can be overridden.
+ 
+ =head2 getEndPointAuthenticationCredentials
+ 
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/OIDC/ClientCredentialsGrant.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/OIDC/ClientCredentialsGrant.pm
+@@ -102,8 +102,8 @@ sub _run {
+     );
+     unless ($access_token) {
+         $self->userLogger->error("Unable to create Access Token");
+-        return $oidc->sendOIDCError( $req, 'Unable to create Access Token',
+-            500 );
++        return $oidc->sendOIDCError( $req, 'server_error', 500,
++            'Unable to create Access Token' );
+     }
+ 
+     my $expires_in =
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/OIDC/PasswordGrant.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/OIDC/PasswordGrant.pm
+@@ -155,8 +155,8 @@ sub _run {
+         unless ($refreshTokenSession) {
+             $self->userLogger->error(
+                 "Unable to create OIDC session for refresh_token");
+-            return $oidc->sendOIDCError( $req,
+-                'Could not create refresh token session', 500 );
++            return $oidc->sendOIDCError( $req, 'server_error', 500,
++                'Could not create refresh token session' );
+         }
+ 
+         $refresh_token = $refreshTokenSession->id;
