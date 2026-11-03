@@ -39,6 +39,7 @@ RUN set -e && for p in \
 	manager-api-conf-metadata.patch \
 	manager-api-oidc-op.patch \
 	auto-cfglog.patch \
+	samlStrictIdpSelection.patch \
     ; do echo patch $p && patch -p1 < $p || exit 1; done && \
     rm -f *.patch && \
     find /usr/share/perl5/Lemonldap -name '*.orig' -delete && \

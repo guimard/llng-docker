@@ -83,6 +83,7 @@ RUN set -e && for p in \
     ldap-filter-escape.patch \
     ppolicy.patch \
     oidc-rfc-compliance.patch \
+    samlStrictIdpSelection.patch \
     ; do echo patch $p && patch -p1 < $p || exit 1; done && \
     rm -f /usr/share/lemonldap-ng/portal/htdocs/static/common/js/carousel.min.js && \
     ln -s carousel.js /usr/share/lemonldap-ng/portal/htdocs/static/common/js/carousel.min.js && \

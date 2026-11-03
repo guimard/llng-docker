@@ -1,0 +1,165 @@
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Attributes.pm
+@@ -3395,6 +3395,12 @@ sub attributes {
+             documentation => 'Override SAML EntityID when acting as an IDP',
+             default       => '',
+         },
++        samlStrictIDPSelection => {
++            default       => 0,
++            type          => 'bool',
++            documentation =>
++              'SAML SP: refuse an authentication request without a known IDP',
++        },
+         samlUseQueryStringSpecific => {
+             default       => 0,
+             type          => 'bool',
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/Tree.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/Tree.pm
+@@ -1487,6 +1487,7 @@ sub tree {
+                         'samlRelayStateTimeout',
+                         'samlUseQueryStringSpecific',
+                         'samlOverrideIDPEntityID',
++                        'samlStrictIDPSelection',
+ 
+                         {
+                             title => 'samlCommonDomainCookie',
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ar.json
+@@ -1283,6 +1283,7 @@
+ "samlServiceUseCertificateInResponse":"استخدم الشهادة الرقمية في الردود",
+ "samlStorage":"اسم وحدة الجلسات SAML",
+ "samlStorageOptions":"خيارات وحدة جلسات SAML",
++"samlStrictIDPSelection":"Refuse a missing or unknown IDP",
+ "samlUseQueryStringSpecific":"استخدام أسلوب query_string المعين",
+ "save":"حفظ",
+ "saveReport":"احفظ التقرير",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/en.json
+@@ -1283,6 +1283,7 @@
+ "samlServiceUseCertificateInResponse":"Use certificate in responses",
+ "samlStorage":"SAML sessions module name",
+ "samlStorageOptions":"SAML sessions module options",
++"samlStrictIDPSelection":"Refuse a missing or unknown IDP",
+ "samlUseQueryStringSpecific":"Use specific query_string method",
+ "save":"Save",
+ "saveReport":"Save report",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/es.json
+@@ -1283,6 +1283,7 @@
+ "samlServiceUseCertificateInResponse":"Use certificate in responses",
+ "samlStorage":"SAML sessions module name",
+ "samlStorageOptions":"SAML sessions module options",
++"samlStrictIDPSelection":"Refuse a missing or unknown IDP",
+ "samlUseQueryStringSpecific":"Use specific query_string method",
+ "save":"Salvar",
+ "saveReport":"Salvar informe",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/fr.json
+@@ -1283,6 +1283,7 @@
+ "samlServiceUseCertificateInResponse":"Utilisation du certificat dans les réponses",
+ "samlStorage":"Nom du module des sessions SAML",
+ "samlStorageOptions":"Options du module des sessions SAML",
++"samlStrictIDPSelection":"Refuser un IDP absent ou inconnu",
+ "samlUseQueryStringSpecific":"Utilisation d'une fonction spécifique pour query_string",
+ "save":"Sauver",
+ "saveReport":"Rapport de sauvegarde",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/he.json
+@@ -1283,6 +1283,7 @@
+ "samlServiceUseCertificateInResponse":"Use certificate in responses",
+ "samlStorage":"SAML sessions module name",
+ "samlStorageOptions":"SAML sessions module options",
++"samlStrictIDPSelection":"Refuse a missing or unknown IDP",
+ "samlUseQueryStringSpecific":"Use specific query_string method",
+ "save":"שמירה",
+ "saveReport":"שמירת דוח",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/it.json
+@@ -1283,6 +1283,7 @@
+ "samlServiceUseCertificateInResponse":"Utilizza il certificato nelle risposte",
+ "samlStorage":"Nome del modulo di sessioni SAML",
+ "samlStorageOptions":"Opzioni del modulo sessioni SAML",
++"samlStrictIDPSelection":"Refuse a missing or unknown IDP",
+ "samlUseQueryStringSpecific":"Utilizza il metodo specifico query_string",
+ "save":"Salva",
+ "saveReport":"Salva report",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pl.json
+@@ -1283,6 +1283,7 @@
+ "samlServiceUseCertificateInResponse":"Użyj certyfikatu w odpowiedziach",
+ "samlStorage":"Nazwa modułu sesji SAML",
+ "samlStorageOptions":"Opcje modułu sesji SAML",
++"samlStrictIDPSelection":"Refuse a missing or unknown IDP",
+ "samlUseQueryStringSpecific":"Użyj określonej metody query_string",
+ "save":"Zapisz",
+ "saveReport":"Zapisz raport",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt.json
+@@ -1283,6 +1283,7 @@
+ "samlServiceUseCertificateInResponse":"Usar certificados em respostas",
+ "samlStorage":"Nome do módulo de sessões SAML",
+ "samlStorageOptions":"Opções do módulo de sessões SAML",
++"samlStrictIDPSelection":"Refuse a missing or unknown IDP",
+ "samlUseQueryStringSpecific":"Usar método específico query_string",
+ "save":"Salvar",
+ "saveReport":"Salvar relatório",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/pt_BR.json
+@@ -1283,6 +1283,7 @@
+ "samlServiceUseCertificateInResponse":"Usar certificados em respostas",
+ "samlStorage":"Nome do módulo de sessões SAML",
+ "samlStorageOptions":"Opções do módulo de sessões SAML",
++"samlStrictIDPSelection":"Refuse a missing or unknown IDP",
+ "samlUseQueryStringSpecific":"Usar método específico query_string",
+ "save":"Salvar",
+ "saveReport":"Salvar relatório",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/ru.json
+@@ -1283,6 +1283,7 @@
+ "samlServiceUseCertificateInResponse":"Использовать сертификат в ответах",
+ "samlStorage":"Имя модуля сеансов SAML",
+ "samlStorageOptions":"Параметры модуля сеансов SAML",
++"samlStrictIDPSelection":"Refuse a missing or unknown IDP",
+ "samlUseQueryStringSpecific":"Использовать особый метод query_string",
+ "save":"Сохранить",
+ "saveReport":"Сохранить отчет",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/tr.json
+@@ -1283,6 +1283,7 @@
+ "samlServiceUseCertificateInResponse":"Yanıtlarda sertifika kullan",
+ "samlStorage":"SAML oturumlar modülü adı",
+ "samlStorageOptions":"SAML oturumlar modülü seçenekleri",
++"samlStrictIDPSelection":"Refuse a missing or unknown IDP",
+ "samlUseQueryStringSpecific":"Spesifik query_string metodu kullan",
+ "save":"Kaydet",
+ "saveReport":"Raporu kaydet",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/vi.json
+@@ -1283,6 +1283,7 @@
+ "samlServiceUseCertificateInResponse":"Sử dụng chứng chỉ trong hồi đáp",
+ "samlStorage":"tên mô-đun phiên SAML",
+ "samlStorageOptions":"Tùy chọn mô-đun phiên SAML",
++"samlStrictIDPSelection":"Refuse a missing or unknown IDP",
+ "samlUseQueryStringSpecific":"Sử dụng phương pháp query_string cụ thể",
+ "save":"Lưu",
+ "saveReport":"Lưu báo cáo",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh.json
+@@ -1283,6 +1283,7 @@
+ "samlServiceUseCertificateInResponse":"在回應中使用憑證",
+ "samlStorage":"SAML 工作階段模組名稱",
+ "samlStorageOptions":"SAML 工作階段模組選項",
++"samlStrictIDPSelection":"Refuse a missing or unknown IDP",
+ "samlUseQueryStringSpecific":"使用特定的 query_string 方法",
+ "save":"儲存",
+ "saveReport":"儲存回報",
+--- a/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json
++++ b/usr/share/lemonldap-ng/manager/htdocs/static/languages/zh_TW.json
+@@ -1283,6 +1283,7 @@
+ "samlServiceUseCertificateInResponse":"在回應中使用憑證",
+ "samlStorage":"SAML 工作階段模組名稱",
+ "samlStorageOptions":"SAML 工作階段模組選項",
++"samlStrictIDPSelection":"Refuse a missing or unknown IDP",
+ "samlUseQueryStringSpecific":"使用特定的 query_string 方法",
+ "save":"儲存",
+ "saveReport":"儲存回報",
