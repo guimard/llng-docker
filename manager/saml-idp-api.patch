@@ -1,0 +1,832 @@
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Api.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Api.pm
+@@ -11,6 +11,7 @@ use Lemonldap::NG::Manager::Api::Misc;
+ use Lemonldap::NG::Manager::Api::Providers::OidcRp;
+ use Lemonldap::NG::Manager::Api::Providers::OidcOp;
+ use Lemonldap::NG::Manager::Api::Providers::SamlSp;
++use Lemonldap::NG::Manager::Api::Providers::SamlIdp;
+ use Lemonldap::NG::Manager::Api::Providers::CasApp;
+ use Lemonldap::NG::Manager::Api::Menu::Cat;
+ use Lemonldap::NG::Manager::Api::Menu::App;
+@@ -78,6 +79,12 @@ sub init {
+                             },
+                             ':confKey' => 'getSamlSpByConfKey'
+                         },
++                        idp => {
++                            findByConfKey => {
++                                ':uPattern' => 'findSamlIdpByConfKey'
++                            },
++                            ':confKey' => 'getSamlIdpByConfKey'
++                        },
+                     },
+                     cas => {
+                         app => {
+@@ -137,7 +144,8 @@ sub init {
+                         op => 'addOidcOp'
+                     },
+                     saml => {
+-                        sp => 'addSamlSp'
++                        sp  => 'addSamlSp',
++                        idp => 'addSamlIdp'
+                     },
+                     cas => {
+                         app => 'addCasApp'
+@@ -171,7 +179,8 @@ sub init {
+                         op => { ':confKey' => 'replaceOidcOp' }
+                     },
+                     saml => {
+-                        sp => { ':confKey' => 'replaceSamlSp' }
++                        sp  => { ':confKey' => 'replaceSamlSp' },
++                        idp => { ':confKey' => 'replaceSamlIdp' }
+                     },
+                     cas => {
+                         app => { ':confKey' => 'replaceCasApp' }
+@@ -199,7 +208,8 @@ sub init {
+                         op => { ':confKey' => 'updateOidcOp' }
+                     },
+                     saml => {
+-                        sp => { ':confKey' => 'updateSamlSp' }
++                        sp  => { ':confKey' => 'updateSamlSp' },
++                        idp => { ':confKey' => 'updateSamlIdp' }
+                     },
+                     cas => {
+                         app => { ':confKey' => 'updateCasApp' }
+@@ -227,7 +237,8 @@ sub init {
+                         op => { ':confKey' => 'deleteOidcOp' }
+                     },
+                     saml => {
+-                        sp => { ':confKey' => 'deleteSamlSp' }
++                        sp  => { ':confKey' => 'deleteSamlSp' },
++                        idp => { ':confKey' => 'deleteSamlIdp' }
+                     },
+                     cas => {
+                         app => { ':confKey' => 'deleteCasApp' }
+new file mode 100644
+--- /dev/null
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Api/Providers/SamlIdp.pm
+@@ -0,0 +1,394 @@
++package Lemonldap::NG::Manager::Api::Providers::SamlIdp;
++
++our $VERSION = '2.23.0';
++
++package Lemonldap::NG::Manager::Api;
++
++use strict;
++use utf8;
++use Mouse;
++use Lemonldap::NG::Manager::Conf::Parser;
++
++extends 'Lemonldap::NG::Manager::Api::Common';
++
++use constant SAML_MD_NS => 'urn:oasis:names:tc:SAML:2.0:metadata';
++
++sub getSamlIdpByConfKey {
++    my ( $self, $req ) = @_;
++
++    my $confKey = $req->param('confKey')
++      or return $self->sendError( $req, 'confKey is missing', 400 );
++
++    $self->logger->debug("[API] SAML IdP $confKey configuration requested");
++
++    my $conf = $self->_confAcc->getConf( { noCache => 1 } );
++
++    my $samlIdp = $self->_getSamlIdpByConfKey( $conf, $confKey );
++
++    return $self->sendError( $req,
++        "SAML identity provider '$confKey' not found", 404 )
++      unless ( defined $samlIdp );
++
++    return $self->sendJSONresponse( $req, $samlIdp );
++}
++
++sub findSamlIdpByConfKey {
++    my ( $self, $req ) = @_;
++
++    my $pattern = (
++        defined $req->param('uPattern')
++        ? $req->param('uPattern')
++        : ( defined $req->param('pattern') ? $req->param('pattern') : undef )
++    );
++
++    return $self->sendError( $req, 'Invalid input: pattern is missing', 400 )
++      unless ( defined $pattern );
++
++    unless ( $pattern = $self->_getRegexpFromPattern($pattern) ) {
++        return $self->sendError( $req, 'Invalid input: pattern is invalid',
++            400 );
++    }
++
++    $self->logger->debug(
++        "[API] Find SAML IdPs by confKey regexp $pattern requested");
++
++    my $conf = $self->_confAcc->getConf( { noCache => 1 } );
++
++    my @samlIdps =
++      map { $_ =~ $pattern ? $self->_getSamlIdpByConfKey( $conf, $_ ) : () }
++      keys %{ $conf->{samlIDPMetaDataXML} };
++
++    return $self->sendJSONresponse( $req, [@samlIdps] );
++}
++
++sub addSamlIdp {
++    my ( $self, $req ) = @_;
++    my $add = $req->jsonBodyToObj;
++
++    return $self->sendError( $req, "Invalid input: " . $req->error, 400 )
++      unless ($add);
++
++    return $self->sendError( $req, 'Invalid input: body is not an object', 400 )
++      unless ( ref $add eq 'HASH' );
++
++    return $self->sendError( $req, 'Invalid input: confKey is missing', 400 )
++      unless ( defined $add->{confKey} );
++
++    return $self->sendError( $req, 'Invalid input: confKey is not a string',
++        400 )
++      if ( ref $add->{confKey} );
++
++    return $self->sendError( $req, 'Invalid input: confKey is empty', 400 )
++      unless ( $add->{confKey} );
++
++    return $self->sendError( $req, 'Invalid input: metadata is missing', 400 )
++      unless ( defined $add->{metadata} );
++
++    $self->logger->debug(
++        "[API] Add SAML IdP with confKey $add->{confKey} requested");
++
++    my $conf = $self->_confAcc->getConf( { noCache => 1 } );
++
++    return $self->sendError(
++        $req,
++        "Invalid input: A SAML IdP with confKey $add->{confKey} already exists",
++        409
++    ) if ( defined $self->_getSamlIdpByConfKey( $conf, $add->{confKey} ) );
++
++    my $res = $self->_pushSamlIdp( $req, $conf, $add->{confKey}, $add, 1 );
++
++    return $self->sendError( $req, $res->{msg}, $res->{code} || 400 )
++      unless ( $res->{res} eq 'ok' );
++
++    return $self->sendJSONresponse(
++        $req,
++        { message => "Successful operation" },
++        code => 201
++    );
++}
++
++sub updateSamlIdp {
++    my ( $self, $req ) = @_;
++    my $confKey = $req->param('confKey')
++      or return $self->sendError( $req, 'confKey is missing', 400 );
++
++    my $update = $req->jsonBodyToObj;
++
++    return $self->sendError( $req, "Invalid input: " . $req->error, 400 )
++      unless ($update);
++
++    return $self->sendError( $req, 'Invalid input: body is not an object', 400 )
++      unless ( ref $update eq 'HASH' );
++
++    $self->logger->debug(
++        "[API] SAML IdP $confKey configuration update requested");
++
++    my $conf = $self->_confAcc->getConf( { noCache => 1 } );
++
++    return $self->sendError( $req,
++        "SAML identity provider '$confKey' not found", 404 )
++      unless ( defined $self->_getSamlIdpByConfKey( $conf, $confKey ) );
++
++    my $res = $self->_pushSamlIdp( $req, $conf, $confKey, $update, 0 );
++
++    return $self->sendError( $req, $res->{msg}, $res->{code} || 400 )
++      unless ( $res->{res} eq 'ok' );
++
++    return $self->sendJSONresponse( $req, undef, code => 204 );
++}
++
++sub replaceSamlIdp {
++    my ( $self, $req ) = @_;
++    my $confKey = $req->param('confKey')
++      or return $self->sendError( $req, 'confKey is missing', 400 );
++
++    my $replace = $req->jsonBodyToObj;
++
++    return $self->sendError( $req, "Invalid input: " . $req->error, 400 )
++      unless ($replace);
++
++    return $self->sendError( $req, 'Invalid input: body is not an object', 400 )
++      unless ( ref $replace eq 'HASH' );
++
++    return $self->sendError( $req, 'Invalid input: metadata is missing', 400 )
++      unless ( defined $replace->{metadata} );
++
++    $self->logger->debug(
++        "[API] SAML IdP $confKey configuration replace requested");
++
++    my $conf = $self->_confAcc->getConf( { noCache => 1 } );
++
++    return $self->sendError( $req,
++        "SAML identity provider '$confKey' not found", 404 )
++      unless ( defined $self->_getSamlIdpByConfKey( $conf, $confKey ) );
++
++    my $res = $self->_pushSamlIdp( $req, $conf, $confKey, $replace, 1 );
++    return $self->sendError( $req, $res->{msg}, $res->{code} || 400 )
++      unless ( $res->{res} eq 'ok' );
++
++    return $self->sendJSONresponse( $req, undef, code => 204 );
++}
++
++sub deleteSamlIdp {
++    my ( $self, $req ) = @_;
++    my $confKey = $req->param('confKey')
++      or return $self->sendError( $req, 'confKey is missing', 400 );
++
++    my $conf = $self->_confAcc->getConf( { noCache => 1 } );
++
++    return $self->sendError( $req,
++        "SAML identity provider '$confKey' not found", 404 )
++      unless ( defined $self->_getSamlIdpByConfKey( $conf, $confKey ) );
++
++    delete $conf->{samlIDPMetaDataXML}->{$confKey};
++    delete $conf->{samlIDPMetaDataOptions}->{$confKey};
++    delete $conf->{samlIDPMetaDataExportedAttributes}->{$confKey};
++
++    my $s = $self->_saveApplyConf( $req, $conf );
++    return $self->sendError( $req, "Unable to save configuration ($s)", 500 )
++      unless ( $s > 0 );
++
++    return $self->sendJSONresponse( $req, undef, code => 204 );
++}
++
++sub _getSamlIdpByConfKey {
++    my ( $self, $conf, $confKey ) = @_;
++
++    return undef unless ( defined $conf->{samlIDPMetaDataXML}->{$confKey} );
++
++    my $options = {};
++    for
++      my $configOption ( keys %{ $conf->{samlIDPMetaDataOptions}->{$confKey} } )
++    {
++        my $apiName  = $self->_translateOptionConfToApi($configOption);
++        my $apiValue = $self->_translateValueConfToApi( $configOption,
++            $conf->{samlIDPMetaDataOptions}->{$confKey}->{$configOption} );
++        $options->{$apiName} = $apiValue;
++    }
++
++    my $exportedAttributes = {};
++    my $attrs = $conf->{samlIDPMetaDataExportedAttributes}->{$confKey} || {};
++    foreach ( keys %$attrs ) {
++        my ( $mandatory, $name, $format, $friendlyName ) =
++          split( /;/, $attrs->{$_} );
++        $exportedAttributes->{$_} = {
++            name      => $name,
++            mandatory => ( $mandatory ? 'true' : 'false' ),
++        };
++        $exportedAttributes->{$_}->{format} = $format
++          if ( defined $format and $format ne '' );
++        $exportedAttributes->{$_}->{friendlyName} = $friendlyName
++          if ( defined $friendlyName and $friendlyName ne '' );
++    }
++
++    return {
++        confKey  => $confKey,
++        metadata =>
++          $conf->{samlIDPMetaDataXML}->{$confKey}->{samlIDPMetaDataXML},
++        exportedAttributes => $exportedAttributes,
++        options            => $options
++    };
++}
++
++# Returns the entityID as written in the raw XML. Metadata is untrusted, so
++# DTDs, external entities and network access are refused.
++sub _readSamlIdpEntityId {
++    my ( $self, $metadata ) = @_;
++
++    die "metadata is not a string\n" if ( ref $metadata );
++
++    # XML::LibXML is only recommended by the manager package
++    eval { require XML::LibXML; 1 }
++      or die "XML::LibXML is required to read metadata\n";
++
++    my $parser = XML::LibXML->new(
++        load_ext_dtd    => 0,
++        expand_entities => 0,
++        no_network      => 1,
++        expand_xinclude => 0,
++    );
++    my $doc = eval { $parser->parse_string($metadata) };
++    die "metadata is not valid XML\n" unless ($doc);
++    die "metadata must not contain a DTD\n"
++      if ( $doc->internalSubset or $doc->externalSubset );
++
++    my $root = $doc->documentElement;
++    die "metadata is not a SAML EntityDescriptor\n"
++      unless ( $root->localname eq 'EntityDescriptor'
++        and ( $root->namespaceURI // '' ) eq SAML_MD_NS );
++
++    my $entityId = $root->getAttribute('entityID');
++    die "metadata has no entityID\n" unless ($entityId);
++
++    die "metadata has no IDPSSODescriptor\n"
++      unless (
++        $root->getChildrenByTagNameNS( SAML_MD_NS, 'IDPSSODescriptor' )->size );
++
++    # The configuration parser and the portal take the first entityID they
++    # find in the raw text, so it has to be this one
++    my ( $quote, $raw ) = $metadata =~ /entityID=(['"])(.+?)\1/si;
++    my $seen = defined $raw
++      ? eval {
++        $parser->parse_string("<x a=$quote$raw$quote/>")
++          ->documentElement->getAttribute('a');
++      }
++      : undef;
++    die "metadata has an entityID outside the EntityDescriptor\n"
++      unless ( defined $seen and $seen eq $entityId );
++
++    return $raw;
++}
++
++sub _pushSamlIdp {
++    my ( $self, $req, $conf, $confKey, $push, $replace ) = @_;
++
++    if ( defined $push->{metadata} ) {
++        my $entityId =
++          eval { $self->_readSamlIdpEntityId( $push->{metadata} ) };
++        unless ($entityId) {
++            chomp( my $err = $@ );
++            return { res => 'ko', msg => "Invalid input: $err" };
++        }
++
++        # Same entityID test as the configuration parser, done here to
++        # answer 409
++        foreach ( keys %{ $conf->{samlIDPMetaDataXML} } ) {
++            next if ( $_ eq $confKey );
++            my $xml = $conf->{samlIDPMetaDataXML}->{$_}->{samlIDPMetaDataXML}
++              // '';
++            my $other = $xml =~ /entityID=(['"])(.+?)\1/si ? $2 : undef;
++            return {
++                res  => 'ko',
++                code => 409,
++                msg  =>
++"Invalid input: A SAML IdP with entityID $entityId already exists",
++              }
++              if ( defined $other and $other eq $entityId );
++        }
++    }
++
++    my $translatedOptions = {};
++    if ($replace) {
++        $conf->{samlIDPMetaDataOptions}->{$confKey}            = {};
++        $conf->{samlIDPMetaDataExportedAttributes}->{$confKey} = {};
++        $translatedOptions = $self->_getDefaultValues('samlIDPMetaDataNode');
++    }
++
++    if ( defined $push->{options} ) {
++        return {
++            res => 'ko',
++            msg => "Invalid input: options is not a hash object"
++          }
++          unless ( ref( $push->{options} ) eq 'HASH' );
++
++        foreach ( keys %{ $push->{options} } ) {
++            my $optionName = $self->_translateOptionApiToConf( $_, 'samlIDP' );
++            eval {
++                my $optionValue =
++                  $self->_translateValueApiToConf( $optionName,
++                    $push->{options}->{$_} );
++                $translatedOptions->{$optionName} = $optionValue;
++            };
++            if ($@) {
++                return {
++                    res => 'ko',
++                    msg => "Invalid input: $@",
++                };
++            }
++        }
++
++        my $res = $self->_hasAllowedAttributes( $translatedOptions,
++            'samlIDPMetaDataNode' );
++        return $res unless ( $res->{res} eq 'ok' );
++    }
++
++    $self->_merge_hash( $conf, 'samlIDPMetaDataOptions', $confKey,
++        $translatedOptions );
++
++    $conf->{samlIDPMetaDataXML}->{$confKey}->{samlIDPMetaDataXML} =
++      $push->{metadata}
++      if ( defined $push->{metadata} );
++
++    if ( defined $push->{exportedAttributes} ) {
++        return {
++            res => 'ko',
++            msg => "Invalid input: exportedAttributes is not a hash object"
++          }
++          unless ( ref( $push->{exportedAttributes} ) eq 'HASH' );
++
++        my $res =
++          $self->_readSamlSpExportedAttributes( $push->{exportedAttributes},
++            $conf->{samlIDPMetaDataExportedAttributes}->{$confKey} );
++        return $res unless ( $res->{res} eq 'ok' );
++
++        $conf->{samlIDPMetaDataExportedAttributes}->{$confKey} =
++          $res->{exportedAttributes};
++    }
++
++    my $parser = Lemonldap::NG::Manager::Conf::Parser->new( {
++            refConf => $self->_confAcc->getConf( { noCache => 1 } ),
++            newConf => $conf,
++            req     => {},
++        }
++    );
++    unless ( $parser->testNewConf( $self->p ) ) {
++        return {
++            res  => 'ko',
++            code => 400,
++            msg  => "Configuration error: "
++              . join( ". ", map { $_->{message} } @{ $parser->errors } ),
++        };
++    }
++
++    my $s = $self->_saveApplyConf( $req, $conf, $confKey );
++    return {
++        res  => 'ko',
++        code => 500,
++        msg  => "Unable to save configuration ($s)",
++      }
++      unless ( $s > 0 );
++
++    return { res => 'ok' };
++}
++
++1;
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Api/Providers/SamlSp.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Api/Providers/SamlSp.pm
+@@ -339,6 +339,11 @@ sub _readSamlSpExportedAttributes {
+     ];
+     foreach ( keys %{$attrs} ) {
+         if ( defined( $attrs->{$_} ) ) {
++            return {
++                res => "ko",
++                msg => "Exported attribute $_ is not a hash object"
++              }
++              unless ( ref( $attrs->{$_} ) eq 'HASH' );
+             return { res => "ko", msg => "Exported attribute $_ has no name" }
+               unless ( defined $attrs->{$_}->{name} );
+             my $mandatory    = 0;
+@@ -363,7 +368,7 @@ sub _readSamlSpExportedAttributes {
+                     res => "ko",
+                     msg => "Exported attribute $_ format does not exist."
+                   }
+-                  unless ( length( grep { /^$format$/ } @{$allowedFormats} ) );
++                  unless ( grep { $_ eq $format } @{$allowedFormats} );
+             }
+ 
+             $friendlyName = $attrs->{$_}->{friendlyName}
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/OpenApi.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/OpenApi.pm
+@@ -102,6 +102,10 @@ sub openapi {
+                 'name'        => 'samlsp',
+                 'description' => 'SAML Service Providers'
+             },
++            {
++                'name'        => 'samlidp',
++                'description' => 'SAML Identity Providers'
++            },
+             {
+                 'name'        => 'oidcrp',
+                 'description' => 'OpenID Connect Relying Parties'
+@@ -934,6 +938,230 @@ EOF
+                     }
+                 }
+             },
++            '/api/v1/providers/saml/idp' => {
++                'post' => {
++                    'tags'        => ['samlidp'],
++                    'summary'     => 'Create a new SAML Identity Provider',
++                    'operationId' => 'addsamlidp',
++                    'requestBody' => {
++                        'description' => 'SAML Identity Provider to add',
++                        'content'     => {
++                            'application/json' => {
++                                'schema' => {
++                                    '$ref' => '#/components/schemas/SamlIdp'
++                                }
++                            }
++                        },
++                        'required' => JSON::true
++                    },
++                    'responses' => {
++                        '201' => {
++                            '$ref' => '#/components/responses/Created'
++                        },
++                        '400' => {
++                            '$ref' => '#/components/responses/Error'
++                        },
++                        '409' => {
++                            '$ref' => '#/components/responses/Conflict'
++                        }
++                    }
++                }
++            },
++            '/api/v1/providers/saml/idp/findByConfKey' => {
++                'get' => {
++                    'tags'    => ['samlidp'],
++                    'summary' =>
++                      'Finds SAML Identity Providers by configuration key',
++                    'description' =>
++'Takes a search pattern to be tested against existing providers',
++                    'operationId' => 'findSamlIdpByConfKey',
++                    'parameters'  => [ {
++                            'name'        => 'pattern',
++                            'in'          => 'query',
++                            'description' => 'Search pattern',
++                            'required'    => JSON::true,
++                            'schema'      => {
++                                '$ref' => '#/components/schemas/confKey'
++                            },
++                            'examples' => {
++                                'any' => {
++                                    'summary' => 'Any value',
++                                    'value'   => '*'
++                                },
++                                'prefix' => {
++                                    'summary' => 'Given prefix',
++                                    'value'   => 'zone1-*'
++                                },
++                                'anywhere' => {
++                                    'summary' => 'Substring',
++                                    'value'   => 'something'
++                                }
++                            }
++                        }
++                    ],
++                    'responses' => {
++                        '200' => {
++                            '$ref' => '#/components/responses/ManySamlIdp'
++                        },
++                        '400' => {
++                            '$ref' => '#/components/responses/Error'
++                        }
++                    }
++                }
++            },
++            '/api/v1/providers/saml/idp/{confKey}' => {
++                'get' => {
++                    'tags'    => ['samlidp'],
++                    'summary' =>
++                      'Get SAML Identity Provider by configuration key',
++                    'description' => 'Returns a single SAML Identity Provider',
++                    'operationId' => 'getSamlIdpByConfKey',
++                    'parameters'  => [ {
++                            'name'        => 'confKey',
++                            'in'          => 'path',
++                            'description' =>
++                              'Configuration key of SAML Identity Provider',
++                            'required' => JSON::true,
++                            'schema'   => {
++                                '$ref' => '#/components/schemas/confKey'
++                            }
++                        }
++                    ],
++                    'responses' => {
++                        '200' => {
++                            '$ref' => '#/components/responses/OneSamlIdp'
++                        },
++                        '400' => {
++                            '$ref' => '#/components/responses/Error'
++                        },
++                        '404' => {
++                            '$ref' => '#/components/responses/NotFound'
++                        }
++                    }
++                },
++                'patch' => {
++                    'tags'        => ['samlidp'],
++                    'summary'     => 'Updates a SAML Identity Provider',
++                    'description' => <<'EOF'
++This method merges the supplied JSON object with existing configuration. You
++can delete a subkey from a top-level key by setting its value to `null`.  For
++example:
++```
++{
++  "exportedAttributes": {
++    "deleteme": null
++  }
++}
++```
++EOF
++                    ,
++                    'operationId' => 'updateSamlIdp',
++                    'parameters'  => [ {
++                            'name'        => 'confKey',
++                            'in'          => 'path',
++                            'description' =>
++'Configuration key of SAML Identity Provider that needs to be updated',
++                            'required' => JSON::true,
++                            'schema'   => {
++                                '$ref' => '#/components/schemas/confKey'
++                            }
++                        }
++                    ],
++                    'requestBody' => {
++                        'content' => {
++                            'application/json' => {
++                                'schema' => {
++                                    '$ref' =>
++                                      '#/components/schemas/SamlIdpUpdate'
++                                }
++                            }
++                        }
++                    },
++                    'responses' => {
++                        '204' => {
++                            '$ref' => '#/components/responses/NoContent'
++                        },
++                        '400' => {
++                            '$ref' => '#/components/responses/Error'
++                        },
++                        '404' => {
++                            '$ref' => '#/components/responses/NotFound'
++                        },
++                        '409' => {
++                            '$ref' => '#/components/responses/Conflict'
++                        }
++                    }
++                },
++                'put' => {
++                    'tags'        => ['samlidp'],
++                    'summary'     => 'Replaces a SAML Identity Provider',
++                    'description' =>
++'Options and exported attributes left out get their default value.',
++                    'operationId' => 'replaceSamlIdp',
++                    'parameters'  => [ {
++                            'name'        => 'confKey',
++                            'in'          => 'path',
++                            'description' =>
++'Configuration key of SAML Identity Provider that needs to be replaced',
++                            'required' => JSON::true,
++                            'schema'   => {
++                                '$ref' => '#/components/schemas/confKey'
++                            }
++                        }
++                    ],
++                    'requestBody' => {
++                        'content' => {
++                            'application/json' => {
++                                'schema' => {
++                                    '$ref' =>
++                                      '#/components/schemas/SamlIdpReplace'
++                                }
++                            }
++                        }
++                    },
++                    'responses' => {
++                        '204' => {
++                            '$ref' => '#/components/responses/NoContent'
++                        },
++                        '400' => {
++                            '$ref' => '#/components/responses/Error'
++                        },
++                        '404' => {
++                            '$ref' => '#/components/responses/NotFound'
++                        },
++                        '409' => {
++                            '$ref' => '#/components/responses/Conflict'
++                        }
++                    }
++                },
++                'delete' => {
++                    'tags'        => ['samlidp'],
++                    'summary'     => 'Deletes a SAML Identity Provider',
++                    'operationId' => 'deleteSamlIdp',
++                    'parameters'  => [ {
++                            'name'        => 'confKey',
++                            'in'          => 'path',
++                            'description' =>
++'Configuration key of SAML Identity Provider to delete',
++                            'required' => JSON::true,
++                            'schema'   => {
++                                '$ref' => '#/components/schemas/confKey'
++                            }
++                        }
++                    ],
++                    'responses' => {
++                        '204' => {
++                            '$ref' => '#/components/responses/NoContent'
++                        },
++                        '400' => {
++                            '$ref' => '#/components/responses/Error'
++                        },
++                        '404' => {
++                            '$ref' => '#/components/responses/NotFound'
++                        }
++                    }
++                }
++            },
+             '/api/v1/providers/cas/app' => {
+                 'post' => {
+                     'tags'        => ['casapp'],
+@@ -2126,6 +2354,73 @@ EOF
+                     'properties' =>
+                       getOptions( $attributes, 'samlSPMetaDataOptions' ),
+                 },
++                'SamlIdp' => {
++                    'required'   => [ 'confKey', 'metadata' ],
++                    'type'       => 'object',
++                    'properties' => {
++                        'confKey' => {
++                            '$ref' => '#/components/schemas/confKey'
++                        },
++                        'metadata' => {
++                            '$ref' => '#/components/schemas/SamlIdpMetadata'
++                        },
++                        'exportedAttributes' => {
++                            'type'  => 'object',
++                            'items' => {
++                                '$ref' => '#/components/schemas/samlAttribute'
++                            }
++                        },
++                        'options' => {
++                            '$ref' => '#/components/schemas/SamlIdpOptions'
++                        }
++                    }
++                },
++                'SamlIdpMetadata' => {
++                    'type'        => 'string',
++                    'description' =>
++'Metadata of the provider: an EntityDescriptor with an IDPSSODescriptor. A DTD is refused.',
++                    'example' => '<?xml version="1.0"?><EntityDescriptor...'
++                },
++                'SamlIdpOptions' => {
++                    'type'       => 'object',
++                    'properties' =>
++                      getOptions( $attributes, 'samlIDPMetaDataOptions' ),
++                },
++                'SamlIdpUpdate' => {
++                    'type'       => 'object',
++                    'properties' => {
++                        'metadata' => {
++                            '$ref' => '#/components/schemas/SamlIdpMetadata'
++                        },
++                        'exportedAttributes' => {
++                            'type'  => 'object',
++                            'items' => {
++                                '$ref' => '#/components/schemas/samlAttribute'
++                            }
++                        },
++                        'options' => {
++                            '$ref' => '#/components/schemas/SamlIdpOptions'
++                        }
++                    }
++                },
++                'SamlIdpReplace' => {
++                    'type'       => 'object',
++                    'required'   => ['metadata'],
++                    'properties' => {
++                        'metadata' => {
++                            '$ref' => '#/components/schemas/SamlIdpMetadata'
++                        },
++                        'exportedAttributes' => {
++                            'type'  => 'object',
++                            'items' => {
++                                '$ref' => '#/components/schemas/samlAttribute'
++                            }
++                        },
++                        'options' => {
++                            '$ref' => '#/components/schemas/SamlIdpOptions'
++                        }
++                    }
++                },
+                 'samlAttribute' => {
+                     'type'       => 'object',
+                     'properties' => {
+@@ -2733,6 +3028,29 @@ EOF
+                         }
+                     }
+                 },
++                'OneSamlIdp' => {
++                    'description' => 'Return a SAML Identity Provider',
++                    'content'     => {
++                        'application/json' => {
++                            'schema' => {
++                                '$ref' => '#/components/schemas/SamlIdp'
++                            }
++                        }
++                    }
++                },
++                'ManySamlIdp' => {
++                    'description' => 'Return a list of SAML Identity Providers',
++                    'content'     => {
++                        'application/json' => {
++                            'schema' => {
++                                'type'  => 'array',
++                                'items' => {
++                                    '$ref' => '#/components/schemas/SamlIdp'
++                                }
++                            }
++                        }
++                    }
++                },
+                 'OneCasApp' => {
+                     'description' => 'Return a CAS Provider',
+                     'content'     => {

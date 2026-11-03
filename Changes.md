@@ -5,6 +5,7 @@
 - Rebuild with plugins 0.6.1 _(security fix for ssh-ca)_
 - Fix RFC compliance of OIDC error responses
 - Add SAML-strict-IDP-selection
+- Add SAML IdP in manager APIs
 
 ## v2.23.4-5 _(2026-11-02)_
 
