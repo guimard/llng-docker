@@ -5,9 +5,9 @@ this repository.
 
 ## 0. In one sentence
 
-This repository **does not build LemonLDAP::NG from source**: it builds Docker
-images from the **Debian packages** of LemonLDAP::NG, adds the **Linagora
-plugins**, and applies **backport patches** for features or fixes that are not
+This repository **does not build LemonLDAP::NG from [source](https://gitlab.ow2.org/lemonldap-ng/lemonldap-ng)**: it builds Docker
+images from the [**Debian packages** of LemonLDAP::NG](https://tracker.debian.org/pkg/lemonldap-ng), adds the **[Linagora
+plugins](https://linagora.github.io/lemonldap-ng-plugins/)**, and applies **backport patches** for features or fixes that are not
 yet in the Debian version being used.
 
 Practical consequence: you will not find the LLNG source code here. You will
@@ -211,6 +211,34 @@ without an explicit decision.
   GitLab repository (`BRANCH`, default `v2.0`). It is not a release image.
 - **`lemonldap-ng.list`**: historical upstream LLNG repository file, not used
   by the current Dockerfiles.
+
+### 2.5 Reference links
+
+These links provide context; they are **not** the source of truth for this
+repository. Always inspect the local Dockerfiles, patches and workflow `env:`
+first.
+
+| Link                                                                                                                                          | Use it for                                                                                   | Do not use it for                                                       |
+| --------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| [LLNG upstream (GitLab)](https://gitlab.ow2.org/lemonldap-ng/lemonldap-ng)                                                                    | finding a commit/MR to backport, understanding an upstream feature                           | assuming the upstream source layout matches the Debian-installed layout |
+| [Debian package tracker](https://tracker.debian.org/pkg/lemonldap-ng)                                                                         | checking the Debian version, CVEs and upload history                                         | reading the actual source code                                          |
+| [Debian Salsa, `trixie` branch](https://salsa.debian.org/perl-team/modules/packages/lemonldap-ng)                                             | Debian source, Debian packaging patches, exact package content                               | Linagora-specific patches and plugin integration                        |
+| [Linagora plugins source](https://github.com/linagora/lemonldap-ng-plugins)                                                                   | plugin code, issues, activation rules, the Open Bastion submodule                            | the exact package version installed in an image                         |
+| [Linagora plugin store](https://linagora.github.io/lemonldap-ng-plugins/)                                                                     | checking whether a feature already exists as a plugin and how to activate it                 | the source of truth for plugin code                                     |
+| [Linagora Debian repository](https://linagora.github.io/lemonldap-ng-plugins/debian)                                                          | package names and published versions consumed by the Dockerfiles                             | replacing a local patch without checking the image                      |
+| [Open Bastion](https://github.com/linagora/open-bastion)                                                                                      | source of `pam-access`, `ssh-ca`, `oidc-device-authorization` and `oidc-device-organization` | the publication channel of the plugins                                  |
+| [Docker Hub `yadd`](https://hub.docker.com/u/yadd)                                                                                            | published image tags and digests                                                             | build or patch behavior                                                 |
+| [Helm `latest`](https://guimard.github.io/llng-docker/helm/latest) and [Helm `lts-2.21`](https://guimard.github.io/llng-docker/helm/lts-2.21) | published chart versions                                                                     | image source code                                                       |
+
+Notes:
+
+- an upstream LLNG fix is useful input, but this repository patches the
+  **Debian-installed files**: run the upstream patch through `./transform` and
+  adapt it before adding it;
+- external branches and URLs move. The authoritative LLNG version is the
+  `VERSION` value in `.github/workflows/docker-publish.yml`, and the
+  authoritative installed package is whatever the Dockerfile installs;
+- when a link and the local files disagree, the local files win.
 
 ---
 
