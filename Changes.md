@@ -1,6 +1,6 @@
 # Changes
 
-## v2.23.4-6 _(unreleased)_
+## v2.23.4-6 _(2026-11-04)_
 
 - Rebuild with plugins 0.6.1 _(security fix for ssh-ca)_
 - Fix RFC compliance of OIDC error responses
