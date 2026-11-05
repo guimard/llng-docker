@@ -2,7 +2,7 @@
 
 ## v2.23.4-7 _(Unreleased)_
 
-- Rebuild with plugins 0.7.0 _(various fixes for Matrix)_
+- Rebuild with plugins 0.7.1 _(various fixes for Matrix and other plugins)_
 
 ## v2.23.4-6 _(2026-11-04)_
 
