@@ -8,7 +8,6 @@ to run sessions databases maintenance.
 
 ```yaml
 services:
-
   llng-db:
     image: yadd/lemonldap-ng-pg-database
     environment:

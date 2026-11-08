@@ -14,12 +14,13 @@ $ docker build -t my/test --build-arg=BRANCH=oidc-front-channel-logout .
 
 ## Tags
 
-* `2.x.x-date`: base version and date of last patches included
+- `2.x.x-date`: base version and date of last patches included
 
 ## Copyright and license
 
 Copyright:
- * 2018-2024, Xavier Guimard <yadd@debian.org>
- * 2023-2024, LINAGORA <https://linagora.com>
+
+- 2018-2024, Xavier Guimard <yadd@debian.org>
+- 2023-2024, LINAGORA <https://linagora.com>
 
 License: [GNU General Public License v2.0](https://github.com/guimard/llng-docker/blob/master/LICENSE)

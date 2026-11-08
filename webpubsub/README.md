@@ -12,12 +12,14 @@ $ docker run -p 8080:8080 -e PUBSUB_TOKEN=qwerty yadd/lemonldap-ng-webpubsub
 
 ### Test it
 
-* Reader
+- Reader
+
 ```shell
 $ wscat -H 'Authorization: Bearer qwerty' -c ws://localhost:8080/subscribe?channels=chan1
 ```
 
-* Publisher
+- Publisher
+
 ```shell
 $ curl -XPOST -d '{"foo":"bar","bar":"baz","baz":"foo","channel":"chan1"}' -H 'Authorization: Bearer qwerty' http://localhost:8080/publish
 ```
@@ -41,21 +43,25 @@ $ curl -XPOST -d '{"foo":"bar","bar":"baz","baz":"foo","channel":"chan1"}' -H 'A
 - URL: `/publish`
 - Method: POST
 - Headers:
-    - **Authorization** _(optional)_: f a token is required, set it here in the form:
+  - **Authorization** _(optional)_: f a token is required, set it here in the form:
+
 ```
 Authorization: Bearer <value>
 ```
+
 - Request body: JSON content with at least a "**channel**" key
-_(the channel where the message will be published)_
+  _(the channel where the message will be published)_
 
 ### Reader _(websockets)_
 
 - URL: `/subscribe` _(this opens the websocket)_
 - Method: GET
 - Headers:
-    - **Authorization** _(optional)_: f a token is required, set it here in the form:
+  - **Authorization** _(optional)_: f a token is required, set it here in the form:
+
 ```
 Authorization: Bearer <value>
 ```
+
 - Query _(GET parameters)_:
   - **channels** _(required)_: comma separated list of channels to subscribe to.
