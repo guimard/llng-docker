@@ -110,6 +110,11 @@
 - Add Crowdsec statistics patch
 - Update DBD::Patroni
 
+## v2.21.6-8 _(2026-11-08)_
+
+- Fix OIDC redirects
+- Rebuild (imagemagick-7-common updated to 8:7.1.1.43+dfsg1-1+deb13u14, libdatetime-timezone-perl updated to 1:2.65-1+2026f, libimage-magick-perl updated to 8:7.1.1.43+dfsg1-1+deb13u14, libimage-magick-q16-perl updated to 8:7.1.1.43+dfsg1-1+deb13u14, libmagickcore-7.q16-10 updated to 8:7.1.1.43+dfsg1-1+deb13u14)
+
 ## v2.21.6-7 _(2026-11-02)_
 
 - Rebuild (imagemagick-7-common updated to 8:7.1.1.43+dfsg1-1+deb13u13, libdatetime-timezone-perl updated to 1:2.65-1+2026e, libimage-magick-perl updated to 8:7.1.1.43+dfsg1-1+deb13u13, libimage-magick-q16-perl updated to 8:7.1.1.43+dfsg1-1+deb13u13, libmagickcore-7.q16-10 updated to 8:7.1.1.43+dfsg1-1+deb13u13, tzdata updated to 2026f-0+deb13u1)
