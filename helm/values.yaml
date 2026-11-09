@@ -95,10 +95,28 @@ portal:
     args:
       - infinity
 
-  # -- Configuration for Readiness Probes
+  # -- Configuration for Readiness Probes. /languages is a lightweight
+  # unauthenticated portal route served by the application server (uWSGI/
+  # FastCGI): it fails if the backend is down, without creating any SAML/OIDC
+  # context
   readinessProbe:
-  # -- Configuration for Liveness Probes
+    httpGet:
+      path: /languages
+      port: auth
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  # -- Configuration for Liveness Probes (restarts the pod if the
+  # application server stays unreachable)
   livenessProbe:
+    httpGet:
+      path: /languages
+      port: auth
+    initialDelaySeconds: 60
+    periodSeconds: 20
+    timeoutSeconds: 5
+    failureThreshold: 6
 
   # -- Servername override
 

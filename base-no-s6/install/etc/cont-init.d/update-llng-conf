@@ -114,7 +114,7 @@ if test "$DBI_CHAIN" != ""; then
    ' $INI
 
    # 5 - Check if there is already a configuration stored in SQL database
-   CONF=`perl -MDBI -MDBD::Pg -e '$dbh=DBI->connect("'"$DBI_CHAIN"'","'"$DBI_USER"'","'"$DBI_PASSWORD"'",{ RaiseError => 1});$r=$dbh->selectall_arrayref("SELECT * FROM '"$DBI_TABLE"'");print scalar @$r'`
+   CONF=`perl -MDBI -MDBD::Pg -e '$dbh=DBI->connect("'"$DBI_CHAIN"'","'"$DBI_USER"'","'"$DBI_PASSWORD"'",{ RaiseError => 1});($n)=$dbh->selectrow_array("SELECT COUNT(*) FROM '"$DBI_TABLE"'");print $n'`
    # 6 - If no configuration in current server, let's convert current "File" configuration into database
    if test "$CONF" = "0"; then
      /usr/share/lemonldap-ng/bin/convertConfig --new=$INI --current=/etc/lemonldap-ng/lemonldap-ng-file.ini

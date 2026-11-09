@@ -48,6 +48,10 @@ There are also date-based tags.
 - `LOGLEVEL` = `info` _(possible values: debug, info, notice, warn, error)_
 - `LOGGER` = `syslog` _(possible values: stderr, syslog, loki)_
 - `USERLOGGER` = `syslog` _(possible values: stderr, syslog, loki)_
+- `S6_CMD_WAIT_FOR_SERVICES_MAXTIME` = `0` _(S6 images only: maximum time in
+  milliseconds for init scripts and services startup, `0` means no limit)_
+- `S6_BEHAVIOUR_IF_STAGE2_FAILS` = `2` _(S6 images only: stop the container if
+  an init script or a service fails to start)_
 - `AUDITLOGGER` =
 - `NGINX_LOG_JSON` = _(if a value is set, then default llng format is changed into JSON)_
 - `LOKIURL` = `http://localhost:3100/loki/api/v1/push`
