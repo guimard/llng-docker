@@ -1,0 +1,19 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Plugins/OIDC/InternalTokenExchange.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/OIDC/InternalTokenExchange.pm
+@@ -59,8 +59,14 @@ sub getUid {
+         return 0;
+     }
+ 
+-    my $id      = $accessTokenSession->data->{user_session_id};
+-    my $session = $self->p->getApacheSession($id);
++    # Access tokens generated from a refresh token can be tied either to the
++    # SSO session (online) or to the refresh token itself (offline)
++    my $session = $self->oidc->_getSessionFromAccessTokenData(
++        $accessTokenSession->data );
++    unless ($session) {
++        $self->logger->debug("Unable to find session for subject_token");
++        return 0;
++    }
+     return $session->data->{ $self->conf->{whatToTrace} };
+ }
+ 

@@ -1,5 +1,9 @@
 # Changes
 
+## v2.23.4-8 _(unreleased)_
+
+- Fix OIDC token exchange when issued from an offline refresh_token
+
 ## v2.23.4-7 _(2026-11-08)_
 
 - Rebuild with plugins 0.7.1 _(various fixes for Matrix and other plugins)_
