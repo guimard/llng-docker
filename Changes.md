@@ -3,6 +3,13 @@
 ## v2.23.4-8 _(unreleased)_
 
 - Fix OIDC token exchange when issued from an offline refresh_token
+- S6: wait for init scripts without time limit
+  (`S6_CMD_WAIT_FOR_SERVICES_MAXTIME=0`) and stop the container if they fail
+  (`S6_BEHAVIOUR_IF_STAGE2_FAILS=2`). Previously, an init longer than 5s
+  started nginx without uWSGI/FastCGI server
+- Speed up startup with a SQL configuration backend: count stored
+  configurations instead of downloading all of them
+- Helm: add default readiness and liveness probes on portal (`/languages`)
 
 ## v2.23.4-7 _(2026-11-08)_
 

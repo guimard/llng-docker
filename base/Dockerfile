@@ -41,7 +41,9 @@ LABEL maintainer="Yadd yadd@debian.org>" \
       name="yadd/lemonldap-ng-base" \
       version="v1.0"
 
-ENV SSODOMAIN=example.com \
+ENV S6_CMD_WAIT_FOR_SERVICES_MAXTIME=0 \
+    S6_BEHAVIOUR_IF_STAGE2_FAILS=2 \
+    SSODOMAIN=example.com \
     STRICT_SERVER_NAME= \
     CROWDSEC_SERVER= \
     CROWDSEC_POLICY=reject \
