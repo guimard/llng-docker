@@ -6,7 +6,11 @@ POSTGRES_DB=${POSTGRES_DB:-postgres}
 
 DATABASE=${PG_DATABASE:-lemonldapng}
 USER=${PG_USER:-lemonldap}
-PASSWORD=${PG_PASSWORD:-lemonldap}
+PASSWORD=${PG_PASSWORD:-}
+if [ -z "$PASSWORD" ]; then
+	echo "ERROR: PG_PASSWORD must be set" >&2
+	exit 1
+fi
 TABLE=${PG_TABLE:-lmConfig}
 PTABLE=${PG_PERSISTENT_SESSIONS_TABLE:-psessions}
 STABLE=${PG_SESSIONS_TABLE:-sessions}

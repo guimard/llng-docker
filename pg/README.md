@@ -13,7 +13,7 @@ sessions.
 
 - PG_DATABASE: lemonldapng
 - PG_USER: lemonldap
-- PG_PASSWORD: lemonldap
+- PG_PASSWORD: _(required, no default)_
 - PG_TABLE: lmConfig
 - PG_PERSISTENT_SESSIONS_TABLE: psessions
 - PG_SESSIONS_TABLE: sessions
