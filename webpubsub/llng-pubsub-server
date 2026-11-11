@@ -3,6 +3,7 @@
 use strict;
 use Getopt::Long;
 use IO::Select;
+use IO::Socket::IP;
 use JSON;
 use POSIX qw(strftime setsid setuid setgid);
 use Protocol::WebSocket::Handshake::Server;
@@ -24,6 +25,9 @@ my (
 
 # HTTP header separator
 use constant HS => qr/(?:\r?\n){2}/;
+
+# Max size of data waiting to be sent to a subscriber that doesn't read them
+use constant MAX_OUTPUT_BUFFER => 1048576;
 
 my @CMDLINE = @ARGV;
 
@@ -118,12 +122,24 @@ unless ($token) {
 
 # 2. Create server
 
+# Don't die when writing to a client that went away
+$SIG{PIPE} = 'IGNORE';
+
 my @servers;
 my $selector = IO::Select->new;
+my $sslContext;
 $addr = [0] unless @$addr;
 
+if ($cert) {
+    require IO::Socket::SSL;
+    $sslContext = IO::Socket::SSL::SSL_Context->new(
+        SSL_server    => 1,
+        SSL_cert_file => $cert,
+        SSL_key_file  => $key,
+    ) or die "Unable to load TLS certificate: " . IO::Socket::SSL::errstr();
+}
+
 foreach my $a (@$addr) {
-    my $server;
     my $p;
 
     # IPv6 addresses with port
@@ -140,36 +156,28 @@ foreach my $a (@$addr) {
         $p = $port || ( $ENV{PUBSUB_PORT} || ( $cert ? 8443 : 8080 ) );
     }
 
-    my %args = (
+    # Listening sockets are plain TCP sockets: the TLS handshake is done
+    # later without blocking (see tlsHandshake())
+    my $server = IO::Socket::IP->new(
         ( $a ? ( LocalAddr => $a ) : () ),
         LocalPort => $p,
         Listen    => $maxWaitingConn,
         ReuseAddr => 1,
         ReusePort => 1,
+        Proto     => 'tcp',
     );
-    if ($cert) {
-        require IO::Socket::SSL;
-        $server = IO::Socket::SSL->new(
-            %args,
-            SSL_cert_file => $cert,
-            SSL_key_file  => $key,
-            SSL_server    => 1,
-        );
-    }
-    else {
-        require IO::Socket::IP;
-        $server = IO::Socket::IP->new( %args, Proto => 'tcp', );
-    }
 
     die "Cannot create socket ("
       . ( $a ? "address: $a, " : '' )
       . "port: $p): $!"
       unless $server;
 
+    $server->blocking(0);
     debug 'Listening on ' . ( $a ? "$a:" : 'port ' ) . $p;
     $selector->add($server);
     push @servers, $server;
 }
+my %servers = map { fileno($_) => 1 } @servers;
 
 if ($group) {
     my $grp = getgrnam($group) or die "Can't change gid to $group";
@@ -185,161 +193,269 @@ my $json = JSON->new->utf8;
 
 # 3. Manage requests
 
-my %clients;
+# All sockets are non-blocking, so that a slow or idle client can never
+# freeze the server. Each connection has a state:
+#  - tls:     TLS handshake in progress
+#  - request: waiting for a complete HTTP request
+#  - ws:      subscriber (websocket opened)
+#  - closing: response queued, the connection is closed once it is sent
+my %conns;
 
 while (1) {
-    for my $sock ( $selector->can_read(0.1) ) {
-        my ($server) = grep { $sock eq $_ } @servers;
-        if ($server) {
-            my $client = $server->accept or next;
-            $client->autoflush(1);
-            $selector->add($client);
+    my $writers = IO::Select->new(
+        map  { $_->{sock} }
+        grep { length( $_->{out} ) or $_->{tlsWantWrite} } values %conns
+    );
+    my ( $readable, $writable ) =
+      IO::Select->select( $selector, $writers, undef, 0.1 );
+
+    for my $sock ( @{ $writable || [] } ) {
+        my $c = $conns{ fileno($sock) // -1 } or next;
+        $c->{state} eq 'tls' ? tlsHandshake($c) : flushClient($c);
+    }
+
+    for my $sock ( @{ $readable || [] } ) {
+        my $fileno = fileno($sock) // next;
+        if ( $servers{$fileno} ) {
+            acceptClients($sock);
+            next;
         }
-        else {
-            my $fileno = fileno($sock);
-            my $buf    = '';
-            my $n      = sysread( $sock, $buf, 4096 );
-            if ( !defined $n || $n == 0 ) {
-                cleanupClient($sock);
+        my $c = $conns{$fileno} or next;
+        $c->{state} eq 'tls' ? tlsHandshake($c) : readClient($c);
+    }
+
+    # Drop clients that didn't complete their request in time
+    my $now = time;
+    for my $c ( values %conns ) {
+        next if $c->{state} eq 'ws' or $now - $c->{start} <= $maxRequestTime;
+        if ( $c->{state} eq 'request' and length( $c->{in} ) ) {
+            sendHttp( $c, 408, 'Request Timeout', 'Request timeout' );
+        }
+        cleanupClient($c);
+    }
+}
+
+sub acceptClients {
+    my ($server) = @_;
+    while ( my $sock = $server->accept ) {
+        my $c = {
+            sock  => $sock,
+            fd    => fileno($sock),
+            ip    => getIp($sock),
+            in    => '',
+            out   => '',
+            start => time,
+            state => 'request',
+        };
+        if ($sslContext) {
+            unless (
+                IO::Socket::SSL->start_SSL(
+                    $sock,
+                    SSL_server         => 1,
+                    SSL_reuse_ctx      => $sslContext,
+                    SSL_startHandshake => 0,
+                )
+              )
+            {
+                warning 'TLS error: ' . IO::Socket::SSL::errstr();
+                close $sock;
                 next;
             }
+            $c->{state} = 'tls';
+        }
+        $sock->blocking(0);
+        $conns{ $c->{fd} } = $c;
+        $selector->add($sock);
+    }
+}
 
-            # Known clients are subscribers, we can discard
-            if ( exists $clients{$fileno} ) {
-                my $frame = $clients{$fileno}->{frame};
-                $frame->append($buf);
-                while ( my $msg = $frame->next ) {
+sub tlsHandshake {
+    my ($c) = @_;
+    if ( $c->{sock}->accept_SSL ) {
+        $c->{state} = 'request';
+        delete $c->{tlsWantWrite};
 
-                    # read-only client; we discard messages
-                }
-            }
+        # The request may have been sent with the end of the handshake
+        readClient($c);
+    }
+    elsif ( $!{EWOULDBLOCK} or $!{EAGAIN} ) {
+        $c->{tlsWantWrite} =
+          $IO::Socket::SSL::SSL_ERROR == IO::Socket::SSL::SSL_WANT_WRITE();
+    }
+    else {
+        debug 'TLS handshake failed: ' . IO::Socket::SSL::errstr();
+        cleanupClient($c);
+    }
+}
 
-            else {
-                my $req   = $buf;
-                my $start = time;
-                while ( $req !~ HS ) {
-                    last if length($req) > $maxRequestSize;
-                    last if ( time - $start ) > $maxRequestTime;
-                    my $tmp;
-                    my $r = sysread( $sock, $tmp, 4096 );
-                    $req .= $tmp if $r;
-                }
+sub readClient {
+    my ($c) = @_;
+    my $eof;
 
-                # Get headers
-                my ( $headers, $body ) = split( HS, $req, 2 );
-                my @lines   = split /\r?\n/, $headers;
-                my $request = shift @lines;
-                my %hdr;
-                for (@lines) {
-                    if (/^([^:]+):\s*(.+)$/) {
-                        $hdr{ lc $1 } = $2;
-                    }
-                }
+    # Read all available data (including data buffered by the TLS layer)
+    while (1) {
+        my $n = sysread( $c->{sock}, my $buf, 16384 );
+        if ($n) {
+            $c->{in} .= $buf;
+            last if length( $c->{in} ) > $maxRequestSize;
+            next;
+        }
+        last if !defined($n) and ( $!{EAGAIN} or $!{EWOULDBLOCK} );
+        $eof = 1;
+        last;
+    }
 
-                # Auth check
-                if ( $token and $hdr{authorization} ne "Bearer $token" ) {
-                    sendHttp( $sock, 401, "Unauthorized", "Bad token",
-                        $request );
-                    next;
-                }
+    if ( $c->{state} eq 'request' ) {
+        processRequest($c);
+    }
+    else {
+        # Subscribers are read-only clients: their messages are discarded
+        $c->{in} = '';
+    }
 
-                # WebSocket GET
-                if ( $request =~ m{^GET\s+(/subscribe\S*)\s+HTTP/1.[01]$} ) {
-                    my %params = eval { URI->new($1)->query_form };
-                    warning "URI parse error: $@" if $@;
-                    my @channels = split /,/, ( $params{channels} // '' );
+    if ( $eof and !$c->{closed} ) {
 
-                    unless (@channels) {
-                        warning "Missing channel(s)";
-                        sendHttp( $sock, 400, "Bad Request",
-                            "Missing channel(s)", $request );
-                    }
-
-                    my $hs = Protocol::WebSocket::Handshake::Server->new;
-                    $hs->parse($req);
-
-                    if ( $hs->is_done ) {
-                        my $ip  = getIp($sock);
-                        my $res = $hs->to_string;
-                        my $len = length($res);
-                        print $sock $res;
-                        $clients{$fileno} = {
-                            socket   => $sock,
-                            frame    => Protocol::WebSocket::Frame->new,
-                            channels => { map { $_ => 1 } @channels },
-                        };
-                        $request =~ s/[\r\n]//g;
-                        printWebLog( qq("$request" 200 $len), $ip );
-                    }
-                    else {
-                        warning "ERROR: " . $hs->error;
-                        sendHttp( $sock, 400, "Bad Request",
-                            "WebSocket handshake failed", $request );
-                    }
-                }
-
-                # Publish API
-                elsif ( $request =~ m{^POST\s+/publish\s+HTTP/1.[01]$} ) {
-                    my $len       = $hdr{'content-length'} // length($body);
-                    my $remaining = $len - length($body);
-                    while ( $remaining > 0 ) {
-                        last if length($req) > $maxRequestSize;
-                        last if ( time - $start ) > $maxRequestTime;
-                        my $tmp;
-                        my $r = sysread( $sock, $tmp, $remaining );
-                        last unless $r;
-                        $req  .= $tmp;
-                        $body .= $tmp;
-                        $remaining -= $r;
-                    }
-
-                    if ($remaining) {
-                        sendHttp( $sock, 408, 'Request timeout', $request );
-                        next;
-                    }
-
-                    my $data = eval { $json->decode($body) };
-                    if ( $@ || !defined $data ) {
-                        sendHttp( $sock, 400, "Bad Request",
-                            "Missing or invalid JSON", $request );
-                        next;
-                    }
-
-                    debug "Message to publish: $body";
-
-                    my $channel = $data->{channel};
-                    unless ($channel) {
-                        sendHttp( $sock, 400, "Bad Request",
-                            "Missing channel", $request );
-                        next;
-                    }
-
-                    my $msg   = $body;
-                    my $frame = Protocol::WebSocket::Frame->new;
-                    $frame->append($msg);
-                    my $bytes = $frame->to_bytes;
-
-                    for my $c ( values %clients ) {
-                        next unless $c->{channels}->{$channel};
-                        my $ws_sock = $c->{socket};
-                        print $ws_sock $bytes;
-                    }
-
-                    sendHttp( $sock, 200, "OK", "Message sent", $request );
-                }
-
-                else {
-                    sendHttp( $sock, 404, "Not Found", "Unknown endpoint",
-                        $request );
-                }
-            }
+        # Let a queued response be sent before closing the connection
+        if ( $c->{state} eq 'closing' and length( $c->{out} ) ) {
+            $selector->remove( $c->{fd} );
+        }
+        else {
+            cleanupClient($c);
         }
     }
 }
 
+sub processRequest {
+    my ($c) = @_;
+
+    # Wait for complete headers
+    unless ( $c->{in} =~ HS ) {
+        sendHttp( $c, 413, 'Request Entity Too Large', 'Request too large' )
+          if length( $c->{in} ) > $maxRequestSize;
+        return;
+    }
+
+    # Get headers
+    my ( $headers, $body ) = split( HS, $c->{in}, 2 );
+    my @lines   = split /\r?\n/, $headers;
+    my $request = shift @lines;
+    $c->{request} = $request;
+    my %hdr;
+    for (@lines) {
+        if (/^([^:]+):\s*(.+)$/) {
+            $hdr{ lc $1 } = $2;
+        }
+    }
+
+    # Auth check
+    if ( $token and $hdr{authorization} ne "Bearer $token" ) {
+        return sendHttp( $c, 401, "Unauthorized", "Bad token" );
+    }
+
+    # WebSocket GET
+    if ( $request =~ m{^GET\s+(/subscribe\S*)\s+HTTP/1.[01]$} ) {
+        my %params = eval { URI->new($1)->query_form };
+        warning "URI parse error: $@" if $@;
+        my @channels = split /,/, ( $params{channels} // '' );
+
+        unless (@channels) {
+            warning "Missing channel(s)";
+            return sendHttp( $c, 400, "Bad Request", "Missing channel(s)" );
+        }
+
+        my $hs = Protocol::WebSocket::Handshake::Server->new;
+        $hs->parse( $c->{in} );
+
+        if ( $hs->is_done ) {
+            my $res = $hs->to_string;
+            $c->{state}    = 'ws';
+            $c->{in}       = '';
+            $c->{channels} = { map { $_ => 1 } @channels };
+            $c->{out} .= $res;
+            printWebLog( qq("$request" 200 ) . length($res), $c->{ip} );
+            flushClient($c);
+        }
+        else {
+            warning "ERROR: " . $hs->error;
+            sendHttp( $c, 400, "Bad Request", "WebSocket handshake failed" );
+        }
+    }
+
+    # Publish API
+    elsif ( $request =~ m{^POST\s+/publish\s+HTTP/1.[01]$} ) {
+        my $len = $hdr{'content-length'} // length($body);
+        unless ( $len =~ /^\d+$/ ) {
+            return sendHttp( $c, 400, "Bad Request", "Bad Content-Length" );
+        }
+        if ( $len > $maxRequestSize ) {
+            return sendHttp(
+                $c, 413,
+                'Request Entity Too Large',
+                'Request too large'
+            );
+        }
+
+        # Wait for the complete body
+        return if length($body) < $len;
+        $body = substr( $body, 0, $len );
+
+        my $data = eval { $json->decode($body) };
+        if ( $@ || !defined $data ) {
+            return sendHttp( $c, 400, "Bad Request",
+                "Missing or invalid JSON" );
+        }
+
+        debug "Message to publish: $body";
+
+        my $channel = $data->{channel};
+        unless ($channel) {
+            return sendHttp( $c, 400, "Bad Request", "Missing channel" );
+        }
+
+        my $frame = Protocol::WebSocket::Frame->new;
+        $frame->append($body);
+        my $bytes = $frame->to_bytes;
+
+        for my $s ( values %conns ) {
+            next unless $s->{state} eq 'ws' and $s->{channels}->{$channel};
+
+            # Don't keep messages for a subscriber that doesn't read them
+            if ( length( $s->{out} ) + length($bytes) > MAX_OUTPUT_BUFFER ) {
+                warning "Subscriber $s->{ip} is too slow, disconnecting it";
+                cleanupClient($s);
+                next;
+            }
+            $s->{out} .= $bytes;
+            flushClient($s);
+        }
+
+        sendHttp( $c, 200, "OK", "Message sent" );
+    }
+
+    else {
+        sendHttp( $c, 404, "Not Found", "Unknown endpoint" );
+    }
+}
+
+# Write as much pending data as possible without blocking
+sub flushClient {
+    my ($c) = @_;
+    return if $c->{closed};
+    while ( length( $c->{out} ) ) {
+        my $n = syswrite( $c->{sock}, $c->{out}, 16384 );
+        if ($n) {
+            substr( $c->{out}, 0, $n, '' );
+            next;
+        }
+        return if !defined($n) and ( $!{EAGAIN} or $!{EWOULDBLOCK} );
+        return cleanupClient($c);
+    }
+    cleanupClient($c) if $c->{state} eq 'closing';
+}
+
+# Queue an HTTP response, the connection is closed once it is sent
 sub sendHttp {
-    my ( $sock, $code, $status, $body, $request ) = @_;
-    my $ip  = getIp($sock);
+    my ( $c, $code, $status, $body ) = @_;
     my $len = length($body);
     my $resp =
         "HTTP/1.1 $code $status\r\n"
@@ -347,24 +463,28 @@ sub sendHttp {
       . "Content-Length: $len\r\n"
       . "Connection: close\r\n\r\n"
       . $body;
-    print $sock $resp;
-    cleanupClient($sock);
+    $c->{state} = 'closing';
+    $c->{in}    = '';
+    $c->{out} .= $resp;
+    my $request = $c->{request} // '-';
     $request =~ s/[\r\n]//g;
-    $len = length($resp);
-    printWebLog( qq("$request" $code $len), $ip );
+    printWebLog( qq("$request" $code ) . length($resp), $c->{ip} );
+    flushClient($c);
+    return;
 }
 
 sub cleanupClient {
-    my ($sock) = @_;
-    $selector->remove($sock);
-    my $fileno = fileno($sock);
-    delete $clients{$fileno};
-    close $sock;
+    my ($c) = @_;
+    return if $c->{closed}++;
+    $selector->remove( $c->{fd} );
+    delete $conns{ $c->{fd} };
+    close $c->{sock};
+    return;
 }
 
 sub getIp {
     my ($sock)   = @_;
-    my $peer     = getpeername($sock);
+    my $peer     = getpeername($sock) or return '-';
     my ($family) = unpack( 'S', $peer );
     if ( $family == AF_INET ) {
         my ( $port, $addr ) = unpack_sockaddr_in($peer);
@@ -466,6 +586,10 @@ Note that "channel" is required.
 
 B<llng-pubsub-server> is a web-based pub/sub server designed for L<LemonLDAP::NG|https://lemonldap-ng.org>.
 
+All connections are handled in a single process with non-blocking I/O: a slow
+or idle client can't block the server. A subscriber that doesn't read its
+messages is disconnected when more than 1 MiB of data is waiting for it.
+
 =head2 Options
 
 All options except B<--help> can have default value overriden by an
@@ -519,7 +643,8 @@ Environment variable: B<PUBSUB_MAX_REQUEST_SIZE>
 
 =item * B<--max-request-time E<lt>valueE<gt>> I<(default: 5)>
 
-Maximum allowed delay for a request I<(in seconds)>.
+Maximum allowed delay for a client to send its request, including the TLS
+handshake I<(in seconds)>. Slower clients are disconnected.
 
 Environment variable: B<PUBSUB_MAX_REQUEST_TIME>
 
