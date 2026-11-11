@@ -10,6 +10,9 @@
 - Speed up startup with a SQL configuration backend: count stored
   configurations instead of downloading all of them
 - Helm: add default readiness and liveness probes on portal (`/languages`)
+- **Breaking change**: `pg` and `base` images no longer default `PG_PASSWORD`
+  to `lemonldap`. Set `PG_PASSWORD` explicitly (or `DBI_PASSWORD`); the images
+  now refuse to start when a PostgreSQL/DBI backend is configured without it.
 
 ## v2.23.4-7 _(2026-11-08)_
 

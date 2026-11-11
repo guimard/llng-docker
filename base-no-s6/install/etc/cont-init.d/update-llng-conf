@@ -103,6 +103,10 @@ if test "$DBI_CHAIN" != ""; then
    # 3 - Build DBI variables if not given
    DBI_USER=${DBI_USER:-$PG_USER}
    DBI_PASSWORD=${DBI_PASSWORD:-$PG_PASSWORD}
+   if [ -z "$DBI_PASSWORD" ]; then
+      echo "ERROR: DBI_PASSWORD or PG_PASSWORD must be set when using a PostgreSQL storage backend" >&2
+      exit 1
+   fi
    DBI_TABLE=${DBI_TABLE:-$PG_TABLE}
    export DBI_USER
    export DBI_PASSWORD

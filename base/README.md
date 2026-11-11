@@ -65,7 +65,7 @@ There are also date-based tags.
   - `PG_SERVER` =
   - `PG_DATABASE` = `lemonldapng`
   - `PG_USER` = `lemonldap`
-  - `PG_PASSWORD` = `lemonldap`
+  - `PG_PASSWORD` = _(required, no default)_
   - `PG_TABLE` = `lmConfig`
   - `PG_OPTIONS` =
   - Advanced _(see DBI(3pm) for more)_

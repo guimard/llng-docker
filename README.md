@@ -104,6 +104,7 @@ services:
     image: yadd/lemonldap-ng-pg-database
     environment:
       - POSTGRES_PASSWORD=zz
+      - PG_PASSWORD=zz
     healthcheck:
       test: ["CMD-SHELL", "pg_isready"]
       interval: 10s
@@ -120,6 +121,7 @@ services:
         condition: service_healthy
     environment:
       - PG_SERVER=db
+      - PG_PASSWORD=zz
       - REDIS_SERVER=redis:6379
       - LOGGER=stderr
       - USERLOGGER=stderr
@@ -137,6 +139,7 @@ services:
         condition: service_started
     environment:
       - PG_SERVER=db
+      - PG_PASSWORD=zz
       - REDIS_SERVER=redis:6379
       - LOGGER=stderr
       - USERLOGGER=stderr
@@ -163,6 +166,7 @@ services:
     image: yadd/lemonldap-ng-pg-database
     environment:
       - POSTGRES_PASSWORD=zz
+      - PG_PASSWORD=zz
     healthcheck:
       test: ["CMD-SHELL", "pg_isready"]
       interval: 10s
