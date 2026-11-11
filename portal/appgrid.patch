@@ -75,6 +75,21 @@ index 000000000..bb2f280a8
 +    my $data =
 +      Lemonldap::NG::Handler::PSGI::OAuth2->retrieveSession( $req, $id );
 +    return undef unless $data;
++
++    # Only the access tokens explicitly allowed to use the REST API may do so.
++    # restOauth2AllowedRPs lists the client IDs; without it, the token must
++    # carry the dedicated "applications" scope (app-scope.patch).
++    my $allowed = $self->conf->{restOauth2AllowedRPs};
++    if ( defined $allowed and length $allowed ) {
++        my %allowed =
++          map { $_ => 1 } grep { length } split /[;,\s]+/, $allowed;
++        return undef unless $allowed{ $req->data->{_clientConfKey} // '' };
++    }
++    else {
++        my $scope = $req->data->{_scope} // '';
++        return undef unless $scope =~ /\bapplications\b/;
++    }
++
 +    $req->userData($data);
 +    return 1;
 +}
