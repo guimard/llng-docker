@@ -1,6 +1,6 @@
 # Changes
 
-## v2.23.4-8 _(unreleased)_
+## v2.23.4-8 _(2026-11-11)_
 
 - Fix OIDC token exchange when issued from an offline refresh_token
 - S6: wait for init scripts without time limit
