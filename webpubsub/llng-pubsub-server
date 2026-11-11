@@ -15,11 +15,11 @@ use URI;
 # 1. Parse options
 
 my (
-    $accessLog,      $addr,           $cert,          $daemon,
-    $_debug,         $group,          $help,          $key,
-    $maxRequestSize, $maxRequestTime, $maxRestarts,   $quiet,
-    $pidFile,        $port,           $restartWindow, $token,
-    $user,
+    $accessLog,      $addr,           $cert,        $daemon,
+    $_debug,         $group,          $help,        $key,
+    $maxRequestSize, $maxRequestTime, $maxRestarts, $maxWaitingConn,
+    $quiet,          $pidFile,        $port,        $restartWindow,
+    $token,          $user,
 );
 
 # HTTP header separator
@@ -38,7 +38,8 @@ GetOptions(
     'key=s'              => \$key,
     'max-request-size=s' => \$maxRequestSize,
     'max-request-time=s' => \$maxRequestTime,
-    'max-restarts'       => \$maxRestarts,
+    'max-restarts=s'     => \$maxRestarts,
+    'max-waiting-conn=s' => \$maxWaitingConn,
     'quiet|q'            => \$quiet,
     'pid-file=s'         => \$pidFile,
     'port|p=s'           => \$port,
@@ -57,6 +58,7 @@ $key            ||= $ENV{PUBSUB_KEY};
 $maxRequestSize ||= $ENV{PUBSUB_MAX_REQUEST_SIZE} || 8192;
 $maxRequestTime ||= $ENV{PUBSUB_MAX_REQUEST_TIME} || 5;
 $maxRestarts    ||= $ENV{PUBSUB_MAX_RESTARTS}     || 5;
+$maxWaitingConn ||= $ENV{PUBSUB_MAX_WAITING_CONN} || 10;
 $pidFile        ||= $ENV{PUBSUB_PID_FILE};
 $quiet          ||= $ENV{PUBSUB_QUIET};
 $restartWindow  ||= $ENV{PUBSUB_RESTART_WINDOW} || 60;
@@ -141,7 +143,7 @@ foreach my $a (@$addr) {
     my %args = (
         ( $a ? ( LocalAddr => $a ) : () ),
         LocalPort => $p,
-        Listen    => 10,
+        Listen    => $maxWaitingConn,
         ReuseAddr => 1,
         ReusePort => 1,
     );
@@ -164,6 +166,7 @@ foreach my $a (@$addr) {
       . "port: $p): $!"
       unless $server;
 
+    debug 'Listening on ' . ( $a ? "$a:" : 'port ' ) . $p;
     $selector->add($server);
     push @servers, $server;
 }
@@ -401,7 +404,6 @@ sub daemonize {
     else {
         debug "Master pid is $$";
     }
-    system "echo $0 > /tmp/cmdline";
     $0 = join ' ', $0, @CMDLINE;
 
     my $cpid;
@@ -556,6 +558,12 @@ Environment variable: B<PUBSUB_GROUP>
 Max failure accepted in the B<--restart-window> delay.
 
 Environment variable: B<PUBSUB_MAX_RESTARTS>
+
+=item * B<--max-waiting-conn> E<lt>valueE<gt>> I<(default: 10)>
+
+Max client waiting for a response.
+
+Environment variable: B<PUBSUB_MAX_WAITING_CONN>
 
 =item * B<restart-window> E<lt>valueE<gt>> I<(default: 60)>
 
