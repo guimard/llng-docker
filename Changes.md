@@ -1,12 +1,24 @@
 # LTS 2.21.x Changes
 
-## v2.21.6-9 _(2026-11-10)_
+## v2.21.6-9 _(2026-11-11)_
 
 - S6: wait for init scripts without time limit
   (`S6_CMD_WAIT_FOR_SERVICES_MAXTIME=0`) and stop the container if they fail
   (`S6_BEHAVIOUR_IF_STAGE2_FAILS=2`). Previously, an init longer than 5s
   started nginx without uWSGI/FastCGI server
 - Speed up startup with a SQL configuration backend: count stored
+  configurations instead of downloading all of them
+- Helm: add default readiness and liveness probes on portal (`/languages`)
+- Remove the `more-logs` patch, which logged the OIDC client secret in clear
+  text on every failed client authentication
+- `manager-lite`: fix `AUTHBASIC` parsing (empty credentials were accepted and
+  real credentials were refused) and the `TLS_CERT_FILE` variable in `start.sh`
+- `appgrid`: require the `applications` scope or an explicit
+  `restOauth2AllowedRPs` allow-list for OAuth2 REST routes
+- `webpubsub` client: verify TLS certificates on subscribe (and add
+  `liblwpx-paranoidagent-perl` so the publish path also verifies them)
+- Update the embedded Matrix, Twake and MailAutodiscover plugins (token
+  allowlist, app-account deletion, XML escaping, empty tokens)
 
 ## v2.21.6-8 _(2026-11-08)_
 
