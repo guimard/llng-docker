@@ -5,6 +5,7 @@ services:
     image: yadd/lemonldap-ng-pg-database
     environment:
       - POSTGRES_PASSWORD=zz
+      - PG_PASSWORD=zz
     healthcheck:
       test: ["CMD-SHELL", "pg_isready"]
       interval: 10s
@@ -18,6 +19,7 @@ services:
       dockerfile: ./Dockerfile
     environment:
       - PG_SERVER=db
+      - PG_PASSWORD=zz
       - REDIS_SERVER=qwerty
       - FORCE_KEY_REGENERATION=yes
       - OVERRIDE_domain=debian.org

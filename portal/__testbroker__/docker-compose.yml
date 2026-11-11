@@ -6,6 +6,7 @@ services:
     image: yadd/lemonldap-ng-pg-database
     environment:
       - POSTGRES_PASSWORD=zz
+      - PG_PASSWORD=zz
     healthcheck:
       test: ["CMD-SHELL", "pg_isready"]
       interval: 10s
@@ -25,6 +26,7 @@ services:
     environment:
       - LOGLEVEL=debug
       - PG_SERVER=db
+      - PG_PASSWORD=zz
       - LOGGER=stderr
       - USERLOGGER=stderr
       - PORTAL=http://auth.example.com:19876/
@@ -45,6 +47,7 @@ services:
     environment:
       - LOGLEVEL=debug
       - PG_SERVER=db
+      - PG_PASSWORD=zz
       - LOGGER=stderr
       - USERLOGGER=stderr
       - PORTAL=http://auth.example.com:19876/
