@@ -18,6 +18,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+      # Fail fast if the release bump forgot the Helm chart (helm/Chart.yaml,
+      # helm/values.yaml, helm/README.md must match VERSION-DOCKERREVISION).
+      - name: Check Helm chart versions
+        run: ./.github/helm-version.sh --check
       - name: build_and_test
         run: ./build-all
         env:
@@ -378,12 +382,10 @@ jobs:
         # Image tags come from docker-common as VERSION-DOCKERREVISION, NOT from
         # the git tag name (a tag can be re-cut without bumping the revision).
         # Derive the chart from the SAME env so it always references images that
-        # actually exist:
-        #   version      = VERSION-DOCKERREVISION  -> appVersion + image tags
-        #   chart_version = VERSION                -> clean SemVer, no --devel
-        run: |
-          echo "version=${VERSION}-${DOCKERREVISION}" >> "$GITHUB_OUTPUT"
-          echo "chart_version=${VERSION}" >> "$GITHUB_OUTPUT"
+        # actually exist (see .github/helm-version.sh):
+        #   version       = X.Y.Z-N            -> appVersion + image tags
+        #   chart_version = X.Y.(Z*1000 + N)   -> clean, increasing SemVer, no --devel
+        run: ./.github/helm-version.sh >> "$GITHUB_OUTPUT"
 
       - name: Align chart image tags with the release
         env:
