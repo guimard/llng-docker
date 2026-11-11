@@ -1,6 +1,6 @@
 --- /dev/null
 +++ b/usr/share/perl5/Lemonldap/NG/Common/Matrix.pm
-@@ -0,0 +1,279 @@
+@@ -0,0 +1,341 @@
 +package Lemonldap::NG::Common::Matrix;
 +
 +use strict;
@@ -12,11 +12,12 @@
 +use Regexp::Common 'net';
 +use Regexp::Common::URI::RFC2396 '$hostname';
 +
-+# Check IP:port or IP. Captures IP and port
-+my $isIpLiteral = qr/^($RE{net}{IPv6}|$RE{net}{IPv4})(?:(?<!:):(\d+))?$/;
++# Check [IPv6]:port, [IPv6], IPv4:port or IPv4. Captures IP and port.
++# IPv6 literals must be bracketed, as required by the Matrix specification.
++my $isIpLiteral = qr/^(\[$RE{net}{IPv6}\]|$RE{net}{IPv4})(?::(\d+))?$/;
 +
-+# Check hostname:port or hostname. Cpatures hostname and port
-+my $isHostname = qr/^($hostname)(?:(?<!:):(\d+))?$/;
++# Check hostname:port or hostname. Captures hostname and port
++my $isHostname = qr/^($hostname)(?::(\d+))?$/;
 +
 +has ua => (
 +    is      => 'rw',
@@ -38,82 +39,109 @@
 +    }
 +);
 +
++# Parse a Matrix server name. Return (host, port, is_ip_literal) or an empty
++# list. Ports are checked here so that every caller rejects malformed names.
++sub _parseServerName {
++    my ( $self, $name ) = @_;
++
++    my ( $host, $port, $isIp );
++    if ( $name =~ $isIpLiteral ) {
++        ( $host, $port, $isIp ) = ( $1, $2, 1 );
++    }
++    elsif ( $name =~ $isHostname ) {
++        ( $host, $port, $isIp ) = ( $1, $2, 0 );
++    }
++    else {
++        $self->logger->error("Bad hostname $name");
++        return;
++    }
++
++    if ( defined $port and ( $port < 1 or $port > 65535 ) ) {
++        $self->logger->error("Bad port in Matrix server name $name");
++        return;
++    }
++    return ( $host, $port, $isIp );
++}
++
 +# MATRIX SERVER RESOLUTION
 +#
 +# main method: serverResolve
 +
 +sub serverResolve {
-+    my ( $self, $name ) = @_;
++    my ( $self, $name, $ua ) = @_;
++    $ua ||= $self->ua;
++
++    my ( $host, $port, $isIp ) = $self->_parseServerName($name);
++    return unless defined $host;
 +
 +    # From Matrix spec 1.9
 +    #
 +    # If the hostname is an IP literal, then that IP address should be used,
 +    # together with the given port number, or 8448 if no port is given.
-+    return "https://$1:" . ( $2 || '8448' ) . '/'
-+      if $name =~ $isIpLiteral;
-+
-+    unless ( $name =~ $isHostname ) {
-+        $self->logger->error("Bad hostname $name");
-+        return;
-+    }
++    return "https://$host:" . ( defined $port ? $port : '8448' ) . '/'
++      if $isIp;
 +
 +    # If the hostname is not an IP literal, and the server name includes an
 +    # explicit port, resolve the hostname to an IP address using CNAME, AAAA
 +    # or A records
-+    return "https://$1:$2/" if $2;
++    return "https://$host:$port/" if defined $port;
 +
 +    # If the hostname is not an IP literal, a regular HTTPS request is made
 +    # to https://<hostname>/.well-known/matrix/server
-+    my $resp = $self->ua->get("https://$name/.well-known/matrix/server");
++    my $resp = $ua->get("https://$host/.well-known/matrix/server");
 +    if ( $resp->is_success ) {
 +        my $content = eval { JSON::from_json( $resp->decoded_content ) };
 +        unless ($@) {
-+            if (    ref($content)
-+                and ref($content) eq 'HASH'
-+                and my $delegated = $content->{'m.server'} )
-+            {
-+                # If <delegated_hostname> is an IP literal, then that IP
-+                # address should be used together with the <delegated_port>
-+                # or 8448 if no port is provided
-+                return "https://$1:" . ( $2 || '8448' ) . '/'
-+                  if $delegated =~ $isIpLiteral;
++            if ( ref($content) and ref($content) eq 'HASH' ) {
++                my $delegated = $content->{'m.server'};
++                if ( defined $delegated and !ref $delegated ) {
++                    my ( $delegatedHost, $delegatedPort, $delegatedIsIp ) =
++                      $self->_parseServerName($delegated);
++                    return unless defined $delegatedHost;
 +
-+                unless ( $delegated =~ $isHostname ) {
-+                    $self->logger->error("Bad hostname $name");
-+                    return;
++                    # If <delegated_hostname> is an IP literal, then that IP
++                    # address should be used together with the
++                    # <delegated_port> or 8448 if no port is provided
++                    return "https://$delegatedHost:"
++                      . ( defined $delegatedPort ? $delegatedPort : '8448' )
++                      . '/'
++                      if $delegatedIsIp;
++
++                    # If <delegated_hostname> is not an IP literal, and
++                    # <delegated_port> is present, an IP address is discovered
++                    # by looking up CNAME, AAAA or A records for
++                    # <delegated_hostname>
++                    return "https://$delegatedHost:$delegatedPort/"
++                      if defined $delegatedPort;
++
++                    # ALL NEXT CASES ARE EXACTLY THE SAME DNS SEARCH THAN IF
++                    # NO .well-known IS VALID BUT USING ${delegatedHost}
++                    # INSTEAD OF ${host}
++
++                    # If <delegated_hostname> is not an IP literal and no
++                    # <delegated_port> is present, an SRV record is looked up
++                    # for _matrix-fed._tcp.<delegated_hostname>. This may
++                    # result in another hostname (to be resolved using AAAA or
++                    # A records) and port.
++                    #
++                    # [Deprecated] If <delegated_hostname> is not an IP
++                    # literal, no <delegated_port> is present, and a
++                    # _matrix-fed._tcp.<delegated_hostname> SRV record was not
++                    # found, an SRV record is looked up for
++                    # _matrix._tcp.<delegated_hostname>. This may result in
++                    # another hostname # (to be resolved using AAAA or A
++                    # records) and port.
++                    #
++                    # If no SRV record is found, an IP address is resolved
++                    # using CNAME, # AAAA or A records. Requests are then made
++                    # to the resolve IP address # and a port of 8448, using a
++                    # Host header of <delegated_hostname>
++                    return $self->_dnsResolve($delegatedHost);
 +                }
-+
-+                # If <delegated_hostname> is not an IP literal, and
-+                # <delegated_port> is present, an IP address is discovered by
-+                # looking up CNAME, AAAA or A records for <delegated_hostname>
-+                return "https://$1:$2/" if $2;
-+
-+                # ALL NEXT CASES ARE EXACTLY THE SAME DNS SEARCH THAN IF NO
-+                # .well-known IS VALID BUT USING ${delegated} INSTEAD OF
-+                # ${name}
-+
-+                # If <delegated_hostname> is not an IP literal and no
-+                # <delegated_port> is present, an SRV record is looked up for
-+                # _matrix-fed._tcp.<delegated_hostname>. This may result in
-+                # another hostname (to be resolved using AAAA or A records) and
-+                # port.
-+                #
-+                # [Deprecated] If <delegated_hostname> is not an IP literal, no
-+                # <delegated_port> is present, and a
-+                # _matrix-fed._tcp.<delegated_hostname> SRV record was not
-+                # found, an SRV record is looked up for
-+                # _matrix._tcp.<delegated_hostname>. This may result in another
-+                # hostname # (to be resolved using AAAA or A records) and port.
-+                #
-+                # If no SRV record is found, an IP address is resolved using
-+                # CNAME, # AAAA or A records. Requests are then made to the
-+                # resolve IP address # and a port of 8448, using a Host header
-+                # of <delegated_hostname>
-+                return $self->_dnsResolve($delegated);
 +            }
 +        }
 +    }
-+    return $self->_dnsResolve($name);
++    return $self->_dnsResolve($host);
 +}
 +
 +sub _dnsResolve {
@@ -150,8 +178,30 @@
 +    my ( $self, $name ) = @_;
 +    my $reply = $self->dnsResolver->query( $name, 'SRV' );
 +    return unless $reply;
-+    return map { 'https://' . $_->target . ':' . $_->port . '/' }
-+      sort { $b->priority <=> $a->priority } $reply->answer;
++
++    my @res;
++    foreach my $rr (
++        sort { $a->priority <=> $b->priority }
++        grep { $_->type eq 'SRV' } $reply->answer
++      )
++    {
++        my $target = $rr->target;
++        my $port   = $rr->port;
++        next unless defined $target and defined $port;
++        next if $target eq '.';    # service not available
++
++        # DNS returns fully qualified names
++        $target =~ s/\.$//;
++
++        # An SRV target has no port and no bracket syntax of its own. Reuse
++        # the server name parser to reject impossible records and to bracket
++        # IPv6 targets.
++        my ($host) = $self->_parseServerName( $target . ':' . $port );
++        next unless defined $host;
++
++        push @res, "https://$host:$port/";
++    }
++    return @res;
 +}
 +
 +# MATRIX TOKEN VALIDATION
@@ -159,10 +209,11 @@
 +# main method: validateMatrixToken
 +
 +sub validateMatrixToken {
-+    my ( $self, $matrixBaseUrl, $accessToken ) = @_;
++    my ( $self, $matrixBaseUrl, $accessToken, $ua ) = @_;
++    $ua ||= $self->ua;
 +    $matrixBaseUrl =~ s#/+$##;
 +    my $resp =
-+      $self->ua->get( "$matrixBaseUrl/_matrix/federation/v1/openid/userinfo?"
++      $ua->get( "$matrixBaseUrl/_matrix/federation/v1/openid/userinfo?"
 +          . build_urlencoded( access_token => $accessToken ) );
 +    if ( $resp->is_success ) {
 +        my $content = eval { JSON::from_json( $resp->decoded_content ) };
@@ -171,7 +222,11 @@
 +            return;
 +        }
 +        if ( ref $content eq 'HASH' and my $sub = $content->{sub} ) {
-+            unless ( $sub =~ /^\@(.*):(.*)$/ ) {
++            # Historical user ID grammar (printable ASCII localpart, no colon),
++            # minus "@" so that a localpart never looks like a mail address
++            unless ( $sub =~
++                /^\@([\x21-\x39\x3B-\x3F\x41-\x7E]+):([A-Za-z0-9.\-:\[\]]+)\z/ )
++            {
 +                $self->logger->error(
 +                    "Bad 'sub' received from $matrixBaseUrl: $sub");
 +                return;
@@ -186,7 +241,7 @@
 +    }
 +    else {
 +        $self->userLogger->error(
-+            "Token $accessToken refused by $matrixBaseUrl: "
++            "Matrix token refused by $matrixBaseUrl: "
 +              . $resp->status_line );
 +        return;
 +    }
@@ -232,9 +287,16 @@
 +Return the base URL corresponding to the given Matrix "Servername", following
 +L<Matrix specifications|https://spec.matrix.org/v1.9/server-server-api/#server-discovery>
 +
++IPv6 literals must be bracketed (C<[2001:db8::1]>), and an explicit port must
++be between 1 and 65535. A malformed name is logged and returns C<undef>.
++
++An optional second argument is the L<LWP::UserAgent> to use instead of C<ua>.
++
 +=head2 validateMatrixToken
 +
 +Verify the given "federation token" and return the matrix address.
++
++An optional third argument is the L<LWP::UserAgent> to use instead of C<ua>.
 +
 +The "federation token" isn't the Matrix C<access_token> but a token that user
 +can get by calling C</_matrix/client/v3/user/$USER_ID/openid/request_token>
@@ -248,7 +310,7 @@
 +
 +=over
 +
-+=item LemonLDAP::NG team L<http://lemonldap-ng.org/team>
++=item Xavier Guimard L<yadd@debian.org>
 +
 +=back
 +
@@ -280,8 +342,6 @@
 +along with this program.  If not, see L<http://www.gnu.org/licenses/>.
 +
 +=cut
-diff --git a/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm b/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm
-index bc2b8e867..9e51457c1 100644
 --- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Plugins.pm
 @@ -49,6 +49,8 @@ our @pList = (
@@ -298,7 +358,7 @@ new file mode 100644
 index 000000000..cf2072cfe
 --- /dev/null
 +++ b/usr/share/perl5/Lemonldap/NG/Portal/Plugins/MatrixTokenExchange.pm
-@@ -0,0 +1,74 @@
+@@ -0,0 +1,218 @@
 +package Lemonldap::NG::Portal::Plugins::MatrixTokenExchange;
 +
 +use strict;
@@ -316,33 +376,167 @@ index 000000000..cf2072cfe
 +        return 0;
 +    }
 +
-+    unless ( $target->{audience} ) {
-+        $target->{rp} = $rp;
-+        return 1;
-+    }
-+
 +    unless ( $target->{rp} ) {
 +        $self->logger->debug(
 +            "Token exchange request for an unexistent RP $target->{audience}");
 +        return 0;
 +    }
 +
-+    return 1 if $target->{rp} eq $rp;
++    # Matrix OpenID tokens are handed to widgets and integration managers, so
++    # without a client secret anyone holding one could exchange it
++    if ( $self->oidc->rpOptions->{ $target->{rp} }->{oidcRPMetaDataOptionsPublic} )
++    {
++        $self->logger->warn(
++            "Matrix token exchange refused: $target->{rp} is a public client");
++        return 0;
++    }
 +
-+    my $list = $self->oidc->rpOptions->{ $target->{rp} }
-+      ->{oidcRPMetaDataOptionsTokenXAuthorizedMatrix};
++    # Getting tokens for another RP needs that RP's consent, as in core
++    # InternalTokenExchange
++    if ( $target->{rp} ne $rp ) {
++        my $callers = $self->oidc->rpOptions->{ $target->{rp} }
++          ->{oidcRPMetaDataOptionsTokenXAuthorizedRP} // '';
++        unless ( grep { $_ eq $rp } split /[,;\s]+/, $callers ) {
++            $self->logger->debug(
++                "Token exchange for an unauthorized RP ($rp => $target->{rp})");
++            return 0;
++        }
++    }
++
++    # Any Matrix server can vouch for any user it likes, so the allowlist is
++    # checked on every request, and an empty allowlist authorizes no server
++    my $opts = $self->oidc->rpOptions->{ $target->{rp} };
++    my $list = $opts->{oidcRPMetaDataOptionsTokenXAuthorizedMatrix};
++    my $mailMapping =
++      ( $opts->{oidcRPMetaDataOptionsTokenXMatrixUser} // '' ) eq 'mail';
 +    my $subject_issuer = $req->param('subject_issuer');
 +    unless ($subject_issuer) {
 +        $self->logger->debug('Request without subject_issuer');
 +        return 0;
 +    }
-+    unless ( $list and grep { $_ eq $subject_issuer } split /[,;\s]+/, $list ) {
++
++    # A server name with a port or an IP literal is no mail domain
++    if ( $mailMapping
++        and $subject_issuer !~
++        /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+(?:[a-z]{2,}|xn--[a-z0-9-]+)\z/i )
++    {
++        $self->logger->debug(
++            "Matrix server $subject_issuer is not a domain name");
++        return 0;
++    }
++
++    my @servers = split /[,;\s]+/, $list // '';
++    my $wildcard = grep { $_ eq '*' } @servers;
++    if ( $wildcard and !$mailMapping and !$self->_wildcardWarned->{ $target->{rp} }++ )
++    {
++        $self->logger->warn( "\"*\" in TokenXAuthorizedMatrix of $target->{rp}"
++              . ' is ignored unless TokenXMatrixUser is "mail"' );
++    }
++
++    # "*" is only safe when the user is looked up by its full address: each
++    # server then only reaches the users of its own domain
++    my $listed = grep { lc($_) eq lc($subject_issuer) } @servers;
++    unless ( $listed or ( $wildcard and $mailMapping ) ) {
 +        $self->logger->debug(
 +"Token exchange for an unauthorized Matrix server ($subject_issuer => $target->{rp})"
 +        );
 +        return 0;
 +    }
++    $req->data->{matrixMailMapping} = $mailMapping;
++
++    # The internal allowlist is only for explicitly listed servers. A server
++    # accepted through "*" is chosen by the caller; applying the allowlist to
++    # it would let anyone reach an allowlisted internal IP from any domain.
++    $req->data->{matrixInternalHosts} =
++      $listed
++      ? ( $opts->{oidcRPMetaDataOptionsTokenXMatrixInternalHosts} // '' )
++      : '';
 +    return 1;
++}
++
++has _wildcardWarned => ( is => 'ro', default => sub { {} } );
++
++# Every Matrix server, listed or accepted through "*", is chosen by the
++# caller, and so are the hosts its .well-known, SRV target and redirects
++# point to: resolve and fetch them with the paranoid agent, which refuses
++# internal addresses at connect time.
++has paranoidUa => (
++    is      => 'rw',
++    lazy    => 1,
++    builder => sub {
++        my $self = shift;
++        require LWPx::ParanoidAgent;
++
++        # LWPx::ParanoidAgent has no proxy support. ssl_opts is read by
++        # LWPx::Protocol::https_paranoid, so a private CA configured through
++        # lwpSslOpts still works; lwpOpts only contributes its timeout.
++        my $lwpOpts = $self->conf->{lwpOpts} || {};
++        my %opts    = (
++            agent   => "LemonLDAP-NG/$Lemonldap::NG::Portal::Main::VERSION ",
++            timeout => $lwpOpts->{timeout} || 10,
++        );
++        $opts{ssl_opts} = $self->conf->{lwpSslOpts}
++          if $self->conf->{lwpSslOpts};
++        my $ua = LWPx::ParanoidAgent->new(%opts);
++
++        # Shared address space (RFC 6598), often used inside clusters
++        $ua->blocked_hosts( qr/^100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./ );
++        return $ua;
++    }
++);
++
++has _internalHostsCache => ( is => 'ro', default => sub { {} } );
++
++# Clone the paranoid agent and allow the RP's configured internal hosts.
++# A hostname is resolved here so the private A records the agent will check
++# are whitelisted too; whitelisting only the name would still block them.
++sub _paranoidUa {
++    my ( $self, $allowlist ) = @_;
++    my @entries = grep { length } split /[,;\s]+/, $allowlist // '';
++    return $self->paranoidUa unless @entries;
++
++    my $ua = $self->paranoidUa->clone;
++    $ua->whitelisted_hosts( $self->_internalWhitelist(@entries) );
++    return $ua;
++}
++
++# Resolve the allowlist once and cache the result briefly: the agent rechecks
++# every resolved IP, so a hostname must contribute both its name and its A
++# records. Entries are IPv4 addresses or hostnames; IPv6 is not filtered by
++# LWPx::ParanoidAgent, so it is logged and ignored.
++sub _internalWhitelist {
++    my ( $self, @entries ) = @_;
++    my $key = join "\0", @entries;
++    my $now = time;
++    if ( my $cached = $self->_internalHostsCache->{$key} ) {
++        return @{ $cached->{hosts} } if $now - $cached->{at} < 60;
++    }
++
++    my @whitelist;
++    my $resolver = $self->paranoidUa->resolver;
++    for my $entry (@entries) {
++        if ( $entry =~ /^\[[0-9a-f:.]+\]$/i ) {
++            $self->logger->warn(
++"Matrix internal allowlist: IPv6 entry $entry ignored (only IPv4 is filtered)"
++            );
++            next;
++        }
++        push @whitelist, $entry;
++        next if $entry =~ /^\d{1,3}(?:\.\d{1,3}){3}$/;
++
++        my $reply = $resolver->query( $entry, 'A' );
++        my @addresses =
++          $reply ? map { $_->address } grep { $_->type eq 'A' } $reply->answer
++          : ();
++        unless (@addresses) {
++            $self->logger->warn(
++                "Matrix internal allowlist: no A record for $entry");
++            next;
++        }
++        push @whitelist, @addresses;
++    }
++    $self->_internalHostsCache->{$key} = { at => $now, hosts => \@whitelist };
++    return @whitelist;
 +}
 +
 +sub getUid {
@@ -354,22 +548,32 @@ index 000000000..cf2072cfe
 +        return 0;
 +    }
 +
-+    my $subject_issuer = $req->param('subject_issuer');
-+    $subject_issuer = $self->serverResolve($subject_issuer);
++    my $ua = $self->_paranoidUa( $req->data->{matrixInternalHosts} );
++    my $serverName     = $req->param('subject_issuer');
++    my $subject_issuer = $self->serverResolve( $serverName, $ua );
++    unless ($subject_issuer) {
++        $self->logger->debug("Unable to resolve Matrix server $serverName");
++        return 0;
++    }
 +
-+    # 2. Validate Matrix token against given Matrix server
 +    $self->logger->debug(
-+        "Token exchange asked for Matrix token $subjectToken on $subject_issuer"
-+    );
++        "Token exchange asked for a Matrix token on $subject_issuer");
 +
 +    my ( $matrixSub, $uid, $domain ) =
-+      $self->validateMatrixToken( $subject_issuer, $subjectToken );
++      $self->validateMatrixToken( $subject_issuer, $subjectToken, $ua );
 +
 +    unless ($matrixSub) {
 +        $self->logger->debug("Matrix token rejected by $subject_issuer");
 +        return 0;
 +    }
-+    return $uid;
++
++    # A server is only trusted for its own users
++    unless ( lc($domain) eq lc($serverName) ) {
++        $self->userLogger->error(
++            "Matrix server $serverName answered for foreign user $matrixSub");
++        return 0;
++    }
++    return $req->data->{matrixMailMapping} ? "$uid\@" . lc($domain) : $uid;
 +}
 +
 +1;

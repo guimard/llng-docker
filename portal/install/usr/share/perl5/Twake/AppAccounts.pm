@@ -1,13 +1,14 @@
 package Twake::AppAccounts;
 
 use strict;
+use Digest::SHA  qw(sha256);
 use List::Util   qw(shuffle);
 use MIME::Base64 qw/encode_base64/;
 use Mouse;
+use Net::LDAP::Util qw(escape_dn_value escape_filter_value);
 use String::Random;
 
 use Lemonldap::NG::Portal::Main::Constants qw(
-  portalConsts
   PE_ERROR
   PE_LDAPCONNECTFAILED
   PE_LDAPERROR
@@ -55,16 +56,31 @@ sub init {
         return 0;
     }
 
-    if ( $self->conf->{twakeAdminTokens} ) {
-        my $str = '^(?:'
-          . join( '|',
-            map { "\\Q$_\\E" } split /[;,\s]\s*/,
-            $self->conf->{twakeAdminTokens} ) . ')$';
-        $self->validTokens(qr/$str/);
+    if ( my $raw = $self->conf->{twakeAdminTokens} ) {
+        my @tokens = grep { length } split /[;,\s]+/, $raw;
+        if (@tokens) {
+            my %digests;
+            for my $token (@tokens) {
+
+                # HTTP headers are bytes; a token read from a decoded
+                # configuration may be a character string.
+                my $bytes = $token;
+                utf8::encode($bytes) if utf8::is_utf8($bytes);
+                $digests{ sha256($bytes) } = 1;
+            }
+            $self->validTokens( \%digests );
+        }
+        else {
+            $self->logger->error('twakeAdminTokens contains no token');
+        }
     }
     if ( $self->conf->{twakeAppEntryFields} ) {
-        $self->fieldsToMap( split /[;,\s]\s*/,
-            $self->conf->{twakeAppEntryFields} );
+        $self->fieldsToMap(
+            [
+                grep { length }
+                  split /[;,\s]+/, $self->conf->{twakeAppEntryFields}
+            ]
+        );
     }
 
     # Catch /deviceaccounts url and launch "deviceAccounts" metho
@@ -107,7 +123,7 @@ sub connect {
         [
                 Location => $portal
               . '/?url='
-              . encode_base64( $portal . '/deviceaccounts' )
+              . encode_base64( $portal . '/deviceaccounts', '' )
         ],
         []
     ];
@@ -157,12 +173,23 @@ sub addAccount {
     my $query = $req->jsonBodyToObj;
 
     return $self->sendError( $req, 'Bad content', PE_ERROR, 400 )
-      unless $query;
+      unless ref $query eq 'HASH';
 
-    my ( $accounts, $err ) = $self->getAccounts($req);
+    # HIDDEN__ marks an account created by the token API. A user must not be
+    # able to create one: it would stay invisible in the list and bypass the
+    # account limit.
+    if ( !$req->data->{skipMaxAccounts}
+        and defined $query->{name}
+        and ( ref $query->{name} or $query->{name} =~ /^\s*HIDDEN__/i ) )
+    {
+        return $self->sendError( $req, 'Bad name', PE_ERROR, 400 );
+    }
+
+    my ( $accounts, $err, $total ) = $self->getAccounts($req);
     return $err unless $accounts;
     return $self->sendError( $req, 'Too many accounts', PE_ERROR, 400 )
-      if !$req->data->{skipMaxAccounts} and scalar(@$accounts) >= MAX_ACCOUNTS;
+      if !$req->data->{skipMaxAccounts}
+      and ( $total // scalar(@$accounts) ) >= MAX_ACCOUNTS;
     my @uids = map { $_->{uid} } @$accounts;
 
     my $newAccount;
@@ -173,8 +200,8 @@ sub addAccount {
     } while ( grep { $_ eq $newAccount } @uids );
 
     my $uid = $req->userData->{uid} . "_$newAccount";
-    $query->{name} =~ s/^HIDDEN__// if defined $query->{name};
     if ( $req->data->{skipMaxAccounts} ) {
+        $query->{name} =~ s/^HIDDEN__// if defined $query->{name};
         $query->{name} = 'HIDDEN__' . ( $query->{name} // '' );
     }
     my $newEntry = [
@@ -201,9 +228,11 @@ sub addAccount {
           unless $newEntry->[$i] eq 'uid';
     }
     push @$newEntry, uid => $uid;
-    my $mesg =
-      $self->ldap->add( "uid=$uid," . $self->conf->{twakeAppLdapBranch},
-        attrs => $newEntry );
+    my $mesg = $self->ldap->add(
+        'uid=' . escape_dn_value($uid) . ','
+          . $self->conf->{twakeAppLdapBranch},
+        attrs => $newEntry
+    );
     return $self->sendError( $req,
         "$prefix LDAP Add error " . $mesg->code . ': ' . $mesg->error,
         PE_LDAPERROR )
@@ -211,12 +240,14 @@ sub addAccount {
     $mesg = $self->ldap->search(
         base   => $self->conf->{twakeAppLdapBranch},
         scope  => 'sub',
-        filter => '(uid=' . $req->userData->{mail} . ')',
+        filter => '(uid=' . escape_filter_value( $req->userData->{mail} ) . ')',
         deref  => 'find',
     );
     push @outlookEntry, uid => $req->userData->{mail};
     my $dn =
-      'uid=' . $req->userData->{mail} . ',' . $self->conf->{twakeAppLdapBranch};
+        'uid='
+      . escape_dn_value( $req->userData->{mail} ) . ','
+      . $self->conf->{twakeAppLdapBranch};
     my @tmp = eval { $mesg->entries };
 
     if ( $mesg->code() != 0 or !@tmp ) {
@@ -269,31 +300,43 @@ sub delAccount {
     my $query = $req->jsonBodyToObj;
 
     return $self->sendError( $req, 'Bad content', PE_ERROR, 400 )
-      unless $query;
+      unless ref $query eq 'HASH';
 
-    my $accounts = $self->getAccounts($req);
+    my ( $accounts, $err ) = $self->getAccounts($req);
+    return $err unless $accounts;
     return $self->sendError( $req, 'No accounts', PE_ERROR, 400 )
       if scalar(@$accounts) == 0;
+
+    my $uid = $query->{uid};
+
+    # Only the caller's own accounts can be deleted. getAccounts() never lists
+    # the caller's aggregate Outlook entry (uid=<mail>), so it stays protected
+    # even when the caller knows its DN.
+    return $self->sendError( $req, 'No such accounts', PE_ERROR, 400 )
+      unless defined $uid
+      and !ref $uid
+      and grep { $_->{uid} eq $uid } @$accounts;
 
     my $mesg = $self->ldap->search(
         base   => $self->conf->{twakeAppLdapBranch},
         scope  => 'sub',
-        filter => "(uid=$query->{uid})",
+        filter => '(uid=' . escape_filter_value($uid) . ')',
         deref  => 'find',
     );
     if ( $mesg->code() != 0 ) {
-        $self->userLogger->error("Account $query->{uid} already deleted");
-        return $self->p->sendJSONresponse( $req, { uid => $query->{uid} } );
+        $self->userLogger->error("Account $uid already deleted");
+        return $self->p->sendJSONresponse( $req, { uid => $uid } );
     }
     my ($entry) = $mesg->entries;
     return $self->sendError( $req, 'No such accounts', PE_ERROR, 400 )
       unless $entry;
     my $passwordToDelete = $entry->get_value('userPassword');
 
-    # TODO
-    my $outlookDn = $req->userData->{mail};
-    $outlookDn = "uid=$outlookDn," . $self->conf->{twakeAppLdapBranch};
-    $mesg      = $self->ldap->modify(
+    my $outlookDn =
+        'uid='
+      . escape_dn_value( $req->userData->{mail} ) . ','
+      . $self->conf->{twakeAppLdapBranch};
+    $mesg = $self->ldap->modify(
         $outlookDn,
         delete => {
             userPassword => $passwordToDelete,
@@ -305,13 +348,14 @@ sub delAccount {
       if $mesg->code;
 
     $mesg = $self->ldap->delete(
-        "uid=$query->{uid}," . $self->conf->{twakeAppLdapBranch} );
+        'uid=' . escape_dn_value($uid) . ','
+          . $self->conf->{twakeAppLdapBranch} );
     return $self->sendError( $req,
         "$prefix LDAP Delete error " . $mesg->code . ': ' . $mesg->error,
         PE_LDAPERROR )
       if $mesg->code;
 
-    return $self->p->sendJSONresponse( $req, { uid => $query->{uid} } );
+    return $self->p->sendJSONresponse( $req, { uid => $uid } );
 }
 
 # INTERNAL METHODS
@@ -319,7 +363,9 @@ sub delAccount {
 # Get IMAP accounts list
 sub getAccounts {
     my ( $self, $req ) = @_;
-    $self->validateLdap;
+    # validateLdap() only exists since LLNG 2.19; bind() does the connection
+    # check on older versions, which the plugin still supports.
+    $self->validateLdap if $self->can('validateLdap');
     return ( 0,
         $self->sendError( $req, "$prefix LDAP error", PE_LDAPCONNECTFAILED ) )
       unless $self->ldap and $self->bind();
@@ -338,10 +384,10 @@ sub getAccounts {
     my $mesg = $self->ldap->search(
         base   => $self->conf->{twakeAppLdapBranch},
         scope  => 'sub',
-        filter => "(mail=$mail)",
+        filter => '(mail=' . escape_filter_value($mail) . ')',
         deref  => 'find',
     );
-    $self->logger->debug( "Look to $mail IMAP accounts, (mail=$mail) into "
+    $self->logger->debug( "Look to $mail IMAP accounts into "
           . $self->conf->{twakeAppLdapBranch} );
     my $count = 0;
     return (
@@ -363,10 +409,13 @@ sub getAccounts {
           or $_->get_value('uid') eq $req->userData->{mail};
     }
     @accounts = sort { $a->{uid} cmp $b->{uid} } @accounts;
+
+    # The limit counts every entry, including the hidden API-created ones.
+    my $total = scalar @accounts;
     unless ( $req->data->{skipMaxAccounts} ) {
         @accounts = grep { !$_->{name} or $_->{name} !~ /^HIDDEN__/ } @accounts;
     }
-    return \@accounts;
+    return ( \@accounts, undef, $total );
 }
 
 # Manage error display
@@ -379,7 +428,7 @@ sub sendError {
     $self->logger->error("$prefix $logMsg");
     return $self->p->sendHtml(
         $req,
-        'displayLdapAccounts',
+        'displayAppAccounts',
         params => {
             AUTH_ERROR      => $errCode,
             AUTH_ERROR_TYPE => 'warning',
@@ -402,6 +451,17 @@ sub getContent {
     return $query;
 }
 
+# Steps computing groups and macros of a user looked up without a session.
+# LLNG <= 2.23 exposes Main::Run::groupsAndMacros(), which honours the
+# `groupsBeforeMacros` option; that option was dropped upstream (#3482) and
+# groups are now always computed first.
+sub groupsAndMacros {
+    my ($self) = @_;
+    return $self->p->can('groupsAndMacros')
+      ? $self->p->groupsAndMacros
+      : qw(setGroups setMacros);
+}
+
 sub apiCall {
     my ( $self, $req, $sub ) = @_;
 
@@ -410,22 +470,26 @@ sub apiCall {
 
     # Get user
     my $body = $req->jsonBodyToObj;
-    return $self->p->sendError( $req, 'Empty body',   400 ) unless $body;
+    return $self->p->sendError( $req, 'Empty body', 400 )
+      unless ref $body eq 'HASH';
     return $self->p->sendError( $req, 'Missing user', 400 )
       unless $body->{user};
     $req->user( $body->{user} );
 
     # Build user
     $req->steps( [
-            'getUser',                 'setSessionInfo',
-            $self->p->groupsAndMacros, 'setLocalGroups'
+            'getUser',              'setSessionInfo',
+            $self->groupsAndMacros, 'setLocalGroups'
         ]
     );
     $req->data->{findUserChoice} = '1_LDAP';
     $self->logger->debug("$prefix API call");
     my $res = $self->p->process($req);
     if ($res) {
-        my $txt = portalConsts->{$res};
+        my $txt =
+          Lemonldap::NG::Portal::Main::Constants->can('portalConsts')
+          ? Lemonldap::NG::Portal::Main::Constants::portalConsts()->{$res}
+          : $res;
         $self->userLogger->error("API call: unable to resolve user: $txt");
         return $self->p->sendJSONresponse( $req,
             { error => ( $txt || $res ) }, 400 );
@@ -439,11 +503,12 @@ sub apiCall {
 
 sub missingToken {
     my ( $self, $req ) = @_;
+    my $tokens = $self->validTokens;
     return $self->p->sendError( $req, 'Tokens not allowed', 403 )
-      unless $self->validTokens;
-    my $authorization = $req->{env}->{HTTP_AUTHORIZATION};
+      unless $tokens and ref $tokens eq 'HASH' and %$tokens;
+    my $authorization = $req->{env}->{HTTP_AUTHORIZATION} // '';
     return $self->p->sendError( $req, 'Bad token', 403 )
-      unless $authorization =~ $self->validTokens;
+      unless length $authorization and $tokens->{ sha256($authorization) };
     return;
 }
 
