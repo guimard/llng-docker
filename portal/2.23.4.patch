@@ -519,14 +519,6 @@ diff -aburN a/usr/share/perl5/Lemonldap/NG/Portal/Lib/OpenIDConnect.pm b/usr/sha
      }
      else {
          if ( $method eq "none" ) {
-@@ -2040,7 +2084,6 @@
-             unless ( $client_secret eq
-                 $self->rpOptions->{$rp}->{oidcRPMetaDataOptionsClientSecret} )
-             {
--                $self->logger->debug("OIDC SECRETS MISMATCH: '$client_secret' != '$self->{rpOptions}->{$rp}->{oidcRPMetaDataOptionsClientSecret}'\n");
-                 $self->logger->error("Wrong credentials for $rp");
-                 return undef;
-             }
 @@ -3014,9 +3057,17 @@
  
  sub getSidFromSession {

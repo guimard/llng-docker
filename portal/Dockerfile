@@ -67,7 +67,6 @@ RUN apt-get -y -o Dpkg::Options::="--force-confold" install \
 COPY *.patch /
 
 RUN set -e && for p in \
-    more-logs.patch \
     redirect-ajax.patch \
     getreftoken.patch \
     779-mail2f-api.patch \
