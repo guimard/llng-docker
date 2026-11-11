@@ -105,9 +105,33 @@ Rules:
 
 - a new release = bump `DOCKERREVISION` (and `VERSION` when the LLNG version
   changes) + an entry in `Changes.md` + a git tag;
+- always change the version with `./bump-version` (see below), never by hand;
 - never move an existing tag: bump the revision instead;
 - even a simple Debian rebuild (package updates) deserves a new revision,
   because the published images change.
+
+#### Changing the version: `./bump-version`
+
+The version is written in several files: the `env:` block of
+`docker-publish.yml`, `helm/Chart.yaml` (`version`, `appVersion`),
+`helm/values.yaml` (image tags) and `helm/README.md`. `./bump-version` updates
+all of them at once and opens a `## vX.Y.Z-N _(unreleased)_` section in
+`Changes.md`:
+
+```shell
+./bump-version              # next revision: 2.23.4-8 -> 2.23.4-9
+./bump-version 2.23.5       # new LLNG version: -> 2.23.5-1
+./bump-version 2.23.4-12    # explicit version
+./bump-version --release    # date the current unreleased Changes.md section
+```
+
+It commits nothing. The `test` job runs `.github/helm-version.sh --check` and
+fails if the Helm files do not match `VERSION-DOCKERREVISION`.
+
+The Helm **chart version** is `X.Y.(Z*1000 + N)`: `2.23.4-8` gives chart
+`2.23.4008`. Each revision thus gets a new, increasing SemVer chart version
+(no `--devel` needed), so Helm, Argo CD and Flux see the update. The formula
+lives only in `.github/helm-version.sh`; `DOCKERREVISION` must stay below 1000.
 
 On every push to a release branch, CI also publishes `latest` images (master)
 or `YYYY-MM-DD-lts` images (LTS) and date tags on master. Version tags and the
@@ -554,12 +578,13 @@ diff -Nur /tmp/orig/usr /usr > /tmp/my.patch
 ### 7.3 Updating LemonLDAP::NG
 
 1. Check the version available in `trixie` or `trixie-backports`.
-2. Update `VERSION` in `.github/workflows/docker-publish.yml`.
+2. Run `./bump-version X.Y.Z` (sets `VERSION`, restarts `DOCKERREVISION` at 1,
+   aligns the Helm chart and opens the `Changes.md` section).
 3. Regenerate the version patches (`2.x.y.patch`) by comparing installed
    files between the old and new versions, split by component.
 4. Rebase or remove feature patches that are no longer needed.
 5. Check the application order and conflicts.
-6. Update `Changes.md`, bump `DOCKERREVISION`.
+6. Fill `Changes.md`, then run `./bump-version --release`.
 7. Run `./build-all` (or at least the impacted images).
 8. Tag `v${VERSION}-${DOCKERREVISION}` and push the tag.
 
@@ -573,7 +598,7 @@ version published in the Linagora APT repository. To integrate a new version:
 2. rebuild the impacted images;
 3. if the rebuild changes no tracked file, trigger the workflow manually
    (`workflow_dispatch`);
-4. update `Changes.md` and bump `DOCKERREVISION` to publish clean tags.
+4. run `./bump-version` and update `Changes.md` to publish clean tags.
 
 ### 7.5 Debian security rebuild
 
@@ -581,8 +606,9 @@ When Debian publishes updates (nginx, ImageMagick, tzdata, etc.):
 
 1. rebuild;
 2. check the tests;
-3. bump `DOCKERREVISION`;
-4. document the updated packages in `Changes.md`;
+3. run `./bump-version`;
+4. document the updated packages in `Changes.md`, then
+   `./bump-version --release`;
 5. tag.
 
 A rebuild must never reuse an existing tag.
@@ -649,7 +675,8 @@ it locally only, never to validate a release.
 `docker-publish.yml` runs:
 
 1. `check-tag`: the tag must match `v${VERSION}-${DOCKERREVISION}`;
-2. `test`: `./build-all`;
+2. `test`: `.github/helm-version.sh --check` (Helm files aligned with
+   `VERSION-DOCKERREVISION`), then `./build-all`;
 3. build and push of each image, with job dependencies (base before
    portal/manager, portal before full);
 4. `publish-helm` only on tags, after the `-no-s6` images.
@@ -665,10 +692,10 @@ The `.github/actions/docker-common` composite action handles:
 
 ### 9.2 Release checklist
 
-1. `Changes.md` up to date, unreleased section turned into a dated version.
-2. `VERSION` and `DOCKERREVISION` up to date in the branch workflow.
-3. `helm/Chart.yaml` and `helm/values.yaml` consistent (the workflow adjusts
-   image tags at publish time).
+1. Version changed with `./bump-version` (workflow env, Helm chart, README).
+2. `Changes.md` up to date, then `./bump-version --release` to date the
+   unreleased section.
+3. `.github/helm-version.sh --check` green (also run by the `test` job).
 4. `./build-all` green.
 5. Commit pushed.
 6. Tag `v${VERSION}-${DOCKERREVISION}` pushed.
@@ -692,7 +719,8 @@ Publishing happens on the `gh-pages` branch. The workflow:
 
 1. aligns the image tags in `helm/values.yaml` with the release;
 2. `helm dependency build`;
-3. `helm package` with `--version ${VERSION}` and
+3. `helm package` with `--version X.Y.(Z*1000 + N)` (computed by
+   `.github/helm-version.sh`, e.g. `2.23.4008`) and
    `--app-version ${VERSION}-${DOCKERREVISION}`;
 4. copies the archive and updates `index.yaml` on `gh-pages`.
 

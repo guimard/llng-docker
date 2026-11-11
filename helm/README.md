@@ -2,7 +2,7 @@
 
 A Helm chart for LemonLDAP::NG (manager, portal and maintenance cronjob)
 
-![Version: 2.23.4](https://img.shields.io/badge/Version-2.23.4-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 2.23.4-8](https://img.shields.io/badge/AppVersion-2.23.4--8-informational?style=flat-square)
+![Version: 2.23.4008](https://img.shields.io/badge/Version-2.23.4008-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 2.23.4-8](https://img.shields.io/badge/AppVersion-2.23.4--8-informational?style=flat-square)
 
 ## Source Code
 

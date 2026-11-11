@@ -1,0 +1,111 @@
+#!/bin/bash
+#
+# Change the release version everywhere it is written:
+#   - .github/workflows/docker-publish.yml  (env VERSION / DOCKERREVISION)
+#   - helm/Chart.yaml                       (version / appVersion)
+#   - helm/values.yaml                      (manager, portal, cronjob tags)
+#   - helm/README.md                        (helm-docs if available, else sed)
+#   - Changes.md                            (adds "## vX.Y.Z-N _(unreleased)_")
+# then checks the result with .github/helm-version.sh --check.
+#
+# Usage:
+#   ./bump-version              next docker revision      (2.21.6-9 -> 2.21.6-10)
+#   ./bump-version 2.21.7       new upstream version      (-> 2.21.7-1)
+#   ./bump-version 2.21.6-12    explicit version-revision
+#   ./bump-version --release    date the current "_(unreleased)_" section of
+#                               Changes.md (no version change)
+#
+# Nothing is committed.
+
+set -euo pipefail
+
+cd "$(dirname "$0")"
+
+WORKFLOW=.github/workflows/docker-publish.yml
+
+cur_version=$(sed -n 's/^  VERSION: *//p' "$WORKFLOW")
+cur_rev=$(sed -n 's/^  DOCKERREVISION: *//p' "$WORKFLOW")
+[ -n "$cur_version" ] && [ -n "$cur_rev" ] || {
+	echo "Unable to read VERSION/DOCKERREVISION from $WORKFLOW" >&2
+	exit 1
+}
+
+case "${1:-}" in
+"")
+	VERSION=$cur_version
+	DOCKERREVISION=$((cur_rev + 1))
+	;;
+-h | --help)
+	sed -n '3,19s/^# \{0,1\}//p' "$0"
+	exit 0
+	;;
+--release)
+	version="${cur_version}-${cur_rev}"
+	header_re="^## v${version//./\\.} _(unreleased)_\$"
+	if ! grep -q "$header_re" Changes.md; then
+		echo "Changes.md has no \"## v${version} _(unreleased)_\" section" >&2
+		exit 1
+	fi
+	entries=$(awk -v h="## v${version} _(unreleased)_" \
+		'$0 == h { in_s = 1; next } /^## / { in_s = 0 } in_s && /^- /' Changes.md | wc -l)
+	if [ "$entries" -eq 0 ]; then
+		echo "Changes.md: the v${version} section has no entries" >&2
+		exit 1
+	fi
+	sed -i "s/${header_re}/## v${version} _($(date +%F))_/" Changes.md
+	echo "Changes.md: v${version} dated $(date +%F) (${entries} entries)"
+	VERSION=$cur_version DOCKERREVISION=$cur_rev .github/helm-version.sh --check
+	exit
+	;;
+*-*)
+	VERSION=${1%-*}
+	DOCKERREVISION=${1##*-}
+	;;
+*)
+	VERSION=$1
+	DOCKERREVISION=1
+	;;
+esac
+export VERSION DOCKERREVISION
+
+# Validates the input and computes chart_version (single source of truth)
+versions=$(.github/helm-version.sh) || exit 1
+eval "$versions"
+# shellcheck disable=SC2154 # set by the eval above
+echo "${cur_version}-${cur_rev} -> ${version} (chart ${chart_version})"
+
+# Workflow env
+sed -i -E \
+	-e "s/^(  VERSION: ).*/\1${VERSION}/" \
+	-e "s/^(  DOCKERREVISION: ).*/\1${DOCKERREVISION}/" \
+	"$WORKFLOW"
+
+# Chart
+sed -i -E \
+	-e "s/^(version: ).*/\1${chart_version}/" \
+	-e "s/^(appVersion: ).*/\1${version}/" \
+	helm/Chart.yaml
+
+# Image tags (keep the -no-s6 / -no-s6-hiperf suffix)
+sed -i -E "s/^( *tag: )[0-9.]+-[0-9]+(-no-s6)/\1${version}\2/" helm/values.yaml
+
+# README
+if command -v helm-docs >/dev/null; then
+	helm-docs --chart-search-root helm >/dev/null
+else
+	# shields.io escapes "-" as "--" in badge labels
+	badge_version=${version//-/--}
+	sed -i -E \
+		-e "s/(Version: )[0-9.]+(\]\(https:\/\/img\.shields\.io\/badge\/Version-)[0-9.]+-/\1${chart_version}\2${chart_version}-/" \
+		-e "s/(AppVersion: )[0-9.-]+(\]\(https:\/\/img\.shields\.io\/badge\/AppVersion-)[0-9.-]+-informational/\1${version}\2${badge_version}-informational/" \
+		-e "s/\`\"[0-9.]+-[0-9]+(-no-s6)/\`\"${version}\1/g" \
+		helm/README.md
+fi
+
+# Changelog: open a section for the new version if there is none yet
+if ! grep -q "^## v${version} " Changes.md; then
+	sed -i "0,/^## /s//## v${version} _(unreleased)_\n\n&/" Changes.md
+	echo "Changes.md: added \"## v${version} _(unreleased)_\""
+fi
+
+.github/helm-version.sh --check
