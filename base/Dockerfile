@@ -105,7 +105,7 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     libhttp-parser-xs-perl liblwp-protocol-https-perl libstring-random-perl \
     libconvert-base32-perl libnet-ldap-perl libxml-libxml-perl libxml-simple-perl \
     libdbd-cassandra-perl libprotocol-websocket-perl \
-    libredis-perl libyaml-perl libencode-perl patch && \
+    libredis-perl libyaml-perl libencode-perl liblwpx-paranoidagent-perl patch && \
     apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/* && \
     mkdir -p /var/lib/lemonldap-ng/cache && \
     chown www-data:www-data /var/lib/lemonldap-ng/cache && \

@@ -34,13 +34,38 @@
 +        $args->{server} = DEFAULTWS;
 +    }
 +    $logger->debug("$pr using server $args->{server}");
++
++    # TLS options used to publish and to subscribe: lwpSslOpts, overridden by
++    # the SSL_* keys of messageBrokerOptions (SSL_verify_mode, SSL_ca_file...).
++    # The server certificate is verified unless SSL_verify_mode is 0
++    my %tlsOpts = (
++        %{ $conf->{lwpSslOpts} || {} },
++        map { $_ => $args->{$_} } grep { /^SSL_/ } keys %$args
++    );
++    $tlsOpts{verify_hostname} = 0
++      if defined $tlsOpts{SSL_verify_mode} and !$tlsOpts{SSL_verify_mode};
++
++    # LWP::UserAgent modifies the given options: use copies
++    my $ua = $args->{ua} || Lemonldap::NG::Common::UserAgent->new( {
++            %$conf,
++            lwpOpts    => { %{ $conf->{lwpOpts} || {} } },
++            lwpSslOpts => {%tlsOpts},
++        }
++    );
++
++    # Same options for the subscribe connection
++    my %sockOpts = map { $_ => $tlsOpts{$_} } grep { /^SSL_/ } keys %tlsOpts;
++    $sockOpts{SSL_verifycn_scheme} = 'none'
++      if defined $tlsOpts{verify_hostname} and !$tlsOpts{verify_hostname};
++
 +    my $self = bless {
 +        logger   => $logger,
 +        server   => $args->{server},
 +        messages => {},
 +        ssl      => $ssl,
++        sslOpts  => \%sockOpts,
 +        token    => $args->{token},
-+        ua       => $args->{ua} || Lemonldap::NG::Common::UserAgent->new($conf),
++        ua       => $ua,
 +    }, $class;
 +    $self->{ua}->env_proxy();
 +    return $self;
@@ -125,9 +150,17 @@
 +    $self->logger->debug("$pr connected");
 +
 +    if ( $self->{ssl} ) {
-+        $sock = IO::Socket::SSL->start_SSL( $sock, SSL_verify_mode => 0 )
++        $sock = IO::Socket::SSL->start_SSL(
++            $sock,
++            SSL_verify_mode     => IO::Socket::SSL::SSL_VERIFY_PEER(),
++            SSL_hostname        => $host,
++            SSL_verifycn_name   => $host,
++            SSL_verifycn_scheme => 'http',
++            %{ $self->{sslOpts} },
++          )
 +          or do {
-+            $self->logger->error("$pr SSL error: $!");
++            $self->logger->error(
++                "$pr SSL error: " . IO::Socket::SSL::errstr() );
 +            $self->{connected} = 0;
 +            return;
 +          };
