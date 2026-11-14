@@ -2,8 +2,31 @@ apiVersion: v1
 entries:
   lemonldap:
   - apiVersion: v2
+    appVersion: 2.23.4-9
+    created: "2026-11-14T10:35:48.359802296Z"
+    dependencies:
+    - name: commons
+      repository: file://charts/commons
+      version: 1.0.0
+    description: A Helm chart for LemonLDAP::NG (manager, portal and maintenance cronjob)
+    digest: b97084c0a2f4edc88dd613567b8abd3a2685d698ded27bb2b9f165a27d917e0e
+    home: https://github.com/guimard/llng-docker
+    icon: https://lemonldap-ng.org/images/llng_opengraph.png
+    kubeVersion: '>=1.22'
+    maintainers:
+    - email: yadd@debian.org
+      name: Xavier Guimard
+      url: https://github.com/guimard
+    name: lemonldap
+    sources:
+    - https://github.com/guimard/llng-docker
+    - https://github.com/LemonLDAPNG/lemonldap-ng
+    urls:
+    - https://guimard.github.io/llng-docker/helm/latest/lemonldap-2.23.4009.tgz
+    version: 2.23.4009
+  - apiVersion: v2
     appVersion: 2.23.4-8
-    created: "2026-11-11T19:26:37.184325713Z"
+    created: "2026-11-14T10:35:48.358384254Z"
     dependencies:
     - name: commons
       repository: file://charts/commons
@@ -26,7 +49,7 @@ entries:
     version: 2.23.4
   - apiVersion: v2
     appVersion: 2.23.3-3
-    created: "2026-11-11T19:26:37.18314693Z"
+    created: "2026-11-14T10:35:48.356053428Z"
     dependencies:
     - name: commons
       repository: file://charts/commons
@@ -49,7 +72,7 @@ entries:
     version: 2.23.3
   - apiVersion: v2
     appVersion: 2.23.2-1
-    created: "2026-11-11T19:26:37.182035528Z"
+    created: "2026-11-14T10:35:48.354909023Z"
     dependencies:
     - name: commons
       repository: file://charts/commons
@@ -72,7 +95,7 @@ entries:
     version: 2.23.2
   - apiVersion: v2
     appVersion: 2.23.0-2
-    created: "2026-11-11T19:26:37.180940681Z"
+    created: "2026-11-14T10:35:48.353702412Z"
     dependencies:
     - name: commons
       repository: file://charts/commons
@@ -116,4 +139,4 @@ entries:
     urls:
     - https://guimard.github.io/llng-docker/helm/latest/lemonldap-2.23.0-2.tgz
     version: 2.23.0-2
-generated: "2026-11-11T19:26:37.178126572Z"
+generated: "2026-11-14T10:35:48.352250067Z"
