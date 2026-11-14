@@ -1,5 +1,9 @@
 # Changes
 
+## v2.23.4-9 _(2026-11-14)_
+
+- Rebuild with plugins 0.7.2
+
 ## v2.23.4-8 _(2026-11-11)_
 
 - Fix OIDC token exchange when issued from an offline refresh_token
