@@ -43,6 +43,7 @@ RUN set -e && for p in \
 	saml-idp-api.patch \
 	manager-api-plugin-attributes.patch \
 	manager-api-casapp-defaults.patch \
+	session-explorer-regexp.patch \
     ; do echo patch $p && patch -p1 < $p || exit 1; done && \
     rm -f *.patch && \
     find /usr/share/perl5/Lemonldap -name '*.orig' -delete && \
