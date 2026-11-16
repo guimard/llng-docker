@@ -1,5 +1,12 @@
 # Changes
 
+## v2.23.4-10 _(unreleased)_
+
+- Manager API: accept the provider options declared by plugins (e.g.
+  `authorizationDetailsEnabled`): they were returned by GET but refused on
+  POST/PUT/PATCH ("Attribute ... does not exist")
+- Manager API: apply default values when replacing (PUT) a CAS application
+
 ## v2.23.4-9 _(2026-11-14)_
 
 - Rebuild with plugins 0.7.2
