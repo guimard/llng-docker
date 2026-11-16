@@ -1,0 +1,58 @@
+Manager API: accept the options declared by plugins
+
+The API validated provider options against Build::CTrees, the core tree,
+so every option added by a plugin (manager-overrides.d) was returned by GET
+but refused on POST/PUT/PATCH ("Attribute ... does not exist"). Also accept
+the options found in the generated files (ReConstants node keys and
+Manager::Attributes), and take default values from Manager::Attributes.
+
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Api/Common.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Api/Common.pm
+@@ -8,6 +8,8 @@
+ use Exporter 'import';
+ use Lemonldap::NG::Manager::Build::Attributes;
+ use Lemonldap::NG::Manager::Build::CTrees;
++use Lemonldap::NG::Manager::Attributes ();
++use Lemonldap::NG::Common::Conf::ReConstants ();
+ 
+ our @EXPORTS = qw(&_listAttributes);
+ 
+@@ -39,8 +41,10 @@
+ 
+ sub _getDefaultValues {
+     my ( $self, $rootNode ) = @_;
+-    my @allAttrs     = $self->_listAttributes($rootNode);
+-    my $defaultAttrs = Lemonldap::NG::Manager::Build::Attributes::attributes();
++    my @allAttrs = $self->_listAttributes($rootNode);
++
++    # Generated attributes: they include those declared by plugins
++    my $defaultAttrs = Lemonldap::NG::Manager::Attributes::attributes();
+     my $attrs        = {};
+ 
+     foreach my $attr (@allAttrs) {
+@@ -80,6 +84,25 @@
+     my $rootNodes  = [ grep { ref($_) eq "HASH" } @{ $mainTree->{$rootNode} } ];
+     my @attributes = map { $self->_listNodeAttributes($_) } @$rootNodes;
+ 
++    # Build::CTrees only knows core options. Options declared by plugins are
++    # merged into the tree by llng-build-manager-files and only end up in the
++    # generated files: the node keys regexp of ReConstants and the attributes
++    # of Manager::Attributes. Add the options found there.
++    my ($prefix) = $rootNode =~ /^(\w+?)MetaDataNode$/;
++    my $keys;
++    {
++        no strict 'refs';
++        $keys = ${"Lemonldap::NG::Common::Conf::ReConstants::${rootNode}Keys"};
++    }
++    if ( $prefix and $keys ) {
++        my %known = map { $_ => 1 } @attributes;
++        push @attributes, sort grep {
++                  !$known{$_}
++              and /^${prefix}MetaDataOptions/
++              and /^(?:$keys)$/
++        } keys %{ Lemonldap::NG::Manager::Attributes::attributes() };
++    }
++
+     return @attributes;
+ }
+ 
