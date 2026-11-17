@@ -50,6 +50,7 @@ RUN set -e && for p in \
 	manager-api-plugin-attributes.patch \
 	manager-api-casapp-defaults.patch \
 	manager-api-cas-srv.patch \
+	cas-srv-options.patch \
 	session-explorer-regexp.patch \
     ; do echo patch $p && patch -p1 < $p || exit 1; done && \
     rm -f *.patch && \

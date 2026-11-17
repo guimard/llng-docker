@@ -8,6 +8,15 @@
 - Manager API: apply default values when replacing (PUT) a CAS application
 - Manager API: add CAS server routes (`/api/v1/providers/cas/srv`), thanks
   to Khaled Ferjani (upstream MR !1186)
+- CAS authentication, thanks to Khaled Ferjani:
+  - new per-server options `casSrvMetaDataOptionsValidateP3` (validate
+    tickets on `/p3/serviceValidate`) and `casSrvMetaDataOptionsUserAttribute`
+    (CAS attribute holding the user, default principal);
+  - new option `casStrictSrvSelection`: refuse a missing or unknown CAS server
+    and a ticket received without the server cookie;
+  - ticket validation without redirects, in bounded time and size;
+  - skip the CAS logout when the session's server no longer exists;
+  - log the name of a user attribute missing from the validation response
 - Session explorer: fix the display of sessions containing a key with regexp
   metacharacters (e.g. `_pamEphCert::SHA256:...+...` from the PAM plugin):
   the key was used unescaped in a RegExp ("Nothing to repeat")

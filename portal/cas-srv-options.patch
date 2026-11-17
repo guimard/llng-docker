@@ -1,0 +1,199 @@
+CAS: per-server ticket validation options and strict server selection
+Origin: https://github.com/rezk2ll/lemonldap-ng/tree/feat/cas-srv-options (not proposed upstream yet)
+Credits: Khaled Ferjani <https://github.com/rezk2ll>
+
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Auth/CAS.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Auth/CAS.pm
+@@ -10,6 +10,7 @@ use Lemonldap::NG::Portal::Main::Constants qw(
+   PE_REDIRECT
+   PE_IDPCHOICE
+   PE_SENDRESPONSE
++  PE_UNKNOWNPARTNER
+ );
+ 
+ our $VERSION = '2.23.0';
+@@ -139,14 +140,45 @@ sub extractFormInfo {
+     # Check Service Ticket
+     my $ticket = $req->param('ticket');
+ 
++    # Only a server this browser was just sent to may return a ticket, so a
++    # forged link cannot log the victim in on the attacker's account. The
++    # cookie is single use: a parallel CAS login in another tab is refused.
++    if ( $ticket and $self->conf->{casStrictSrvSelection} ) {
++        unless ( $req->cookies->{llngcasserver} ) {
++            $self->userLogger->error(
++                "CAS ticket received without server cookie, refused");
++            return PE_UNKNOWNPARTNER;
++        }
++        $req->addCookie(
++            $self->p->cookie(
++                name    => 'llngcasserver',
++                value   => 0,
++                expires => 'Wed, 21 Oct 2015 00:00:00 GMT',
++                secure  => $self->conf->{securedCookie},
++            )
++        );
++    }
++
+     # Check if CAS server is chosen
+     unless ( ( $ticket and $srv = $req->cookies->{llngcasserver} )
+         or $srv = $req->param('idp') )
+     {
+         $self->logger->debug("Redirecting user to CAS server list");
+ 
++        # Strict selection: a session renewal or upgrade goes back to the
++        # server the current session was opened with
++        if ( $self->conf->{casStrictSrvSelection} ) {
++            $srv = $req->userData->{_casSrv} if ( $req->userData );
++            unless ($srv) {
++                $self->userLogger->error(
++"No CAS server requested and strict server selection is enabled"
++                );
++                return PE_UNKNOWNPARTNER;
++            }
++        }
++
+         # Auto select provider if there is only one
+-        if ( $self->srvNumber == 1 ) {
++        elsif ( $self->srvNumber == 1 ) {
+             ($srv) = keys %{ $self->casSrvList };
+             $self->logger->debug("Selecting the only defined CAS server: $srv");
+         }
+@@ -177,7 +209,9 @@ sub extractFormInfo {
+     my $srvConf = $self->conf->{casSrvMetaDataOptions}->{$srv};
+     unless ($srvConf) {
+         $self->userLogger->error("CAS server $srv not configured");
+-        return PE_ERROR;
++        return $self->conf->{casStrictSrvSelection}
++          ? PE_UNKNOWNPARTNER
++          : PE_ERROR;
+     }
+ 
+     # Provider is choosen
+@@ -352,10 +386,17 @@ sub authLogout {
+     my $session_id = $req->sessionInfo->{_session_id};
+     $self->deleteCasSecondarySessions($session_id);
+ 
++    my $srv     = $req->userData->{_casSrv} // '';
++    my $srvConf = $self->conf->{casSrvMetaDataOptions}->{$srv} || {};
++    unless ( $srvConf->{casSrvMetaDataOptionsUrl} ) {
++        $self->logger->notice(
++            "CAS server '$srv' not configured, skip CAS logout");
++        return PE_OK;
++    }
++
+     # Build CAS logout URL
+     my $logout_url = $self->getServerLogoutURL( $self->p->fullUrl($req),
+-        $self->conf->{casSrvMetaDataOptions}->{ $req->userData->{_casSrv} }
+-          ->{casSrvMetaDataOptionsUrl} );
++        $srvConf->{casSrvMetaDataOptionsUrl} );
+ 
+     $self->logger->debug("Build CAS logout URL: $logout_url");
+ 
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Lib/CAS.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Lib/CAS.pm
+@@ -28,6 +28,34 @@ has ua => (
+     }
+ );
+ 
++# Ticket validation: the response decides who logs in, so it must come from
++# the configured server itself, in bounded time and size. LWP's timeout only
++# limits each read and max_size counts compressed bytes, so the total time is
++# checked as data arrives and compressed responses are refused.
++has validationUa => (
++    is      => 'rw',
++    lazy    => 1,
++    builder => sub {
++        my $ua   = Lemonldap::NG::Common::UserAgent->new( $_[0]->{conf} );
++        my $opts = $_[0]->{conf}->{lwpOpts} || {};
++        $ua->max_redirect(0);
++        $ua->timeout(10)             unless ( defined $opts->{timeout} );
++        $ua->max_size( 1024 * 1024 ) unless ( defined $opts->{max_size} );
++        $ua->default_header( 'Accept-Encoding' => 'identity' );
++        my $deadline;
++        $ua->add_handler(
++            request_send => sub { $deadline = time + $ua->timeout; return } );
++        $ua->add_handler(
++            response_data => sub {
++                die "total time over " . $ua->timeout . "s\n"
++                  if ( time > $deadline );
++                return 1;
++            }
++        );
++        return $ua;
++    }
++);
++
+ has casSrvList   => ( is => 'rw', default => sub { {} }, );
+ has casAppList   => ( is => 'rw', default => sub { {} }, );
+ has srvRules     => ( is => 'rw', default => sub { {} }, );
+@@ -503,16 +531,32 @@ sub validateST {
+         }
+         else {
+             $self->_buildRequestForServiceValidate(
+-                $srvConf->{casSrvMetaDataOptionsUrl}, %prm );
++                $srvConf->{casSrvMetaDataOptionsUrl},
++                $srvConf->{casSrvMetaDataOptionsValidateP3}, %prm );
+         }
+     };
+ 
+-    my $response = $self->ua->request($request);
++    my $response = $self->validationUa->request($request);
+ 
+     $self->logger->debug(
+         "Get CAS serviceValidate response: " . $response->as_string );
+ 
+-    return 0 if $response->is_error;
++    unless ( $response->is_success ) {
++        $self->logger->error(
++            "CAS ticket validation failed: " . $response->status_line );
++        return 0;
++    }
++    if ( my $aborted = $response->header('Client-Aborted') ) {
++        $self->logger->error( "CAS ticket validation response aborted: "
++              . ( $response->header('X-Died') // $aborted ) );
++        return 0;
++    }
++    my $encoding = $response->header('Content-Encoding');
++    if ( $encoding and $encoding ne 'identity' ) {
++        $self->logger->error(
++            "CAS ticket validation response refused: encoded with $encoding");
++        return 0;
++    }
+ 
+     my $xml = $response->decoded_content( default_charset => 'UTF-8' );
+ 
+@@ -529,6 +573,22 @@ sub validateST {
+         my $user       = $extract_result->{user};
+         my $attributes = $extract_result->{attributes};
+ 
++        if ( my $userAttr = $srvConf->{casSrvMetaDataOptionsUserAttribute} ) {
++            my $values = $attributes->{$userAttr} || [];
++            unless (@$values) {
++                $self->logger->error(
++                    "CAS attribute $userAttr missing from the response");
++                return 0;
++            }
++            unless ( @$values == 1 and length $values->[0] ) {
++                $self->logger->error( "CAS attribute $userAttr has "
++                      . scalar(@$values)
++                      . " values, expected exactly one non-empty value" );
++                return 0;
++            }
++            $user = $values->[0];
++        }
++
+         # Flatten each list of attribute values
+         my $result = {};
+         while ( my ( $attribute, $values ) = each %$attributes ) {
+@@ -552,8 +612,9 @@ sub validateST {
+ }
+ 
+ sub _buildRequestForServiceValidate {
+-    my ( $self, $url, %prm ) = @_;
++    my ( $self, $url, $p3, %prm ) = @_;
+ 
++    $url .= '/p3' if ($p3);
+     my $serviceValidateUrl = "$url/serviceValidate?" . build_urlencoded(%prm);
+     $self->logger->debug("Validate ST on CAS URL $serviceValidateUrl");
+ 
