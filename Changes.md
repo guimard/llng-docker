@@ -6,6 +6,8 @@
   `authorizationDetailsEnabled`): they were returned by GET but refused on
   POST/PUT/PATCH ("Attribute ... does not exist")
 - Manager API: apply default values when replacing (PUT) a CAS application
+- Manager API: add CAS server routes (`/api/v1/providers/cas/srv`), thanks
+  to Khaled Ferjani (upstream MR !1186)
 - Session explorer: fix the display of sessions containing a key with regexp
   metacharacters (e.g. `_pamEphCert::SHA256:...+...` from the PAM plugin):
   the key was used unescaped in a RegExp ("Nothing to repeat")

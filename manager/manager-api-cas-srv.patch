@@ -1,0 +1,693 @@
+Manager API: add CAS server routes
+Upstream: https://gitlab.ow2.org/lemonldap-ng/lemonldap-ng/-/merge_requests/1186
+Credits: Khaled Ferjani <https://github.com/rezk2ll>
+
+diff --git a/usr/share/perl5/Lemonldap/NG/Manager/Api.pm b/usr/share/perl5/Lemonldap/NG/Manager/Api.pm
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Api.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Api.pm
+@@ -13,6 +13,7 @@ use Lemonldap::NG::Manager::Api::Providers::OidcOp;
+ use Lemonldap::NG::Manager::Api::Providers::SamlSp;
+ use Lemonldap::NG::Manager::Api::Providers::SamlIdp;
+ use Lemonldap::NG::Manager::Api::Providers::CasApp;
++use Lemonldap::NG::Manager::Api::Providers::CasSrv;
+ use Lemonldap::NG::Manager::Api::Menu::Cat;
+ use Lemonldap::NG::Manager::Api::Menu::App;
+ use Lemonldap::NG::Common::TOTP;
+@@ -96,6 +97,12 @@ sub init {
+                             },
+                             ':confKey' => 'getCasAppByConfKey'
+                         },
++                        srv => {
++                            findByConfKey => {
++                                ':uPattern' => 'findCasSrvByConfKey'
++                            },
++                            ':confKey' => 'getCasSrvByConfKey'
++                        },
+                     },
+                 },
+                 secondFactor => {
+@@ -148,7 +155,8 @@ sub init {
+                         idp => 'addSamlIdp'
+                     },
+                     cas => {
+-                        app => 'addCasApp'
++                        app => 'addCasApp',
++                        srv => 'addCasSrv'
+                     },
+                 },
+                 menu => {
+@@ -183,7 +191,8 @@ sub init {
+                         idp => { ':confKey' => 'replaceSamlIdp' }
+                     },
+                     cas => {
+-                        app => { ':confKey' => 'replaceCasApp' }
++                        app => { ':confKey' => 'replaceCasApp' },
++                        srv => { ':confKey' => 'replaceCasSrv' }
+                     },
+                 },
+                 menu => {
+@@ -212,7 +221,8 @@ sub init {
+                         idp => { ':confKey' => 'updateSamlIdp' }
+                     },
+                     cas => {
+-                        app => { ':confKey' => 'updateCasApp' }
++                        app => { ':confKey' => 'updateCasApp' },
++                        srv => { ':confKey' => 'updateCasSrv' }
+                     },
+                 },
+                 menu => {
+@@ -241,7 +251,8 @@ sub init {
+                         idp => { ':confKey' => 'deleteSamlIdp' }
+                     },
+                     cas => {
+-                        app => { ':confKey' => 'deleteCasApp' }
++                        app => { ':confKey' => 'deleteCasApp' },
++                        srv => { ':confKey' => 'deleteCasSrv' }
+                     },
+                 },
+                 secondFactor => {
+diff --git a/usr/share/perl5/Lemonldap/NG/Manager/Api/Providers/CasSrv.pm b/usr/share/perl5/Lemonldap/NG/Manager/Api/Providers/CasSrv.pm
+--- /dev/null
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Api/Providers/CasSrv.pm
+@@ -0,0 +1,291 @@
++package Lemonldap::NG::Manager::Api::Providers::CasSrv;
++
++our $VERSION = '2.23.0';
++
++package Lemonldap::NG::Manager::Api;
++
++use strict;
++use utf8;
++use Mouse;
++use Lemonldap::NG::Manager::Conf::Parser;
++
++extends 'Lemonldap::NG::Manager::Api::Common';
++
++sub getCasSrvByConfKey {
++    my ( $self, $req ) = @_;
++
++    my $confKey = $req->params('confKey')
++      or return $self->sendError( $req, 'confKey is missing', 400 );
++
++    $self->logger->debug("[API] CAS server $confKey configuration requested");
++
++    my $conf = $self->_confAcc->getConf( { noCache => 1 } );
++
++    my $casSrv = $self->_getCasSrvByConfKey( $conf, $confKey );
++
++    return $self->sendError( $req, "CAS server '$confKey' not found", 404 )
++      unless ( defined $casSrv );
++
++    return $self->sendJSONresponse( $req, $casSrv );
++}
++
++sub findCasSrvByConfKey {
++    my ( $self, $req ) = @_;
++
++    my $pattern = (
++        defined $req->params('uPattern')
++        ? $req->params('uPattern')
++        : ( defined $req->params('pattern') ? $req->params('pattern') : undef )
++    );
++
++    return $self->sendError( $req, 'Invalid input: pattern is missing', 400 )
++      unless ( defined $pattern );
++
++    unless ( $pattern = $self->_getRegexpFromPattern($pattern) ) {
++        return $self->sendError( $req, 'Invalid input: pattern is invalid',
++            400 );
++    }
++
++    $self->logger->debug(
++        "[API] Find CAS servers by confKey regexp $pattern requested");
++
++    my $conf = $self->_confAcc->getConf( { noCache => 1 } );
++
++    my @casSrvs =
++      map { $_ =~ $pattern ? $self->_getCasSrvByConfKey( $conf, $_ ) : () }
++      keys %{ $conf->{casSrvMetaDataOptions} };
++
++    return $self->sendJSONresponse( $req, [@casSrvs] );
++}
++
++sub addCasSrv {
++    my ( $self, $req ) = @_;
++    my $add = $req->jsonBodyToObj;
++
++    return $self->sendError( $req, "Invalid input: " . $req->error, 400 )
++      unless ($add);
++
++    return $self->sendError( $req, 'Invalid input: body is not an object', 400 )
++      unless ( ref $add eq 'HASH' );
++
++    return $self->sendError( $req, 'Invalid input: confKey is missing', 400 )
++      unless ( defined $add->{confKey} );
++
++    return $self->sendError( $req, 'Invalid input: confKey is not a string',
++        400 )
++      if ( ref $add->{confKey} );
++
++    return $self->sendError( $req, 'Invalid input: confKey is empty', 400 )
++      unless ( $add->{confKey} );
++
++    return $self->sendError( $req, 'Invalid input: url is missing', 400 )
++      unless ( ref $add->{options} eq 'HASH'
++        and defined $add->{options}->{url} );
++
++    $self->logger->debug(
++        "[API] Add CAS server with confKey $add->{confKey} requested");
++
++    my $conf = $self->_confAcc->getConf( { noCache => 1 } );
++
++    return $self->sendError(
++        $req,
++"Invalid input: A CAS server with confKey $add->{confKey} already exists",
++        409
++    ) if ( defined $self->_getCasSrvByConfKey( $conf, $add->{confKey} ) );
++
++    my $res = $self->_pushCasSrv( $req, $conf, $add->{confKey}, $add, 1 );
++
++    return $self->sendError( $req, $res->{msg}, $res->{code} || 400 )
++      unless ( $res->{res} eq 'ok' );
++
++    return $self->sendJSONresponse(
++        $req,
++        { message => "Successful operation" },
++        code => 201
++    );
++}
++
++sub updateCasSrv {
++    my ( $self, $req ) = @_;
++    my $confKey = $req->params('confKey')
++      or return $self->sendError( $req, 'confKey is missing', 400 );
++
++    my $update = $req->jsonBodyToObj;
++
++    return $self->sendError( $req, "Invalid input: " . $req->error, 400 )
++      unless ($update);
++
++    return $self->sendError( $req, 'Invalid input: body is not an object', 400 )
++      unless ( ref $update eq 'HASH' );
++
++    return $self->sendError( $req, 'Invalid input: url cannot be removed', 400 )
++      if ( ref $update->{options} eq 'HASH'
++        and exists $update->{options}->{url}
++        and !defined $update->{options}->{url} );
++
++    $self->logger->debug(
++        "[API] CAS server $confKey configuration update requested");
++
++    my $conf = $self->_confAcc->getConf( { noCache => 1 } );
++
++    return $self->sendError( $req, "CAS server '$confKey' not found", 404 )
++      unless ( defined $self->_getCasSrvByConfKey( $conf, $confKey ) );
++
++    my $res = $self->_pushCasSrv( $req, $conf, $confKey, $update, 0 );
++
++    return $self->sendError( $req, $res->{msg}, $res->{code} || 400 )
++      unless ( $res->{res} eq 'ok' );
++
++    return $self->sendJSONresponse( $req, undef, code => 204 );
++}
++
++sub replaceCasSrv {
++    my ( $self, $req ) = @_;
++    my $confKey = $req->params('confKey')
++      or return $self->sendError( $req, 'confKey is missing', 400 );
++
++    my $replace = $req->jsonBodyToObj;
++
++    return $self->sendError( $req, "Invalid input: " . $req->error, 400 )
++      unless ($replace);
++
++    return $self->sendError( $req, 'Invalid input: body is not an object', 400 )
++      unless ( ref $replace eq 'HASH' );
++
++    return $self->sendError( $req, 'Invalid input: url is missing', 400 )
++      unless ( ref $replace->{options} eq 'HASH'
++        and defined $replace->{options}->{url} );
++
++    $self->logger->debug(
++        "[API] CAS server $confKey configuration replace requested");
++
++    my $conf = $self->_confAcc->getConf( { noCache => 1 } );
++
++    return $self->sendError( $req, "CAS server '$confKey' not found", 404 )
++      unless ( defined $self->_getCasSrvByConfKey( $conf, $confKey ) );
++
++    my $res = $self->_pushCasSrv( $req, $conf, $confKey, $replace, 1 );
++    return $self->sendError( $req, $res->{msg}, $res->{code} || 400 )
++      unless ( $res->{res} eq 'ok' );
++
++    return $self->sendJSONresponse( $req, undef, code => 204 );
++}
++
++sub deleteCasSrv {
++    my ( $self, $req ) = @_;
++    my $confKey = $req->params('confKey')
++      or return $self->sendError( $req, 'confKey is missing', 400 );
++
++    my $conf = $self->_confAcc->getConf( { noCache => 1 } );
++
++    return $self->sendError( $req, "CAS server '$confKey' not found", 404 )
++      unless ( defined $self->_getCasSrvByConfKey( $conf, $confKey ) );
++
++    delete $conf->{casSrvMetaDataOptions}->{$confKey};
++    delete $conf->{casSrvMetaDataExportedVars}->{$confKey};
++    delete $conf->{casSrvMetaDataOptionsProxiedServices}->{$confKey};
++
++    my $s = $self->_saveApplyConf( $req, $conf );
++    return $self->sendError( $req, "Unable to save configuration ($s)", 500 )
++      unless ( $s > 0 );
++
++    return $self->sendJSONresponse( $req, undef, code => 204 );
++}
++
++sub _getCasSrvByConfKey {
++    my ( $self, $conf, $confKey ) = @_;
++
++    return undef unless ( defined $conf->{casSrvMetaDataOptions}->{$confKey} );
++
++    my $options = {};
++    for
++      my $configOption ( keys %{ $conf->{casSrvMetaDataOptions}->{$confKey} } )
++    {
++        $options->{ $self->_translateOptionConfToApi($configOption) } =
++          $self->_translateValueConfToApi( $configOption,
++            $conf->{casSrvMetaDataOptions}->{$confKey}->{$configOption} );
++    }
++
++    return {
++        confKey      => $confKey,
++        exportedVars => $conf->{casSrvMetaDataExportedVars}->{$confKey} || {},
++        options      => $options
++    };
++}
++
++sub _pushCasSrv {
++    my ( $self, $req, $conf, $confKey, $push, $replace ) = @_;
++
++    my $translatedOptions = {};
++    if ($replace) {
++        $conf->{casSrvMetaDataOptions}->{$confKey}      = {};
++        $conf->{casSrvMetaDataExportedVars}->{$confKey} = {};
++        $translatedOptions = $self->_getDefaultValues('casSrvMetaDataNode');
++    }
++
++    if ( defined $push->{options} ) {
++        return {
++            res => 'ko',
++            msg => "Invalid input: options is not a hash object"
++          }
++          unless ( ref( $push->{options} ) eq 'HASH' );
++
++        foreach ( keys %{ $push->{options} } ) {
++            my $optionName = $self->_translateOptionApiToConf( $_, 'casSrv' );
++            eval {
++                $translatedOptions->{$optionName} =
++                  $self->_translateValueApiToConf( $optionName,
++                    $push->{options}->{$_} );
++            };
++            return { res => 'ko', msg => "Invalid input: $@" } if ($@);
++        }
++
++        my $res = $self->_hasAllowedAttributes( $translatedOptions,
++            'casSrvMetaDataNode' );
++        return $res unless ( $res->{res} eq 'ok' );
++    }
++
++    $self->_merge_hash( $conf, 'casSrvMetaDataOptions', $confKey,
++        $translatedOptions );
++
++    if ( defined $push->{exportedVars} ) {
++        return {
++            res => 'ko',
++            msg =>
++"Invalid input: exportedVars is not a hash object with \"key\":\"value\" attributes"
++          }
++          unless ( $self->_isSimpleKeyValueHash( $push->{exportedVars} ) );
++
++        $self->_merge_hash(
++            $conf,    'casSrvMetaDataExportedVars',
++            $confKey, $push->{exportedVars}
++        );
++    }
++
++    my $parser = Lemonldap::NG::Manager::Conf::Parser->new( {
++            refConf => $self->_confAcc->getConf( { noCache => 1 } ),
++            newConf => $conf,
++            req     => {},
++        }
++    );
++    unless ( $parser->testNewConf( $self->p ) ) {
++        return {
++            res  => 'ko',
++            code => 400,
++            msg  => "Configuration error: "
++              . join( ". ", map { $_->{message} } @{ $parser->errors } ),
++        };
++    }
++
++    my $s = $self->_saveApplyConf( $req, $conf, $confKey );
++    return {
++        res  => 'ko',
++        code => 500,
++        msg  => "Unable to save configuration ($s)",
++      }
++      unless ( $s > 0 );
++
++    return { res => 'ok' };
++}
++
++1;
+diff --git a/usr/share/perl5/Lemonldap/NG/Manager/Build/OpenApi.pm b/usr/share/perl5/Lemonldap/NG/Manager/Build/OpenApi.pm
+--- a/usr/share/perl5/Lemonldap/NG/Manager/Build/OpenApi.pm
++++ b/usr/share/perl5/Lemonldap/NG/Manager/Build/OpenApi.pm
+@@ -34,6 +34,7 @@ sub handleSelect {
+ 
+ my @exceptions = qw(
+   oidcRPMetaDataOptionsExtraClaims
++  casSrvMetaDataOptionsProxiedServices
+ );
+ 
+ sub getOptions {
+@@ -101,6 +102,10 @@ sub openapi {
+                 'name'        => 'samlsp',
+                 'description' => 'SAML Service Providers'
+             },
++            {
++                'name'        => 'cassrv',
++                'description' => 'CAS servers'
++            },
+             {
+                 'name'        => 'samlidp',
+                 'description' => 'SAML Identity Providers'
+@@ -1161,6 +1166,221 @@ EOF
+                     }
+                 }
+             },
++            '/api/v1/providers/cas/srv' => {
++                'post' => {
++                    'tags'        => ['cassrv'],
++                    'summary'     => 'Create a new CAS server',
++                    'operationId' => 'addcassrv',
++                    'requestBody' => {
++                        'description' => 'CAS server to add',
++                        'content'     => {
++                            'application/json' => {
++                                'schema' => {
++                                    '$ref' => '#/components/schemas/CasSrv'
++                                }
++                            }
++                        },
++                        'required' => JSON::true
++                    },
++                    'responses' => {
++                        '201' => {
++                            '$ref' => '#/components/responses/Created'
++                        },
++                        '400' => {
++                            '$ref' => '#/components/responses/Error'
++                        },
++                        '409' => {
++                            '$ref' => '#/components/responses/Conflict'
++                        }
++                    }
++                }
++            },
++            '/api/v1/providers/cas/srv/findByConfKey' => {
++                'get' => {
++                    'tags'        => ['cassrv'],
++                    'summary'     => 'Finds CAS servers by configuration key',
++                    'description' =>
++'Takes a search pattern to be tested against existing providers',
++                    'operationId' => 'findCasSrvByConfKey',
++                    'parameters'  => [ {
++                            'name'        => 'pattern',
++                            'in'          => 'query',
++                            'description' => 'Search pattern',
++                            'required'    => JSON::true,
++                            'schema'      => {
++                                '$ref' => '#/components/schemas/confKey'
++                            },
++                            'examples' => {
++                                'any' => {
++                                    'summary' => 'Any value',
++                                    'value'   => '*'
++                                },
++                                'prefix' => {
++                                    'summary' => 'Given prefix',
++                                    'value'   => 'zone1-*'
++                                },
++                                'anywhere' => {
++                                    'summary' => 'Substring',
++                                    'value'   => 'something'
++                                }
++                            }
++                        }
++                    ],
++                    'responses' => {
++                        '200' => {
++                            '$ref' => '#/components/responses/ManyCasSrv'
++                        },
++                        '400' => {
++                            '$ref' => '#/components/responses/Error'
++                        }
++                    }
++                }
++            },
++            '/api/v1/providers/cas/srv/{confKey}' => {
++                'get' => {
++                    'tags'        => ['cassrv'],
++                    'summary'     => 'Get CAS server by configuration key',
++                    'description' => 'Returns a single CAS server',
++                    'operationId' => 'getCasSrvByConfKey',
++                    'parameters'  => [ {
++                            'name'        => 'confKey',
++                            'in'          => 'path',
++                            'description' => 'Configuration key of CAS server',
++                            'required'    => JSON::true,
++                            'schema'      => {
++                                '$ref' => '#/components/schemas/confKey'
++                            }
++                        }
++                    ],
++                    'responses' => {
++                        '200' => {
++                            '$ref' => '#/components/responses/OneCasSrv'
++                        },
++                        '400' => {
++                            '$ref' => '#/components/responses/Error'
++                        },
++                        '404' => {
++                            '$ref' => '#/components/responses/NotFound'
++                        }
++                    }
++                },
++                'patch' => {
++                    'tags'        => ['cassrv'],
++                    'summary'     => 'Updates a CAS server',
++                    'description' => <<'EOF'
++This method merges the supplied JSON object with existing configuration. You
++can delete a subkey from a top-level key by setting its value to `null`.  For
++example:
++```
++{
++  "exportedVars": {
++    "deleteme": null
++  }
++}
++```
++EOF
++                    ,
++                    'operationId' => 'updateCasSrv',
++                    'parameters'  => [ {
++                            'name'        => 'confKey',
++                            'in'          => 'path',
++                            'description' =>
++                              'Configuration key of CAS server to update',
++                            'required' => JSON::true,
++                            'schema'   => {
++                                '$ref' => '#/components/schemas/confKey'
++                            }
++                        }
++                    ],
++                    'requestBody' => {
++                        'content' => {
++                            'application/json' => {
++                                'schema' => {
++                                    '$ref' =>
++                                      '#/components/schemas/CasSrvUpdate'
++                                }
++                            }
++                        }
++                    },
++                    'responses' => {
++                        '204' => {
++                            '$ref' => '#/components/responses/NoContent'
++                        },
++                        '400' => {
++                            '$ref' => '#/components/responses/Error'
++                        },
++                        '404' => {
++                            '$ref' => '#/components/responses/NotFound'
++                        }
++                    }
++                },
++                'put' => {
++                    'tags'        => ['cassrv'],
++                    'summary'     => 'Replaces a CAS server',
++                    'description' =>
++'Options left out get their default value. Exported variables left out are removed.',
++                    'operationId' => 'replaceCasSrv',
++                    'parameters'  => [ {
++                            'name'        => 'confKey',
++                            'in'          => 'path',
++                            'description' =>
++                              'Configuration key of CAS server to replace',
++                            'required' => JSON::true,
++                            'schema'   => {
++                                '$ref' => '#/components/schemas/confKey'
++                            }
++                        }
++                    ],
++                    'requestBody' => {
++                        'content' => {
++                            'application/json' => {
++                                'schema' => {
++                                    '$ref' =>
++                                      '#/components/schemas/CasSrvReplace'
++                                }
++                            }
++                        }
++                    },
++                    'responses' => {
++                        '204' => {
++                            '$ref' => '#/components/responses/NoContent'
++                        },
++                        '400' => {
++                            '$ref' => '#/components/responses/Error'
++                        },
++                        '404' => {
++                            '$ref' => '#/components/responses/NotFound'
++                        }
++                    }
++                },
++                'delete' => {
++                    'tags'        => ['cassrv'],
++                    'summary'     => 'Deletes a CAS server',
++                    'operationId' => 'deleteCasSrv',
++                    'parameters'  => [ {
++                            'name'        => 'confKey',
++                            'in'          => 'path',
++                            'description' =>
++                              'Configuration key of CAS server to delete',
++                            'required' => JSON::true,
++                            'schema'   => {
++                                '$ref' => '#/components/schemas/confKey'
++                            }
++                        }
++                    ],
++                    'responses' => {
++                        '204' => {
++                            '$ref' => '#/components/responses/NoContent'
++                        },
++                        '400' => {
++                            '$ref' => '#/components/responses/Error'
++                        },
++                        '404' => {
++                            '$ref' => '#/components/responses/NotFound'
++                        }
++                    }
++                }
++            },
+             '/api/v1/providers/cas/app' => {
+                 'post' => {
+                     'tags'        => ['casapp'],
+@@ -2724,6 +2944,55 @@ EOF
+                     'properties' =>
+                       getOptions( $attributes, 'casAppMetaDataOptions' ),
+                 },
++                'CasSrv' => {
++                    'required'   => [ 'confKey', 'options' ],
++                    'type'       => 'object',
++                    'properties' => {
++                        'confKey' => {
++                            '$ref' => '#/components/schemas/confKey'
++                        },
++                        'exportedVars' => {
++                            '$ref' => '#/components/schemas/CasSrvExportedVars'
++                        },
++                        'options' => {
++                            '$ref' => '#/components/schemas/CasSrvOptions'
++                        }
++                    }
++                },
++                'CasSrvExportedVars' => {
++                    'type'        => 'object',
++                    'description' =>
++'Session key to CAS attribute, added to the global exported variables.',
++                    'example' => { 'uid' => 'uid', 'mail' => 'mail' }
++                },
++                'CasSrvOptions' => {
++                    'type'       => 'object',
++                    'properties' =>
++                      getOptions( $attributes, 'casSrvMetaDataOptions' ),
++                },
++                'CasSrvUpdate' => {
++                    'type'       => 'object',
++                    'properties' => {
++                        'exportedVars' => {
++                            '$ref' => '#/components/schemas/CasSrvExportedVars'
++                        },
++                        'options' => {
++                            '$ref' => '#/components/schemas/CasSrvOptions'
++                        }
++                    }
++                },
++                'CasSrvReplace' => {
++                    'type'       => 'object',
++                    'required'   => ['options'],
++                    'properties' => {
++                        'exportedVars' => {
++                            '$ref' => '#/components/schemas/CasSrvExportedVars'
++                        },
++                        'options' => {
++                            '$ref' => '#/components/schemas/CasSrvOptions'
++                        }
++                    }
++                },
+                 'NewSecondFactor' => {
+                     'type'       => 'object',
+                     'required'   => ['type'],
+@@ -3019,6 +3288,29 @@ EOF
+                         }
+                     }
+                 },
++                'OneCasSrv' => {
++                    'description' => 'Return a CAS server',
++                    'content'     => {
++                        'application/json' => {
++                            'schema' => {
++                                '$ref' => '#/components/schemas/CasSrv'
++                            }
++                        }
++                    }
++                },
++                'ManyCasSrv' => {
++                    'description' => 'Return a list of CAS servers',
++                    'content'     => {
++                        'application/json' => {
++                            'schema' => {
++                                'type'  => 'array',
++                                'items' => {
++                                    '$ref' => '#/components/schemas/CasSrv'
++                                }
++                            }
++                        }
++                    }
++                },
+                 'OneCasApp' => {
+                     'description' => 'Return a CAS Provider',
+                     'content'     => {
