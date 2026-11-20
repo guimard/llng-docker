@@ -1,5 +1,9 @@
 # LTS 2.21.x Changes
 
+## v2.21.6-10 _(2026-11-20)_
+
+- Rebuild (Nginx,...)
+
 ## v2.21.6-9 _(2026-11-11)_
 
 - S6: wait for init scripts without time limit
