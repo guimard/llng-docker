@@ -1,6 +1,6 @@
 # Changes
 
-## v2.23.4-10 _(unreleased)_
+## v2.23.4-10 _(2026-11-20)_
 
 - Manager API: accept the provider options declared by plugins (e.g.
   `authorizationDetailsEnabled`): they were returned by GET but refused on
@@ -20,6 +20,7 @@
 - Session explorer: fix the display of sessions containing a key with regexp
   metacharacters (e.g. `_pamEphCert::SHA256:...+...` from the PAM plugin):
   the key was used unescaped in a RegExp ("Nothing to repeat")
+- Rebuild _(Nginx,...)_
 
 ## v2.23.4-9 _(2026-11-14)_
 
