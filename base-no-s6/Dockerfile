@@ -110,6 +110,7 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     echo "#patch publish-event-own-message.patch" && patch -p1 <publish-event-own-message.patch && \
     echo "#patch sendhtml-template-cache.patch" && patch -p1 <sendhtml-template-cache.patch && \
     echo "#patch session-cache-one-read.patch" && patch -p1 <session-cache-one-read.patch && \
+    echo "#patch session-cache-per-process.patch" && patch -p1 <session-cache-per-process.patch && \
     echo rm -f *.patch && \
     cd /usr/bin && \
     perl -i -pe 's/bootstrap/bootstrap5/;s/"portalSkinBackground"\s*:\s*"[^"]+"/"portalSkinBackground":""/' /var/lib/lemonldap-ng/conf/lmConf-1.json && \
