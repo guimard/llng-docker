@@ -16,8 +16,27 @@ our $VERSION = '1.2.2';
 # here instead, per process and per data source, and lent to one store at a
 # time: two sessions tied together (a session and its persistent session)
 # never share a transaction. Without Commit, or with a Handle, nothing changes.
-our %IDLE;          # "datasource\0user" => [ [ $dbh, $pid ], ... ]
+our %IDLE;          # "datasource\0user" => [ [ $dbh, $pid, $since ], ... ]
 our $MAX_IDLE = 4;  # idle connections kept per data source and process
+our $PING_AFTER = 30;    # seconds idle: a handle older than this is pinged
+
+# Whether an idle handle can be lent without a round trip: one given back
+# lately, after its commit, whose socket has nothing to read, is alive (a
+# server that goes away closes it, which makes it readable). One idle for
+# longer, one whose socket is readable or unknown, is pinged as before.
+sub _usable {
+    my ( $handle, $since ) = @_;
+    return 0 unless $handle->{Active};
+    my $fd = eval { $handle->{pg_socket} };
+    if ( time - ( $since // 0 ) < $PING_AFTER and defined $fd and $fd >= 0 ) {
+        my $rin = '';
+        vec( $rin, $fd, 1 ) = 1;
+        # the descriptor number only: no Perl handle opened, none closed
+        my $ready = select( my $rout = $rin, undef, undef, 0 );
+        return 1 if defined $ready and $ready == 0;
+    }
+    return eval { $handle->ping } ? 1 : 0;
+}
 
 sub connection {
     my ( $self, $session ) = @_;
@@ -39,7 +58,7 @@ sub connection {
     my $key = join "\0", $datasource // '', $username // '';
     my $dbh;
     while ( my $idle = pop @{ $IDLE{$key} ||= [] } ) {
-        my ( $handle, $pid ) = @$idle;
+        my ( $handle, $pid, $since ) = @$idle;
         if ( $pid != $$ ) {
 
             # inherited from the parent before a fork: its socket is the
@@ -47,7 +66,7 @@ sub connection {
             $handle->{InactiveDestroy} = 1;
             next;
         }
-        if ( eval { $handle->ping } ) {
+        if ( _usable( $handle, $since ) ) {
             $dbh = $handle;
             last;
         }
@@ -77,7 +96,7 @@ sub DESTROY {
         && ${^GLOBAL_PHASE} ne 'DESTRUCT'
         && @{ $IDLE{$key} ||= [] } < $MAX_IDLE )
     {
-        push @{ $IDLE{$key} }, [ $dbh, $$ ];
+        push @{ $IDLE{$key} }, [ $dbh, $$, time ];
         return;
     }
     eval { $dbh->disconnect };
