@@ -1,0 +1,20 @@
+--- a/usr/share/perl5/Lemonldap/NG/Common/PSGI.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Common/PSGI.pm	2026-11-26 09:25:59.301694973 +0100
+@@ -409,8 +409,15 @@
+             search_path_on_include => 1,
+             die_on_bad_params      => 0,
+             die_on_missing_include => 1,
+-            cache                  => 0,
+-            global_vars            => 1,
++
++            # The parsed template is kept per process (HTML::Template's cache:
++            # keyed on the file's full path and the template path, re-read when
++            # the file or one of its includes changes, its params cleared at
++            # each new). No filter applies here (the pages are translated in
++            # the browser), so nothing per request is parsed in. A caller that
++            # needs a fresh parse passes cache => 0.
++            cache       => ( $args{cache} // 1 ),
++            global_vars => 1,
+             loop_context_vars      => 1,
+         );
+ 
