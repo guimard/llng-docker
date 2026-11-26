@@ -87,6 +87,7 @@ RUN set -e && for p in \
     1155-oidc-offline-token-exchange.patch \
     cas-srv-options.patch \
     persistent-session-read-only.patch \
+    userinfo-debug-encode.patch \
     ; do echo patch $p && patch -p1 < $p || exit 1; done && \
     rm -f /usr/share/lemonldap-ng/portal/htdocs/static/common/js/carousel.min.js && \
     ln -s carousel.js /usr/share/lemonldap-ng/portal/htdocs/static/common/js/carousel.min.js && \

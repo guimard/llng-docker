@@ -1,0 +1,20 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Issuer/OpenIDConnect.pm
+@@ -2250,9 +2250,14 @@
+       $self->rpOptions->{$rp}->{oidcRPMetaDataOptionsUserInfoSignAlg};
+ 
+     unless ($userinfo_sign_alg) {
+-        my $debug_response = to_json($userinfo_response);
+-        utf8::downgrade($debug_response);
+-        $self->logger->debug( "Return UserInfo as JSON: " . $debug_response );
++        # encoded for the debug line only when it is written: the logger
++        # drops it above logLevel debug, once the encode was made
++        if ( ( $self->conf->{logLevel} // '' ) eq 'debug' ) {
++            my $debug_response = to_json($userinfo_response);
++            utf8::downgrade($debug_response);
++            $self->logger->debug(
++                "Return UserInfo as JSON: " . $debug_response );
++        }
+         return $self->p->sendJSONresponse( $req, $userinfo_response );
+ 
+     }
