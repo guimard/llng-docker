@@ -1,0 +1,14 @@
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm	2026-11-26 08:36:10.866658456 +0100
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm	2026-11-26 08:36:10.892298766 +0100
+@@ -631,7 +631,10 @@
+     # Compute persistent identifier
+     my $pid = getPSessionID($uid);
+ 
+-    $info->{_session_uid} = $uid;
++    # Only when it is written: a read (no $info) leaves the persistent session
++    # as it is, instead of writing it back unchanged; a new one still gets its
++    # _session_uid below
++    $info->{_session_uid} = $uid if $info;
+ 
+     my $ps = Lemonldap::NG::Common::Session->new( {
+             storageModule        => $self->conf->{persistentStorage},
