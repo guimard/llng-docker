@@ -15,13 +15,21 @@ our $VERSION = '1.2.2';
 # stores commit (Commit set) and no Handle is given, the connections are kept
 # here instead, per process and per data source, and lent to one store at a
 # time: two sessions tied together (a session and its persistent session)
-# never share a transaction. Without Commit, or with a Handle, nothing changes.
+# never share a connection. Without Commit, or with a Handle, nothing changes.
+#
+# On that path each statement is its own transaction (AutoCommit): the store
+# reads without a lock (Apache::Session::Store::DBI's materialize, no FOR
+# UPDATE; the lock manager is Null), and a tie writes once, so a transaction
+# around it protected nothing and cost a BEGIN and a COMMIT round trip each.
+# That once: a new session is inserted at its tie, then updated at its untie
+# with its data (Apache::Session's TIEHASH saves a new session at once); here
+# the insert waits for the untie and writes the data then, a single INSERT.
 our %IDLE;          # "datasource\0user" => [ [ $dbh, $pid, $since ], ... ]
 our $MAX_IDLE = 4;  # idle connections kept per data source and process
 our $PING_AFTER = 30;    # seconds idle: a handle older than this is pinged
 
 # Whether an idle handle can be lent without a round trip: one given back
-# lately, after its commit, whose socket has nothing to read, is alive (a
+# lately, its statements done, whose socket has nothing to read, is alive (a
 # server that goes away closes it, which makes it readable). One idle for
 # longer, one whose socket is readable or unknown, is pinged as before.
 sub _usable {
@@ -73,7 +81,7 @@ sub connection {
         eval { $handle->disconnect };
     }
     $dbh ||= DBI->connect( $datasource, $username, $password,
-        { RaiseError => 1, AutoCommit => 0 } )
+        { RaiseError => 1, AutoCommit => 1 } )
       || die $DBI::errstr;
     $dbh->{pg_enable_utf8} = 1;
     $self->{dbh}        = $dbh;
@@ -82,16 +90,55 @@ sub connection {
     $self->{disconnect} = 0;
 }
 
+# a new session: its insert waits for the untie (the update that follows), so
+# that it is written once, with its data
+sub insert {
+    my ( $self, $session ) = @_;
+    $self->connection($session);
+    return $self->SUPER::insert($session) unless defined $self->{pool_key};
+
+    # what the insert needs, copied: keeping $session would be a cycle (it
+    # holds this store), and neither would ever be destroyed
+    $self->{pending_insert} = {
+        data       => { %{ $session->{data} } },
+        serialized => $session->{serialized},
+        args       => $session->{args},
+    };
+    return 1;
+}
+
+sub update {
+    my ( $self, $session ) = @_;
+    return $self->SUPER::insert($session) if delete $self->{pending_insert};
+    return $self->SUPER::update($session);
+}
+
+sub remove {
+    my ( $self, $session ) = @_;
+
+    # created and removed in the same tie: nothing was written
+    return 1 if delete $self->{pending_insert};
+    return $self->SUPER::remove($session);
+}
+
 sub DESTROY {
     my $self = shift;
     my $key  = $self->{pool_key};
     return $self->SUPER::DESTROY(@_) unless defined $key;
-    my $dbh = delete $self->{dbh} or return;
+    my $dbh = $self->{dbh} or return;
 
-    # the end of this store's transaction, as Apache::Session::Store::Postgres
-    # ends it (commit), then the connection goes back to the idle ones; one
-    # that failed to commit, or found at the end of the program, is closed
-    my $ended = eval { $dbh->commit; 1 };
+    # a new session untied without an update: inserted now, as it was tied
+    my $ended = 1;
+    if ( my $pending = delete $self->{pending_insert} ) {
+        $ended = eval { $self->SUPER::insert($pending); 1 };
+        print STDERR "Unable to store the new session: $@" unless $ended;
+    }
+    delete $self->{dbh};
+
+    # each statement committed itself (AutoCommit): the connection goes back
+    # to the idle ones; one that failed, or found at the end of the program, is
+    # closed
+    $ended &&= $dbh->{AutoCommit} || eval { $dbh->commit; 1 };
     if (   $ended
         && ${^GLOBAL_PHASE} ne 'DESTRUCT'
         && @{ $IDLE{$key} ||= [] } < $MAX_IDLE )
