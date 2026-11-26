@@ -1,0 +1,41 @@
+--- a/usr/share/perl5/Lemonldap/NG/Common/Apache/Session/Store.pm	2026-07-20 15:01:27.000000000 +0200
++++ b/usr/share/perl5/Lemonldap/NG/Common/Apache/Session/Store.pm	2026-11-26 09:25:59.301918333 +0100
+@@ -34,9 +34,9 @@
+         and $session->{args}->{updateCache} == -1 )
+     {
+ 
+-        # Update session in cache
++        # Update session in cache (set replaces the entry: no read nor
++        # removal first)
+         my $id = $session->{data}->{_session_id};
+-        $self->removeFromCache($id) if ( $self->getFromCache($id) );
+         $self->storeInCache( $id, $session->{serialized} );
+     }
+ 
+@@ -56,8 +56,11 @@
+ 
+     # Get session from cache
+     my $id = $session->{data}->{_session_id};
+-    if ( !$self->{args}->{noCache} and $self->getFromCache($id) ) {
+-        $session->{serialized} = $self->getFromCache($id);
++    my $cached;
++    if ( !$self->{args}->{noCache} and $cached = $self->getFromCache($id) ) {
++
++        # one read of the cache entry, then its check
++        $session->{serialized} = $cached;
+         eval { JSON::from_json( $session->{serialized} ); };
+         if ($@) {
+             print STDERR "Local data corrupted, ignore cached session\n";
+@@ -88,9 +91,10 @@
+         and $session->{args}->{updateCache} == -1 )
+     {
+ 
+-        # Remove session from cache
++        # Remove session from cache (removing a missing entry does nothing:
++        # no read first)
+         my $id = $session->{data}->{_session_id};
+-        $self->removeFromCache($id) if ( $self->getFromCache($id) );
++        $self->removeFromCache($id);
+     }
+ 
+     unless ($session->{args}->{updateCache}
