@@ -2,6 +2,18 @@
 
 ## v2.21.6-13 _(2026-11-27)_
 
+- Install [Web::Session](https://github.com/linagora/perl-Web-Session) 1.0.0,
+  fork of Apache::Session::Browseable, from its Debian package
+- New configurations use `Web::Session::PgJSON` (`PG_SERVER`) and
+  `Web::Session::Redis` (`REDIS_SERVER`); existing ones keep their session
+  backends
+- New `/usr/share/docker-llng/convert-to-web-session` script: converts the
+  compatible Apache::Session::Browseable and Apache::Session::File session
+  backends of an existing configuration to Web::Session (PostgreSQL
+  connection pool enabled, see the README of `base`)
+- Session purge: clean the lock files of `Web::Session::File` and delete the
+  corrupted sessions of the Web::Session SQL and LDAP backends with `--force`
+
 - Apache::Session::Browseable Redis backend 1.3.19 (`Redis.pm`,
   `Store/Redis.pm`): the session purge removes the index entries of the
   sessions it deletes, which 1.3.18 left behind (index sets grew without

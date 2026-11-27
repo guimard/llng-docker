@@ -118,16 +118,16 @@ if test "$DBI_CHAIN" != ""; then
    # 6 - If no configuration in current server, let's convert current "File" configuration into database
    if test "$CONF" = "0"; then
      /usr/share/lemonldap-ng/bin/convertConfig --new=$INI --current=/etc/lemonldap-ng/lemonldap-ng-file.ini
-     /usr/share/docker-llng/updateConf set persistentStorage "Apache::Session::Browseable::PgJSON"
+     /usr/share/docker-llng/updateConf set persistentStorage "Web::Session::PgJSON"
      /usr/share/docker-llng/updateConf set persistentStorageOptions '{"TableName":"'"$PG_PERSISTENT_SESSIONS_TABLE"'","DataSource":"'"$DBI_CHAIN"'","UserName":"'"$DBI_USER"'","Password":"'"$DBI_PASSWORD"'","Commit":1}'
      if test "$REDIS_SERVER" = ""; then
-       /usr/share/docker-llng/updateConf set globalStorage "Apache::Session::Browseable::PgJSON"
+       /usr/share/docker-llng/updateConf set globalStorage "Web::Session::PgJSON"
        /usr/share/docker-llng/updateConf set globalStorageOptions '{"TableName":"'"$PG_SESSIONS_TABLE"'","DataSource":"'"$DBI_CHAIN"'","UserName":"'"$DBI_USER"'","Password":"'"$DBI_PASSWORD"'","Commit":1}'
-       /usr/share/docker-llng/updateConf set samlStorage "Apache::Session::Browseable::PgJSON"
+       /usr/share/docker-llng/updateConf set samlStorage "Web::Session::PgJSON"
        /usr/share/docker-llng/updateConf set samlStorageOptions '{"TableName":"'"$PG_SAML_TABLE"'","DataSource":"'"$DBI_CHAIN"'","UserName":"'"$DBI_USER"'","Password":"'"$DBI_PASSWORD"'","Commit":1}'
-       /usr/share/docker-llng/updateConf set oidcStorage "Apache::Session::Browseable::PgJSON"
+       /usr/share/docker-llng/updateConf set oidcStorage "Web::Session::PgJSON"
        /usr/share/docker-llng/updateConf set oidcStorageOptions '{"TableName":"'"$PG_OIDC_TABLE"'","DataSource":"'"$DBI_CHAIN"'","UserName":"'"$DBI_USER"'","Password":"'"$DBI_PASSWORD"'","Commit":1}'
-       /usr/share/docker-llng/updateConf set casStorage "Apache::Session::Browseable::PgJSON"
+       /usr/share/docker-llng/updateConf set casStorage "Web::Session::PgJSON"
        /usr/share/docker-llng/updateConf set casStorageOptions '{"TableName":"'"$PG_CAS_TABLE"'","DataSource":"'"$DBI_CHAIN"'","UserName":"'"$DBI_USER"'","Password":"'"$DBI_PASSWORD"'","Commit":1}'
      fi
      /usr/share/docker-llng/updateConf set messageBroker ::Pg
@@ -188,7 +188,14 @@ if test "$REDIS_SERVER" != ""; then
     TMP=`/usr/share/docker-llng/updateConf get globalStorageOptions Index`
     REDIS_INDEXES=${REDIS_INDEXES:-$TMP}
     REDIS_INDEXES=${REDIS_INDEXES:-_whatToTrace _session_kind _utime ipAddr _httpSessionType user mail _session_uid _saml_id ProxyID _nameID _assert_id _art_id}
-    /usr/share/docker-llng/updateConf set globalStorage 'Apache::Session::Browseable::Redis'
+    # Web::Session::Redis, unless globalStorage still uses
+    # Apache::Session::Browseable: containers of an older image may share
+    # this configuration (see convert-to-web-session)
+    case `/usr/share/docker-llng/updateConf get globalStorage` in
+        Apache::Session::Browseable::*) REDIS_MODULE=Apache::Session::Browseable::Redis;;
+        *) REDIS_MODULE=Web::Session::Redis;;
+    esac
+    /usr/share/docker-llng/updateConf set globalStorage "$REDIS_MODULE"
     /usr/share/docker-llng/updateConf set globalStorageOptions server "$REDIS_SERVER"
     /usr/share/docker-llng/updateConf set globalStorageOptions Index "$REDIS_INDEXES"
     /usr/share/docker-llng/updateConf set forceGlobalStorageIssuerOTT 1
