@@ -92,6 +92,11 @@ ENV S6_CMD_WAIT_FOR_SERVICES_MAXTIME=0 \
 
 COPY *.patch /
 
+# Web::Session (fork of Apache::Session::Browseable), Debian package of its
+# GitHub release
+ARG WEB_SESSION_VERSION=1.0.0
+ADD https://github.com/linagora/perl-Web-Session/releases/download/v${WEB_SESSION_VERSION}/libweb-session-perl_${WEB_SESSION_VERSION}-1_all.deb /tmp/
+
 COPY --from=llng-client /tmp/simple-oidc-client-master/sh/llng /usr/local/lib
 COPY --from=llng-client /tmp/simple-oidc-client-master/sh/llng-lib.sh /usr/local/lib
 
@@ -101,6 +106,7 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     liblemonldap-ng-common-perl${LLNGDIST} \
     liblemonldap-ng-handler-perl${LLNGDIST} \
     libapache-session-browseable-perl libapache-session-ldap-perl \
+    /tmp/libweb-session-perl_${WEB_SESSION_VERSION}-1_all.deb \
     libapache-session-mongodb-perl libapache-session-sqlite3-perl \
     libapache-session-wrapper-perl libsoap-lite-perl \
     libdbi-perl libdbd-pg-perl libnet-cidr-perl \
@@ -108,6 +114,7 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     libconvert-base32-perl libnet-ldap-perl libxml-libxml-perl libxml-simple-perl \
     libdbd-cassandra-perl libprotocol-websocket-perl \
     libredis-perl libyaml-perl libencode-perl liblwpx-paranoidagent-perl patch && \
+    rm -f /tmp/libweb-session-perl_*.deb && \
     apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/* && \
     mkdir -p /var/lib/lemonldap-ng/cache && \
     chown www-data:www-data /var/lib/lemonldap-ng/cache && \
