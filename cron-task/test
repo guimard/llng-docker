@@ -1,0 +1,12 @@
+#!/bin/sh
+
+# The purge must run to its end: S6 stops the container when one of its
+# services fails, and the image runs as www-data
+IMAGE=${IMAGE:-yadd/lemonldap-ng-cron-task}
+
+OUT=`docker run --rm $IMAGE 2>&1` || {
+	echo "$OUT"
+	echo "$IMAGE exited with an error" >&2
+	exit 1
+}
+echo "$OUT" | grep 'Session purge completed'
