@@ -291,6 +291,7 @@ Notes:
 | `.github/actions/docker-common/` | Composite build/publish action                            |
 | `build-all`                      | Local build and test of all images                        |
 | `transform`                      | Converts an upstream patch to the Debian installed layout |
+| `tools/sessions/`                | Session storage maintenance scripts, not in the images    |
 | `Changes.md`                     | Version changelog, to update on every change              |
 | `README.md`, `*/README.md`       | User documentation, pushed to Docker Hub                  |
 
