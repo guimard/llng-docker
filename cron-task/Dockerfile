@@ -8,11 +8,14 @@ LABEL maintainer="Yadd yadd@debian.org>" \
 ENV HANDLER_CRON=no \
     PORTAL_CRON=no
 
+COPY web-session-purge.patch /tmp/
+
 RUN apt-get update && \
     cd /tmp/ && \
     apt-get download liblemonldap-ng-portal-perl${LLNGDIST} && \
     dpkg -x liblemonldap-ng-portal-perl*.deb portal && \
     cp portal/usr/share/lemonldap-ng/bin/purgeCentralCache /usr/share/lemonldap-ng/bin/ && \
+    patch -d / -p1 < /tmp/web-session-purge.patch && rm -f /tmp/web-session-purge.patch && \
     cp portal/etc/cron.d/liblemonldap-ng-portal-perl /etc/cron.d/ && \
     rm -rf portal && \
     apt-get autoremove -y && apt-get clean && \

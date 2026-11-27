@@ -1,0 +1,102 @@
+#!/usr/bin/perl
+# Usage: convert-to-web-session [--dry-run]
+#
+# Replaces the session backends of the LemonLDAP::NG configuration that use
+# Apache::Session::Browseable (and a plain Apache::Session::File) by their
+# Web::Session equivalent, when the stored sessions are compatible. Other
+# backends are kept. The result is saved as a new configuration.
+#
+# Run it once every container sharing this configuration uses an image with
+# Web::Session: an older one can't load the new modules.
+
+use strict;
+use warnings;
+use Lemonldap::NG::Common::Conf;
+
+my $dryRun = ( @ARGV and $ARGV[0] eq '--dry-run' );
+die "Usage: $0 [--dry-run]\n" if ( @ARGV and !$dryRun );
+
+# Same storage format: the module name only changes
+my %same = map { $_ => 1 }
+  qw(Cassandra DBI File LDAP MySQLJSON Patroni PgJSON Redis SQLite);
+
+# Web::Session::Postgres and Web::Session::MySQL are aliases of PgJSON and
+# MySQLJSON, whose tables differ from these column-based backends
+my %columns = ( Postgres => 'PgJSON', MySQL => 'MySQLJSON' );
+
+my $confAcc = Lemonldap::NG::Common::Conf->new( {} )
+  or die "Unable to read the configuration: $Lemonldap::NG::Common::Conf::msg";
+my $cfgNum = $confAcc->lastCfg();
+my $conf   = $confAcc->getConf( { cfgNum => $cfgNum, noCache => 1 } )
+  or die "Unable to read configuration $cfgNum";
+delete $conf->{cipher};
+
+my @converted;
+foreach my $key ( sort grep { /Storage$/ } keys %$conf ) {
+    my $module = $conf->{$key};
+    next unless ( defined $module and !ref $module );
+    my $options = $conf->{"${key}Options"};
+    $options = {} unless ( ref $options eq 'HASH' );
+    my $new;
+    if ( $module =~ /^Apache::Session::Browseable::(\w+)$/ ) {
+        my $backend = $1;
+        if ( $same{$backend} ) {
+            $new = "Web::Session::$backend";
+        }
+        elsif ( $columns{$backend} ) {
+            print "$key: $module kept, its table stores sessions in columns:"
+              . " convert it to JSON first (perldoc Web::Session::$backend),"
+              . " then use Web::Session::$columns{$backend}\n";
+        }
+        else {
+            print "$key: $module kept, not supported by Web::Session\n";
+        }
+    }
+    elsif ( $module eq 'Apache::Session::File' ) {
+
+        # LemonLDAP::NG stores these sessions as JSON, unless useStorable
+        if ( $options->{useStorable} ) {
+            print "$key: $module kept, its sessions are stored with"
+              . " Storable (useStorable)\n";
+        }
+        else {
+            $new = 'Web::Session::File';
+        }
+    }
+    next unless ($new);
+
+    # An optional client library may be missing (Redis, Net::LDAP...)
+    unless ( eval "require $new; 1" ) {
+        print "$key: $module kept, $new can't be loaded: $@";
+        next;
+    }
+    print "$key: $module -> $new\n";
+    if ( $new =~ /::(?:PgJSON|Patroni)$/ ) {
+        print "$key: "
+          . (
+            ( defined $options->{KeepConnections}
+                  and $options->{KeepConnections} =~ /^0+$/ )
+            ? 'connection pool disabled by KeepConnections'
+            : 'connection pool used (set KeepConnections to 0 in'
+              . " ${key}Options to disable it)"
+          ) . "\n";
+    }
+    $conf->{$key} = $new;
+    push @converted, $key;
+}
+
+unless (@converted) {
+    print "Nothing to convert\n";
+    exit 0;
+}
+if ($dryRun) {
+    print "Dry run: configuration $cfgNum not changed\n";
+    exit 0;
+}
+$conf->{cfgAuthor} = 'convert-to-web-session';
+$conf->{cfgLog}    = 'Session backends converted to Web::Session: '
+  . join( ', ', @converted );
+my $res = $confAcc->saveConf( $conf, force => 1 );
+die "Unable to save the configuration: $Lemonldap::NG::Common::Conf::msg\n"
+  unless ( $res and $res > 0 );
+print "Configuration $res saved (previous one: $cfgNum)\n";
