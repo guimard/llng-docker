@@ -87,14 +87,16 @@ searches meet. To clean the ones already stored:
 
 ```shell
 ... perl - < tools/sessions/redis-stats.pl                    # before
-... perl - < tools/sessions/redis-clean-orphans.pl            # plan
+... perl - < tools/sessions/redis-clean-orphans.pl            # count
 ... perl - --apply < tools/sessions/redis-clean-orphans.pl    # every field
 ... perl - --apply _whatToTrace < tools/sessions/redis-clean-orphans.pl
+... perl - --apply --storage samlStorage < tools/sessions/redis-clean-orphans.pl
 ```
 
 It only removes members whose session doesn't exist, with the same atomic
 check as Web::Session's searches: it can run while the portal works. It
-takes a few minutes per field for tens of thousands of sessions.
+pauses after each page of 1000 sets (`--sleep`, 20 ms by default) and
+removes about a thousand orphans per second: half an hour for two million.
 
 ### Changing `Index`
 
