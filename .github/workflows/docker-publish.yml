@@ -29,7 +29,7 @@ jobs:
 
   build-and-push-pg:
     needs: test
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ !startsWith(github.ref, 'refs/tags/') && vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -44,7 +44,7 @@ jobs:
           VERSION: ${{ env.PGVERSION }}
 
   build-and-push-base:
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ !startsWith(github.ref, 'refs/tags/') && vars.CI_RUNNER || 'ubuntu-latest' }}
     needs: test
     steps:
       - name: Checkout code
@@ -60,7 +60,7 @@ jobs:
 
   build-and-push-portal:
     needs: build-and-push-base
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ !startsWith(github.ref, 'refs/tags/') && vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -75,7 +75,7 @@ jobs:
 
   build-and-push-portal-hiperf:
     needs: build-and-push-base
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ !startsWith(github.ref, 'refs/tags/') && vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -91,7 +91,7 @@ jobs:
 
   build-and-push-pubsub-server:
     needs: test
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ !startsWith(github.ref, 'refs/tags/') && vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -106,7 +106,7 @@ jobs:
 
   build-and-push-cron:
     needs: build-and-push-base
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ !startsWith(github.ref, 'refs/tags/') && vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -121,7 +121,7 @@ jobs:
 
   build-and-push-cron-task:
     needs: build-and-push-base
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ !startsWith(github.ref, 'refs/tags/') && vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -136,7 +136,7 @@ jobs:
 
   build-and-push-sessions-backup:
     needs: build-and-push-base
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ !startsWith(github.ref, 'refs/tags/') && vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -151,7 +151,7 @@ jobs:
 
   build-and-push-manager:
     needs: build-and-push-base
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ !startsWith(github.ref, 'refs/tags/') && vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -166,7 +166,7 @@ jobs:
 
   build-and-push-full:
     needs: build-and-push-portal
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ !startsWith(github.ref, 'refs/tags/') && vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -181,7 +181,7 @@ jobs:
 
   build-and-push-ssoaas-fastcgi-server:
     needs: build-and-push-base
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ !startsWith(github.ref, 'refs/tags/') && vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -195,7 +195,7 @@ jobs:
           SHORT_DESCRIPTION: 'LemonLDAP::NG SSOaaS FastCGI Server'
 
   build-and-push-base-no-s6:
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ !startsWith(github.ref, 'refs/tags/') && vars.CI_RUNNER || 'ubuntu-latest' }}
     needs: test
     steps:
       - name: Checkout code
@@ -212,7 +212,7 @@ jobs:
 
   build-and-push-portal-no-s6:
     needs: build-and-push-base-no-s6
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ !startsWith(github.ref, 'refs/tags/') && vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -228,7 +228,7 @@ jobs:
 
   build-and-push-portal-hiperf-no-s6:
     needs: build-and-push-base-no-s6
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ !startsWith(github.ref, 'refs/tags/') && vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -246,7 +246,7 @@ jobs:
 
   build-and-push-cron-no-s6:
     needs: build-and-push-base-no-s6
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ !startsWith(github.ref, 'refs/tags/') && vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -263,7 +263,7 @@ jobs:
 
   build-and-push-cron-task-no-s6:
     needs: build-and-push-base-no-s6
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ !startsWith(github.ref, 'refs/tags/') && vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -280,7 +280,7 @@ jobs:
 
   build-and-push-sessions-backup-no-s6:
     needs: build-and-push-base-no-s6
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ !startsWith(github.ref, 'refs/tags/') && vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -297,7 +297,7 @@ jobs:
 
   build-and-push-manager-no-s6:
     needs: build-and-push-base-no-s6
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ !startsWith(github.ref, 'refs/tags/') && vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -314,7 +314,7 @@ jobs:
 
   build-and-push-full-no-s6:
     needs: build-and-push-portal-no-s6
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ !startsWith(github.ref, 'refs/tags/') && vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -331,7 +331,7 @@ jobs:
 
   build-and-push-ssoaas-fastcgi-server-no-s6:
     needs: build-and-push-base-no-s6
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ !startsWith(github.ref, 'refs/tags/') && vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
