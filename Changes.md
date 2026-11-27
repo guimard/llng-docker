@@ -2,6 +2,11 @@
 
 ## v2.23.4-12 _(unreleased)_
 
+- cron-task: the session purge didn't run since v2.23.4-8. The container
+  runs as `www-data`, which can't prepare syslogd's log directories, and S6
+  now stops the container when a service fails. syslogd is removed from this
+  image (the purge logs to stdout), and a test checks that the purge runs to
+  its end. Workaround for older images: the `-no-s6` variant
 - Install [Web::Session](https://github.com/linagora/perl-Web-Session) 1.0.0,
   fork of Apache::Session::Browseable, from its Debian package
 - New configurations use `Web::Session::PgJSON` (`PG_SERVER`) and

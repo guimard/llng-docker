@@ -23,6 +23,10 @@ RUN apt-get update && \
          "default File conf and purges nothing" && \
     chgrp www-data /etc/lemonldap-ng && \
     chmod g+w /etc/lemonldap-ng && \
+    echo "# www-data can't prepare syslogd's log directories, and S6 stops" \
+         "the container when a service fails: no syslogd, the purge logs" \
+         "to stdout" && \
+    rm -f /etc/s6-overlay/s6-rc.d/user/contents.d/syslogd-bundle && \
     for i in `find /usr/share/lemonldap-ng/bin -type f -perm -g=x`; do \
         NAME=`basename $i`; \
         test -e /usr/bin/$NAME || ln -s $i /usr/bin/$NAME; \
