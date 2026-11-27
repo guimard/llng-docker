@@ -48,7 +48,7 @@ $COMPOSE run base perl -MApache::Session::Browseable::Redis -e 'print "@Apache::
 $COMPOSE run base perl -MApache::Session::Browseable::File -e 'my $s = &{"Apache::Session::Browseable::File::populate"}( {} ); print ref( $s->{object_store} ), "\n"' | grep Web::Session::Store::File
 $COMPOSE run base perl -MApache::Session::Browseable::PgJSON -e '
   my $args = { DataSource => "dbi:Pg:database=lemonldapng;host=db", UserName => "lemonldap",
-    Password => "zz", TableName => "psessions", Index => "_session_uid" };
+    Password => "zz", TableName => "psessions" };
   my %s; tie %s, "Apache::Session::Browseable::PgJSON", undef, $args;
   $s{_session_uid} = "alias-test"; my $id = $s{_session_id}; untie %s;
   my $r = Apache::Session::Browseable::PgJSON->searchOn( $args, "_session_uid", "alias-test" );
