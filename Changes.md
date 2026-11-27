@@ -1,5 +1,13 @@
 # LTS 2.21.x Changes
 
+## v2.21.6-13 _(unreleased)_
+
+- Apache::Session::Browseable Redis backend 1.3.19 (`Redis.pm`,
+  `Store/Redis.pm`): the session purge removes the index entries of the
+  sessions it deletes, which 1.3.18 left behind (index sets grew without
+  limit), and a search removes the index entries of missing sessions it meets.
+  Sessions without `_utime` are purged too
+
 ## v2.21.6-12 _(2026-11-24)_
 
 - Portal: do not count a mandatory password change (`PE_PP_CHANGE_AFTER_RESET`)
