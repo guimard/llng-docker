@@ -39,4 +39,18 @@ $COMPOSE run base $UC get casStorage | grep Apache::Session::Browseable::Postgre
 $COMPOSE run base $UC get globalStorage | grep Web::Session::Redis
 $COMPOSE run base $UC set casStorage Web::Session::PgJSON
 $COMPOSE run base /usr/share/docker-llng/convert-to-web-session | grep 'Nothing to convert'
+
+# Apache::Session::Browseable modules storing sessions as Web::Session does are
+# aliases of it; the others are those of the Debian package
+$COMPOSE run base perl -MApache::Session::Browseable::Patroni -e 'print "@Apache::Session::Browseable::Patroni::ISA\n"' | grep Web::Session::Patroni
+$COMPOSE run base perl -MApache::Session::Browseable::Postgres -e 'print "@Apache::Session::Browseable::Postgres::ISA\n"' | grep Apache::Session::Browseable::DBI
+$COMPOSE run base perl -MApache::Session::Browseable::Redis -e 'my $s = &{"Apache::Session::Browseable::Redis::populate"}( {} ); print ref( $s->{object_store} ), "\n"' | grep Web::Session::Store::Redis
+$COMPOSE run base perl -MApache::Session::Browseable::PgJSON -e '
+  my $args = { DataSource => "dbi:Pg:database=lemonldapng;host=db", UserName => "lemonldap",
+    Password => "zz", TableName => "psessions", Index => "_session_uid" };
+  my %s; tie %s, "Apache::Session::Browseable::PgJSON", undef, $args;
+  $s{_session_uid} = "alias-test"; my $id = $s{_session_id}; untie %s;
+  my $r = Apache::Session::Browseable::PgJSON->searchOn( $args, "_session_uid", "alias-test" );
+  print exists $r->{$id} ? "alias session found\n" : "alias session missing\n";
+  tie %s, "Apache::Session::Browseable::PgJSON", $id, $args; tied(%s)->delete;' | grep 'alias session found'
 $COMPOSE down

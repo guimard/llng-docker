@@ -103,16 +103,23 @@ DBI_PASSWORD=pgpassword
 ### Session backends: Web::Session
 
 The image includes [Web::Session](https://github.com/linagora/perl-Web-Session)
-(`libweb-session-perl`), a fork of Apache::Session::Browseable, next to
-Apache::Session::Browseable. A new configuration uses `Web::Session::PgJSON`
-(`PG_SERVER`) and `Web::Session::Redis` (`REDIS_SERVER`). An existing
-configuration keeps its session backends: `REDIS_SERVER` still sets
+(`libweb-session-perl`), a fork of Apache::Session::Browseable. A new
+configuration uses `Web::Session::PgJSON` (`PG_SERVER`) and
+`Web::Session::Redis` (`REDIS_SERVER`).
+
+An existing configuration keeps its module names: `REDIS_SERVER` still sets
 `Apache::Session::Browseable::Redis` while `globalStorage` uses
 Apache::Session::Browseable, so that containers of an older image sharing the
-configuration keep working.
+configuration keep working. The Apache::Session::Browseable modules that
+store sessions in the same format as Web::Session (`PgJSON`, `Patroni`,
+`MySQLJSON`, `Redis`, `SQLite`, `File`, `LDAP`, `Cassandra`) are aliases of
+their Web::Session module in this image, so such a configuration already
+runs Web::Session, with its fixes and its PostgreSQL connection pool. The
+other ones (the column-based `Postgres` and `MySQL`, `PgHstore`...) are those
+of the Debian package `libapache-session-browseable-perl`.
 
-To convert an existing configuration, once every container sharing it uses
-this image:
+To rename the modules of an existing configuration, and to convert a plain
+`Apache::Session::File`, once every container sharing it uses this image:
 
 ```shell
 docker exec <container> /usr/share/docker-llng/convert-to-web-session --dry-run
@@ -128,8 +135,9 @@ must first be converted to JSON), and the backends that Web::Session doesn't
 provide. The result is saved as a new configuration: the previous one can be
 restored in the manager.
 
-With `Web::Session::PgJSON` and `Web::Session::Patroni`, each process uses a
-pool of PostgreSQL connections: up to 4 idle connections (`MaxIdle`) plus one
+With `Web::Session::PgJSON` and `Web::Session::Patroni` (and their
+Apache::Session::Browseable aliases), each process uses a pool of PostgreSQL
+connections: up to 4 idle connections (`MaxIdle`) plus one
 for each session in use. Size the `max_connections` of the server for the
 number of processes. To change the size of the pool or to disable it, set
 `MaxIdle` or `KeepConnections` to `0` in the options of each session backend,

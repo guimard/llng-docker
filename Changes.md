@@ -13,6 +13,12 @@
   connection pool enabled, see the README of `base`)
 - Session purge: clean the lock files of `Web::Session::File` and delete the
   corrupted sessions of the Web::Session SQL and LDAP backends with `--force`
+- The bundled copy of Apache::Session::Browseable is removed: its modules
+  storing sessions in the Web::Session format (`PgJSON`, `Patroni`,
+  `MySQLJSON`, `Redis`, `SQLite`, `File`, `LDAP`, `Cassandra`) are now aliases
+  of Web::Session, which fixes the SQL injection through session field names
+  of the session explorer and brings the PostgreSQL connection pool to
+  existing configurations; the other ones come from the Debian package
 
 ## v2.23.4-11 _(2026-11-21)_
 
