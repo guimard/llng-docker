@@ -1,0 +1,91 @@
+Local session cache: one Cache object per process and options,
+no lock-time read with a Null lock manager
+See https://github.com/guimard/llng-docker/issues/109
+Upstream: https://gitlab.ow2.org/lemonldap-ng/lemonldap-ng/-/issues/3937
+Upstream: https://gitlab.ow2.org/lemonldap-ng/lemonldap-ng/-/merge_requests/1255
+Must be applied after session-cache-one-read.patch
+
+--- a/usr/share/perl5/Lemonldap/NG/Common/Apache/Session/Lock.pm
++++ b/usr/share/perl5/Lemonldap/NG/Common/Apache/Session/Lock.pm
+@@ -2,6 +2,7 @@
+ package Lemonldap::NG::Common::Apache::Session::Lock;
+ 
+ use strict;
++use Lemonldap::NG::Common::Apache::Session::Store;
+ 
+ our $VERSION = '2.0.0';
+ 
+@@ -25,9 +26,11 @@
+ 
+     return $self->{cache} if $self->{cache};
+ 
+-    my $module = $self->{args}->{localStorage};
+-    eval "use $module;";
+-    $self->{cache} = $module->new( $self->{args}->{localStorageOptions} );
++    # the cache object of the store (one per process and options)
++    $self->{cache} = Lemonldap::NG::Common::Apache::Session::Store::cache_for(
++        $self->{args}->{localStorage},
++        $self->{args}->{localStorageOptions}
++    );
+ 
+     return $self->{cache};
+ }
+@@ -36,6 +39,13 @@
+     my $self    = shift;
+     my $session = shift;
+ 
++    # A Null lock manager (Browseable PgJSON, Redis...) locks nothing: no
++    # read of the cache entry to decide whether to skip it, as the store
++    # reads that entry right after (Apache::Session::restore: the lock, then
++    # materialize)
++    return $self->module->acquire_read_lock($session)
++      if ref( $self->module ) eq 'Apache::Session::Lock::Null';
++
+     # Get session from cache
+     my $id = $session->{data}->{_session_id};
+     if ( $self->cache->get($id) ) {
+--- a/usr/share/perl5/Lemonldap/NG/Common/Apache/Session/Store.pm
++++ b/usr/share/perl5/Lemonldap/NG/Common/Apache/Session/Store.pm
+@@ -2,6 +2,7 @@
+ package Lemonldap::NG::Common::Apache::Session::Store;
+ 
+ use strict;
++use JSON;
+ 
+ our $VERSION = '2.19.0';
+ 
+@@ -119,14 +120,31 @@
+     return $self->{args}->{object_store};
+ }
+ 
++# One cache object per process and per (module, options), shared by every
++# tied session and by the lock: populate() builds a new Store and a new Lock
++# for each tie, and each used to compile "use $module" in a string eval and
++# construct its own cache object (a Cache::FileCache is only its options:
++# every get or set reads or writes its files). The options come from the
++# configuration, so a new configuration gets a new object.
++our %CACHES;
++
++sub cache_for {
++    my ( $module, $options ) = @_;
++    my $key = $module . "\0"
++      . ( $options ? JSON->new->canonical->allow_blessed->encode($options) : '' );
++    return $CACHES{$key} //= do {
++        eval "use $module;";
++        $module->new($options);
++    };
++}
++
+ sub cache {
+     my $self = shift;
+ 
+     return $self->{cache} if $self->{cache};
+ 
+-    my $module = $self->{args}->{localStorage};
+-    eval "use $module;";
+-    $self->{cache} = $module->new( $self->{args}->{localStorageOptions} );
++    $self->{cache} = cache_for( $self->{args}->{localStorage},
++        $self->{args}->{localStorageOptions} );
+ 
+     return $self->{cache};
+ }

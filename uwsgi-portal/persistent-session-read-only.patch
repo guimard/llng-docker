@@ -1,0 +1,19 @@
+getPersistentSession: a read does not write the persistent session back
+See https://github.com/guimard/llng-docker/issues/106
+Upstream: https://gitlab.ow2.org/lemonldap-ng/lemonldap-ng/-/issues/3934
+Upstream: https://gitlab.ow2.org/lemonldap-ng/lemonldap-ng/-/merge_requests/1252
+
+--- a/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm	2026-11-26 08:36:10.866658456 +0100
++++ b/usr/share/perl5/Lemonldap/NG/Portal/Main/Run.pm	2026-11-26 08:36:10.892298766 +0100
+@@ -631,7 +631,10 @@
+     # Compute persistent identifier
+     my $pid = getPSessionID($uid);
+ 
+-    $info->{_session_uid} = $uid;
++    # Only when it is written: a read (no $info) leaves the persistent session
++    # as it is, instead of writing it back unchanged; a new one still gets its
++    # _session_uid below
++    $info->{_session_uid} = $uid if $info;
+ 
+     my $ps = Lemonldap::NG::Common::Session->new( {
+             storageModule        => $self->conf->{persistentStorage},

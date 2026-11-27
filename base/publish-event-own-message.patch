@@ -1,0 +1,48 @@
+Handler publishEvent: wait only when its own message was not processed
+With NoBroker, a newConf queued after the published message made
+publishEvent sleep 100 ms at nearly every login and logout.
+See https://github.com/guimard/llng-docker/issues/105
+Upstream: https://gitlab.ow2.org/lemonldap-ng/lemonldap-ng/-/issues/3933
+Upstream: https://gitlab.ow2.org/lemonldap-ng/lemonldap-ng/-/merge_requests/1251
+
+--- a/usr/share/perl5/Lemonldap/NG/Handler/Main/Run.pm	2026-11-26 08:36:10.863381289 +0100
++++ b/usr/share/perl5/Lemonldap/NG/Handler/Main/Run.pm	2026-11-26 08:36:10.892064979 +0100
+@@ -53,7 +53,7 @@
+ 
+ # Method to check for event in events queue
+ sub checkEvent {
+-    my ( $class, $req, $delay ) = @_;
++    my ( $class, $req, $delay, $seen ) = @_;
+     $class->logger->debug('Checking for events');
+     unless ( $class->tsv->{msgBrokerReader} ) {
+         $class->logger->error('Not initialized');
+@@ -69,6 +69,8 @@
+             if ( my $sub = msgActions->{ $msg->{action} } ) {
+                 $sub->( $class, $msg, $req );
+                 $ret = $msg->{action};
++                $seen->{ $msg->{action} . "\0" . ( $msg->{id} // '' ) } = 1
++                  if $seen;
+             }
+             else {
+                 $class->logger->debug("Unknown action $msg->{action}");
+@@ -98,11 +100,16 @@
+     my $start = time;
+ 
+     # After pushing message, let's pop message queue for this node and
+-    # then launch the concerning method
+-    $ret = $class->checkEvent( $req, 0.1 );
+-    if ( !$ret or $ret ne $msg->{action} ) {
++    # then launch the concerning method. Wait only when this message has not
++    # been processed yet: checkEvent returns the last action it ran, and the
++    # NoBroker queue appends a newConf every checkTime, so comparing that
++    # action made nearly every publish sleep although the message, local, had
++    # been processed at once.
++    my %seen;
++    $class->checkEvent( $req, 0.1, \%seen );
++    unless ( $seen{ $msg->{action} . "\0" . ( $msg->{id} // '' ) } ) {
+         usleep 100000;
+-        $class->checkEvent( $req, 0.1 );
++        $class->checkEvent( $req, 0.1, \%seen );
+     }
+ }
+ 

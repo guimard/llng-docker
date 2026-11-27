@@ -25,6 +25,23 @@
   of the session explorer and brings the PostgreSQL connection pool to
   existing configurations; the other ones come from the Debian package
 
+- Performance patches (from #98):
+  - Handler: `publishEvent` no longer sleeps 100 ms when its own message
+    was already processed (NoBroker), i.e. at nearly every login and
+    logout ([#105](https://github.com/guimard/llng-docker/issues/105))
+  - Portal: reading the persistent session at login no longer writes it
+    back ([#106](https://github.com/guimard/llng-docker/issues/106))
+  - `sendHtml` keeps the parsed templates (HTML::Template cache) instead of
+    parsing them at each request
+    ([#107](https://github.com/guimard/llng-docker/issues/107))
+  - Local session cache: one read per tie, no read-then-remove before an
+    update ([#108](https://github.com/guimard/llng-docker/issues/108)), one
+    cache object per process and no lock-time read with a Null lock manager
+    ([#109](https://github.com/guimard/llng-docker/issues/109))
+  - OIDC userinfo: the response is JSON-encoded for its debug line only at
+    `logLevel = debug` (backport of upstream issue 3932,
+    [#110](https://github.com/guimard/llng-docker/issues/110))
+
 ## v2.23.4-11 _(2026-11-21)_
 
 - Rebuild (base-files updated to 13.8+deb13u8, libc-bin updated to 2.41-12+deb13u5, libc6 updated to 2.41-12+deb13u5, libdbi-perl updated to 1.656-1~deb13u1, libfreetype6 updated to 2.13.3+dfsg-1+deb13u2, libgd3 updated to 2.3.3-14~deb13u3, libnet-dns-perl updated to 1.57-0+deb13u1, libnghttp2-14 updated to 1.64.0-1.1+deb13u2, libssl3t64 updated to 3.5.9-1~deb13u1, libwww-perl updated to 6.78-1+deb13u1, and 4 more packages)
