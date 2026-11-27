@@ -1,3 +1,7 @@
+sendHtml: keep the parsed templates (HTML::Template cache, default 1)
+See https://github.com/guimard/llng-docker/issues/107
+Upstream: not fixed in v2.24, to report
+
 --- a/usr/share/perl5/Lemonldap/NG/Common/PSGI.pm	2026-07-20 15:01:27.000000000 +0200
 +++ b/usr/share/perl5/Lemonldap/NG/Common/PSGI.pm	2026-11-26 09:25:59.301694973 +0100
 @@ -409,8 +409,15 @@

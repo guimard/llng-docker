@@ -1,3 +1,8 @@
+Local session cache: one read per tie, set replaces the entry
+See https://github.com/guimard/llng-docker/issues/108
+Upstream: not fixed in v2.24, to report
+Must be applied before session-cache-per-process.patch
+
 --- a/usr/share/perl5/Lemonldap/NG/Common/Apache/Session/Store.pm	2026-07-20 15:01:27.000000000 +0200
 +++ b/usr/share/perl5/Lemonldap/NG/Common/Apache/Session/Store.pm	2026-11-26 09:25:59.301918333 +0100
 @@ -34,9 +34,9 @@

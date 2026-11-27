@@ -1,3 +1,9 @@
+Local session cache: one Cache object per process and options,
+no lock-time read with a Null lock manager
+See https://github.com/guimard/llng-docker/issues/109
+Upstream: not fixed in v2.24, to report
+Must be applied after session-cache-one-read.patch
+
 --- a/usr/share/perl5/Lemonldap/NG/Common/Apache/Session/Lock.pm
 +++ b/usr/share/perl5/Lemonldap/NG/Common/Apache/Session/Lock.pm
 @@ -2,6 +2,7 @@
