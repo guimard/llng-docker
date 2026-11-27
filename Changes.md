@@ -1,6 +1,6 @@
 # LTS 2.21.x Changes
 
-## v2.21.6-13 _(unreleased)_
+## v2.21.6-13 _(2026-11-27)_
 
 - Apache::Session::Browseable Redis backend 1.3.19 (`Redis.pm`,
   `Store/Redis.pm`): the session purge removes the index entries of the
