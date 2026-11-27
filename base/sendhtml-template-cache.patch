@@ -1,7 +1,7 @@
 sendHtml: keep the parsed templates (HTML::Template cache, default 1)
 See https://github.com/guimard/llng-docker/issues/107
-Upstream: https://gitlab.ow2.org/lemonldap-ng/lemonldap-ng/-/issues/3935
-Upstream: https://gitlab.ow2.org/lemonldap-ng/lemonldap-ng/-/merge_requests/1253
+Upstream: https://gitlab.ow2.org/lemonldap-ng/lemonldap-ng/-/issues/3850
+Upstream: https://gitlab.ow2.org/lemonldap-ng/lemonldap-ng/-/merge_requests/1195
 
 --- a/usr/share/perl5/Lemonldap/NG/Common/PSGI.pm	2026-07-20 15:01:27.000000000 +0200
 +++ b/usr/share/perl5/Lemonldap/NG/Common/PSGI.pm	2026-11-26 09:25:59.301694973 +0100
