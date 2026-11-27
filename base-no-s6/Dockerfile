@@ -76,6 +76,11 @@ ENV SSODOMAIN=example.com \
 
 COPY *.patch /
 
+# Web::Session (fork of Apache::Session::Browseable), Debian package of its
+# GitHub release
+ARG WEB_SESSION_VERSION=1.0.0
+ADD https://github.com/linagora/perl-Web-Session/releases/download/v${WEB_SESSION_VERSION}/libweb-session-perl_${WEB_SESSION_VERSION}-1_all.deb /tmp/
+
 COPY --from=llng-client /tmp/simple-oidc-client-master/sh/llng /usr/local/lib
 COPY --from=llng-client /tmp/simple-oidc-client-master/sh/llng-lib.sh /usr/local/lib
 
@@ -86,6 +91,7 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     liblemonldap-ng-common-perl${LLNGDIST} \
     liblemonldap-ng-handler-perl${LLNGDIST} \
     libapache-session-browseable-perl libapache-session-ldap-perl \
+    /tmp/libweb-session-perl_${WEB_SESSION_VERSION}-1_all.deb \
     libapache-session-mongodb-perl libapache-session-sqlite3-perl \
     libapache-session-wrapper-perl libsoap-lite-perl \
     libdbi-perl libdbd-pg-perl libnet-cidr-perl \
@@ -96,6 +102,7 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     linagora-lemonldap-ng-store \
     && \
     /usr/share/lemonldap-ng/bin/lemonldap-ng-store add-store https://linagora.github.io/lemonldap-ng-plugins/ && \
+    rm -f /tmp/libweb-session-perl_*.deb && \
     apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/* && \
     mkdir -p /var/lib/lemonldap-ng/cache && \
     chown www-data:www-data /var/lib/lemonldap-ng/cache && \
@@ -107,6 +114,7 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     echo "#patch 2.23.3.patch" && patch -p1 <2.23.3.patch && \
     echo "#patch 2.23.4.patch" && patch -p1 <2.23.4.patch && \
     echo "#patch msg-broker-pg.patch" && patch -p1 <msg-broker-pg.patch && \
+    echo "#patch web-session.patch" && patch -p1 <web-session.patch && \
     echo rm -f *.patch && \
     cd /usr/bin && \
     perl -i -pe 's/bootstrap/bootstrap5/;s/"portalSkinBackground"\s*:\s*"[^"]+"/"portalSkinBackground":""/' /var/lib/lemonldap-ng/conf/lmConf-1.json && \

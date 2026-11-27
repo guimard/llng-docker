@@ -9,8 +9,8 @@ fi
 set -e
 
 $COMPOSE run base cat /etc/lemonldap-ng/lemonldap-ng.ini | grep 'dbiChain=DBI:Pg:database=lemonldapng;host=db'
-$COMPOSE run base /usr/share/docker-llng/updateConf get persistentStorage | grep Apache::Session::Browseable::PgJSON
-$COMPOSE run base /usr/share/docker-llng/updateConf get globalStorage | grep Apache::Session::Browseable::Redis
+$COMPOSE run base /usr/share/docker-llng/updateConf get persistentStorage | grep Web::Session::PgJSON
+$COMPOSE run base /usr/share/docker-llng/updateConf get globalStorage | grep Web::Session::Redis
 $COMPOSE run base /usr/share/docker-llng/updateConf get globalStorageOptions Index | grep _whatToTrace
 $COMPOSE run base /usr/share/docker-llng/updateConf get domain | grep debian.org
 $COMPOSE run base /usr/share/docker-llng/updateConf get authChoiceModules | grep 1_LDAP
@@ -19,4 +19,37 @@ $COMPOSE run base /usr/share/docker-llng/updateConf get exportedVars aa | grep b
 $COMPOSE run base /usr/share/docker-llng/updateConf get macros | grep ZZ
 $COMPOSE run base /usr/share/docker-llng/updateConf get portal | grep dockertest.com
 $COMPOSE run base grep languages /etc/lemonldap-ng/lemonldap-ng.ini | perl -pe 's/\r//g' | grep -E '^languages *= *en,fr$'
+
+# A configuration still using Apache::Session::Browseable keeps it (containers
+# of an older image may share it) until convert-to-web-session is run
+UC=/usr/share/docker-llng/updateConf
+$COMPOSE run base $UC set globalStorage Apache::Session::Browseable::Redis
+$COMPOSE run base $UC set persistentStorage Apache::Session::Browseable::PgJSON
+$COMPOSE run base $UC set samlStorage Apache::Session::File
+$COMPOSE run base $UC set casStorage Apache::Session::Browseable::Postgres
+$COMPOSE run base $UC get globalStorage | grep Apache::Session::Browseable::Redis
+$COMPOSE run base /usr/share/docker-llng/convert-to-web-session --dry-run | grep 'Dry run'
+$COMPOSE run base $UC get persistentStorage | grep Apache::Session::Browseable::PgJSON
+$COMPOSE run base /usr/share/docker-llng/convert-to-web-session | grep 'casStorage: Apache::Session::Browseable::Postgres kept'
+$COMPOSE run base $UC get persistentStorage | grep Web::Session::PgJSON
+$COMPOSE run base $UC get samlStorage | grep Web::Session::File
+$COMPOSE run base $UC get casStorage | grep Apache::Session::Browseable::Postgres
+$COMPOSE run base $UC get globalStorage | grep Web::Session::Redis
+$COMPOSE run base $UC set casStorage Web::Session::PgJSON
+$COMPOSE run base /usr/share/docker-llng/convert-to-web-session | grep 'Nothing to convert'
+
+# Apache::Session::Browseable modules storing sessions as Web::Session does are
+# aliases of it; the others are those of the Debian package
+$COMPOSE run base perl -MApache::Session::Browseable::Patroni -e 'print "@Apache::Session::Browseable::Patroni::ISA\n"' | grep Web::Session::Patroni
+$COMPOSE run base perl -MApache::Session::Browseable::Postgres -e 'print "@Apache::Session::Browseable::Postgres::ISA\n"' | grep Apache::Session::Browseable::DBI
+$COMPOSE run base perl -MApache::Session::Browseable::Redis -e 'print "@Apache::Session::Browseable::Redis::ISA\n"' | grep Web::Session::Redis
+$COMPOSE run base perl -MApache::Session::Browseable::File -e 'my $s = &{"Apache::Session::Browseable::File::populate"}( {} ); print ref( $s->{object_store} ), "\n"' | grep Web::Session::Store::File
+$COMPOSE run base perl -MApache::Session::Browseable::PgJSON -e '
+  my $args = { DataSource => "dbi:Pg:database=lemonldapng;host=db", UserName => "lemonldap",
+    Password => "zz", TableName => "psessions" };
+  my %s; tie %s, "Apache::Session::Browseable::PgJSON", undef, $args;
+  $s{_session_uid} = "alias-test"; my $id = $s{_session_id}; untie %s;
+  my $r = Apache::Session::Browseable::PgJSON->searchOn( $args, "_session_uid", "alias-test" );
+  print exists $r->{$id} ? "alias session found\n" : "alias session missing\n";
+  tie %s, "Apache::Session::Browseable::PgJSON", $id, $args; tied(%s)->delete;' | grep 'alias session found'
 $COMPOSE down

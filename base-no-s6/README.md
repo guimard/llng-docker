@@ -20,7 +20,9 @@ There are also date-based tags.
   - set domain (`SSODOMAIN`)
   - set portal (`PORTAL`)
   - set log level (`LOGLEVEL`)
-  - if `REDIS_SERVER` is set, change `globalStorage` to `Apache::Session::Browseable::Redis`
+  - if `REDIS_SERVER` is set, change `globalStorage` to `Web::Session::Redis`
+    _(`Apache::Session::Browseable::Redis` while `globalStorage` uses
+    Apache::Session::Browseable, see [Session backends](#session-backends-websession))_
     and configure it _(indexes given by `REDIS_INDEXES`, default: "uid mail")_
 - Upload local configuration into PostgreSQL database if:
   - `PG_SERVER` is given AND
@@ -69,7 +71,7 @@ There are also date-based tags.
     - `DBI_PASSWORD` = `$PG_PASSWORD`
 - Session storage:
   - `REDIS_SERVER` =
-  - `REDIS_INDEXES` = `_whatToTrace _session_kind _utime ipAddr _httpSessionType _user` _(see Apache::Session::Browseable::Redis)_
+  - `REDIS_INDEXES` = `_whatToTrace _session_kind _utime ipAddr _httpSessionType _user` _(see Web::Session::Redis)_
   - Used only if `REDIS_SERVER` is empty and configuration database is empty:
     - `PG_PERSISTENT_SESSIONS_TABLE` = `psessions`
     - `PG_SESSIONS_TABLE` = `sessions`
@@ -96,6 +98,54 @@ Or use `DBI_CHAIN` directly _(and then `DBI_USER` and `DBI_PASSWORD`)_:
 DBI_CHAIN=dbi:Pg:dbname=lemonldapng;host=postgresql.host.tld;port=23456;sslmode=require
 DBI_USER=pguser
 DBI_PASSWORD=pgpassword
+```
+
+### Session backends: Web::Session
+
+The image includes [Web::Session](https://github.com/linagora/perl-Web-Session)
+(`libweb-session-perl`), a fork of Apache::Session::Browseable. A new
+configuration uses `Web::Session::PgJSON` (`PG_SERVER`) and
+`Web::Session::Redis` (`REDIS_SERVER`).
+
+An existing configuration keeps its module names: `REDIS_SERVER` still sets
+`Apache::Session::Browseable::Redis` while `globalStorage` uses
+Apache::Session::Browseable, so that containers of an older image sharing the
+configuration keep working. The Apache::Session::Browseable modules that
+store sessions in the same format as Web::Session (`PgJSON`, `Patroni`,
+`MySQLJSON`, `Redis`, `SQLite`, `File`, `LDAP`, `Cassandra`) are aliases of
+their Web::Session module in this image, so such a configuration already
+runs Web::Session, with its fixes and its PostgreSQL connection pool. The
+other ones (the column-based `Postgres` and `MySQL`, `PgHstore`...) are those
+of the Debian package `libapache-session-browseable-perl`.
+
+To rename the modules of an existing configuration, and to convert a plain
+`Apache::Session::File`, once every container sharing it uses this image:
+
+```shell
+docker exec <container> /usr/share/docker-llng/convert-to-web-session --dry-run
+docker exec <container> /usr/share/docker-llng/convert-to-web-session
+```
+
+Every session backend (`globalStorage`, `persistentStorage`, `samlStorage`,
+`oidcStorage`, `casStorage`...) using Apache::Session::Browseable, or a plain
+`Apache::Session::File`, is replaced by its Web::Session equivalent when the
+stored sessions are compatible. The others are kept and reported: the
+column-based `Apache::Session::Browseable::Postgres` and `::MySQL` (their table
+must first be converted to JSON), and the backends that Web::Session doesn't
+provide. The result is saved as a new configuration: the previous one can be
+restored in the manager.
+
+With `Web::Session::PgJSON` and `Web::Session::Patroni` (and their
+Apache::Session::Browseable aliases), each process uses a pool of PostgreSQL
+connections: up to 4 idle connections (`MaxIdle`) plus one
+for each session in use. Size the `max_connections` of the server for the
+number of processes. To change the size of the pool or to disable it, set
+`MaxIdle` or `KeepConnections` to `0` in the options of each session backend,
+for example:
+
+```shell
+OVERRIDE_globalStorageOptions_KeepConnections=0
+OVERRIDE_persistentStorageOptions_KeepConnections=0
 ```
 
 ### Override configuration parameters

@@ -228,9 +228,11 @@ without an explicit decision.
   to `/usr/local/lib`.
 - **PostgreSQL**: `postgres:17-trixie` image for `pg/`.
 - **Pub/Sub**: Alpine image for `webpubsub/`.
-- **Bundled Perl modules**: `DBD::Patroni`, `Apache::Session::Browseable`
-  and other modules are copied directly into
-  `base/install/usr/share/perl5/`.
+- **Bundled Perl modules**: `DBD::Patroni` and other modules are copied
+  directly into `base/install/usr/share/perl5/`. The
+  `Apache::Session::Browseable` modules there are aliases of
+  [Web::Session](https://github.com/linagora/perl-Web-Session), installed
+  from the Debian package of its GitHub release.
 - **`dev/`**: exception, this image clones and builds LLNG from the upstream
   GitLab repository (`BRANCH`, default `v2.0`). It is not a release image.
 - **`lemonldap-ng.list`**: historical upstream LLNG repository file, not used
