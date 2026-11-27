@@ -1,5 +1,19 @@
 # Changes
 
+## v2.23.4-12 _(unreleased)_
+
+- Install [Web::Session](https://github.com/linagora/perl-Web-Session) 1.0.0,
+  fork of Apache::Session::Browseable, from its Debian package
+- New configurations use `Web::Session::PgJSON` (`PG_SERVER`) and
+  `Web::Session::Redis` (`REDIS_SERVER`); existing ones keep their session
+  backends
+- New `/usr/share/docker-llng/convert-to-web-session` script: converts the
+  compatible Apache::Session::Browseable and Apache::Session::File session
+  backends of an existing configuration to Web::Session (PostgreSQL
+  connection pool enabled, see the README of `base`)
+- Session purge: clean the lock files of `Web::Session::File` and delete the
+  corrupted sessions of the Web::Session SQL and LDAP backends with `--force`
+
 ## v2.23.4-11 _(2026-11-21)_
 
 - Rebuild (base-files updated to 13.8+deb13u8, libc-bin updated to 2.41-12+deb13u5, libc6 updated to 2.41-12+deb13u5, libdbi-perl updated to 1.656-1~deb13u1, libfreetype6 updated to 2.13.3+dfsg-1+deb13u2, libgd3 updated to 2.3.3-14~deb13u3, libnet-dns-perl updated to 1.57-0+deb13u1, libnghttp2-14 updated to 1.64.0-1.1+deb13u2, libssl3t64 updated to 3.5.9-1~deb13u1, libwww-perl updated to 6.78-1+deb13u1, and 4 more packages)

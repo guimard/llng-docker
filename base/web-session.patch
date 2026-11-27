@@ -1,0 +1,38 @@
+--- a/usr/share/perl5/Lemonldap/NG/Common/Session/Purge.pm	2026-11-27 13:19:00.596850157 +0100
++++ b/usr/share/perl5/Lemonldap/NG/Common/Session/Purge.pm	2026-11-27 13:19:00.605713327 +0100
+@@ -517,7 +517,7 @@
+     my $conf = $self->conf;
+ 
+     # Remove lock files for File backend
+-    if ( $options->{backend} =~ /^Apache::Session::(?:Browseable::)?File$/i ) {
++    if ( $options->{backend} =~ /^(?:Apache::Session::(?:Browseable::)?|Web::Session::)File$/i ) {
+         require Apache::Session::Lock::File;
+         my $l              = Apache::Session::Lock::File->new;
+         my $lock_directory = $options->{LockDirectory} || $options->{Directory};
+@@ -532,7 +532,7 @@
+     my $conf   = $self->conf;
+ 
+     # Force deletion of corrupted sessions for File backend
+-    if (    $options->{backend} =~ /^Apache::Session::(?:Browseable::)?File$/i
++    if (    $options->{backend} =~ /^(?:Apache::Session::(?:Browseable::)?|Web::Session::)File$/i
+         and $self->force )
+     {
+         foreach (@errors) {
+@@ -550,7 +550,7 @@
+ 
+     # Force deletion of corrupted sessions for DBI backend
+     if ( $options->{backend} =~
+-/^Apache::Session::(?:Browseable::)?(MySQL|Postgres|DBI|Oracle|Informix|MySQLJSON|PgHstore|PgJSON|SQLLite|Sybase)$/i
++/^(?:Apache::Session::(?:Browseable::)?|Web::Session::)(MySQL|Postgres|DBI|Oracle|Informix|MySQLJSON|MariaDBJSON|MariaDB|PgHstore|PgJSON|Patroni|SQLite|SQLLite|Sybase)$/i
+         and $self->force )
+     {
+         my $dbi = DBI->connect_cached( $options->{DataSource},
+@@ -571,7 +571,7 @@
+     }
+ 
+     # Force deletion of corrupted sessions for LDAP backend
+-    if (    $options->{backend} =~ /^Apache::Session::(?:Browseable::)?LDAP$/i
++    if (    $options->{backend} =~ /^(?:Apache::Session::(?:Browseable::)?|Web::Session::)LDAP$/i
+         and $self->force )
+     {
+         my $useTls = 0;

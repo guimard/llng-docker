@@ -128,6 +128,7 @@ RUN echo "# Install packages from ${DEBIAN_VERSION} (${LLNGDIST})" && \
     echo "#patch 2.23.3.patch" && patch -p1 <2.23.3.patch && \
     echo "#patch 2.23.4.patch" && patch -p1 <2.23.4.patch && \
     echo "#patch msg-broker-pg.patch" && patch -p1 <msg-broker-pg.patch && \
+    echo "#patch web-session.patch" && patch -p1 <web-session.patch && \
     echo rm -f *.patch && \
     cd /usr/bin && \
     perl -i -pe 's/bootstrap/bootstrap5/;s/"portalSkinBackground"\s*:\s*"[^"]+"/"portalSkinBackground":""/' /var/lib/lemonldap-ng/conf/lmConf-1.json && \
