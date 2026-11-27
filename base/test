@@ -44,7 +44,8 @@ $COMPOSE run base /usr/share/docker-llng/convert-to-web-session | grep 'Nothing 
 # aliases of it; the others are those of the Debian package
 $COMPOSE run base perl -MApache::Session::Browseable::Patroni -e 'print "@Apache::Session::Browseable::Patroni::ISA\n"' | grep Web::Session::Patroni
 $COMPOSE run base perl -MApache::Session::Browseable::Postgres -e 'print "@Apache::Session::Browseable::Postgres::ISA\n"' | grep Apache::Session::Browseable::DBI
-$COMPOSE run base perl -MApache::Session::Browseable::Redis -e 'my $s = &{"Apache::Session::Browseable::Redis::populate"}( {} ); print ref( $s->{object_store} ), "\n"' | grep Web::Session::Store::Redis
+$COMPOSE run base perl -MApache::Session::Browseable::Redis -e 'print "@Apache::Session::Browseable::Redis::ISA\n"' | grep Web::Session::Redis
+$COMPOSE run base perl -MApache::Session::Browseable::File -e 'my $s = &{"Apache::Session::Browseable::File::populate"}( {} ); print ref( $s->{object_store} ), "\n"' | grep Web::Session::Store::File
 $COMPOSE run base perl -MApache::Session::Browseable::PgJSON -e '
   my $args = { DataSource => "dbi:Pg:database=lemonldapng;host=db", UserName => "lemonldap",
     Password => "zz", TableName => "psessions", Index => "_session_uid" };
